@@ -6,6 +6,7 @@ import { Dashboard } from './pages/Dashboard'
 import { Editor } from './pages/Editor'
 import { Assets } from './pages/Assets'
 import { Play } from './pages/Play'
+import { Lobby } from './pages/Lobby'
 
 function App() {
   const [route, setRoute] = useState(window.location.hash);
@@ -20,6 +21,7 @@ function App() {
       if (route.startsWith('#/editor/')) return <Editor />
       if (route.startsWith('#/assets/')) return <Assets />
       if (route.startsWith('#/play/')) return <Play />
+      if (route.startsWith('#/lobby')) return <Lobby />
       switch (route) {
           case '#/settings': return <Settings />
           case '#/templates': return <Templates />

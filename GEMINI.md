@@ -554,15 +554,15 @@ Optional later:
   - session token handshake (if gating enabled)
 
 ## Phase 7 — Multiplayer playtests
-- [ ] Implement `mp.*` tables + RLS
-- [ ] Implement RPC:
+- [x] Implement `mp.*` tables + RLS
+- [x] Implement RPC:
   - `mp.create_room`
   - `mp.join_room`
   - `mp.append_move` (atomic seq)
-- [ ] Build UI:
+- [x] Build UI:
   - LobbyView (players, join code)
   - In-game overlay (invite link, reconnect)
-- [ ] Add Presence integration
+- [x] Add Presence integration
 
 ## Phase 8 — Marketplace + purchases
 - [ ] Implement `listings`, `purchases`, `entitlements`
