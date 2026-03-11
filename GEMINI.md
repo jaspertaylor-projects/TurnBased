@@ -545,11 +545,11 @@ Optional later:
 - [x] Stub `/ai/audio` (interface + placeholder provider)
 
 ## Phase 6 — Preview + Build publishing
-- [ ] Implement in-browser bundling for preview
-- [ ] Implement `project_builds` + publish flow:
+- [x] Implement in-browser bundling for preview
+- [x] Implement `project_builds` + publish flow:
   - publish build snapshot to R2
   - record build row (commit SHA)
-- [ ] Create PlayView:
+- [x] Create PlayView:
   - iframe to `play.<domain>` build URL
   - session token handshake (if gating enabled)
 

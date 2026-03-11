@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabaseClient';
 
 const mockListTree = async () => ['index.html', 'src/main.ts', 'src/game/reducer.ts'];
 const mockReadFile = async (path: string) => {
@@ -68,6 +69,30 @@ export const Editor = () => {
         setAiSuggestion(null);
         setShowAiPanel(false);
     }
+  };
+
+  const [isPublishing, setIsPublishing] = useState(false);
+
+  const handlePublish = async () => {
+      if (!projectId) return;
+      setIsPublishing(true);
+      try {
+          const { data, error } = await supabase.functions.invoke('build-manager', {
+              body: {
+                  projectId,
+                  commitSha: 'mock-sha-' + Date.now(),
+                  notes: 'Published from Web IDE'
+              }
+          });
+          
+          if (error || !data?.success) throw new Error(error?.message || 'Publish failed');
+          
+          window.location.hash = `#/play/${data.buildId}`;
+      } catch(err: any) {
+          alert(err.message);
+      } finally {
+          setIsPublishing(false);
+      }
   };
 
   if (!projectId) return <div>Loading Project ID...</div>;
@@ -175,6 +200,14 @@ export const Editor = () => {
                 style={{ padding: '0.5rem', background: '#10b981', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
             >
                 Commit Changes
+            </button>
+            <hr style={{ margin: '1rem 0', borderTop: '1px solid #ccc' }} />
+            <button 
+                onClick={handlePublish}
+                disabled={isPublishing}
+                style={{ padding: '0.5rem', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+            >
+                {isPublishing ? 'Publishing...' : '🚀 Publish Shareable Link'}
             </button>
         </div>
       </div>
