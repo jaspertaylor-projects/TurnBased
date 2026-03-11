@@ -536,13 +536,13 @@ Optional later:
 - [x] Add model selection per task type (rules/code)
 
 ## Phase 5 — Assets (R2) + AI art/audio
-- [ ] Implement `assets` table + RLS
-- [ ] Add Edge Fn:
+- [x] Implement `assets` table + RLS
+- [x] Add Edge Fn:
   - `r2/sign-upload`
   - `r2/finalize-upload` (HEAD object, enforce quota, insert row)
-- [ ] Build UI: Asset gallery + uploader
-- [ ] Add `/ai/image` with tier routing + ledger
-- [ ] Stub `/ai/audio` (interface + placeholder provider)
+- [x] Build UI: Asset gallery + uploader
+- [x] Add `/ai/image` with tier routing + ledger
+- [x] Stub `/ai/audio` (interface + placeholder provider)
 
 ## Phase 6 — Preview + Build publishing
 - [ ] Implement in-browser bundling for preview
