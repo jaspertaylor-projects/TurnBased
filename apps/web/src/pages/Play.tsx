@@ -114,14 +114,32 @@ export const Play = () => {
     const sendMockMoveToRoom = async () => {
          if (targetType !== 'room' || !targetId) return;
          
+         const payload = { type: 'MOCK_PING', timestamp: Date.now() };
+         
+         // 1. Basic Size Evaluation (Soft check, Postgres has a hard 200KB bound now)
+         const payloadString = JSON.stringify(payload);
+         const byteSize = new Blob([payloadString]).size;
+         
+         if (byteSize > 200000) { // > 200 KB
+             setError("Size Limit Reached: Move payload is excessively large.");
+             alert("Size Limit Reached: Move payload is excessively large.");
+             return;
+         }
+         
          const { error } = await supabase.rpc('mp_append_move', {
              p_room_id: targetId,
-             p_move: { type: 'MOCK_PING', timestamp: Date.now() }
+             p_move: payload
          });
          
          if (error) {
              console.error("Failed to append move", error);
-             alert("Error appending move: " + error.message);
+             
+             // Handle rate limit natively indicating explicit blocks
+             if (error.message.includes('Rate limit exceeded')) {
+                 alert("Anti-Spam: Please wait before sending more moves.");
+             } else {
+                 alert("Error appending move: " + error.message);
+             }
          }
     };
 

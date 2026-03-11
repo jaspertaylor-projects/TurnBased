@@ -583,12 +583,12 @@ Optional later:
 - [x] Add UX messages (why join denied)
 
 ## Phase 10 — Abuse controls
-- [ ] Rate limiting per user for:
+- [x] Rate limiting per user for:
   - room joins
   - move appends
   - anonymous sign-ins
 - [ ] CAPTCHA integration for anonymous sign-in
-- [ ] Move payload size enforcement
+- [x] Move payload size enforcement
 
 ---
 
