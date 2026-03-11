@@ -3,6 +3,7 @@ import { Home } from './pages/Home'
 import { Settings } from './pages/Settings'
 import { Templates } from './pages/Templates'
 import { Dashboard } from './pages/Dashboard'
+import { Editor } from './pages/Editor'
 
 function App() {
   const [route, setRoute] = useState(window.location.hash);
@@ -14,6 +15,7 @@ function App() {
   }, []);
 
   const renderRoute = () => {
+      if (route.startsWith('#/editor/')) return <Editor />
       switch (route) {
           case '#/settings': return <Settings />
           case '#/templates': return <Templates />

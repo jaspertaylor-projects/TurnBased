@@ -491,49 +491,49 @@ Optional later:
 # TODO — Coding Agent (Phased, Implementable)
 
 ## Phase 0 — Repo + environments
-- [ ] Create monorepo structure:
+- [x] Create monorepo structure:
   - `apps/web` (React app)
   - `supabase/` (migrations, functions)
   - `packages/sdk` (game runtime SDK)
   - `packages/ui` (shared UI)
-- [ ] Add `.env.example` with all required variables (no secrets)
-- [ ] Add basic CI lint/typecheck
+- [x] Add `.env.example` with all required variables (no secrets)
+- [x] Add basic CI lint/typecheck
 
 ## Phase 1 — Auth, profiles, tiers, quotas
-- [ ] Implement `profiles` table + RLS
-- [ ] Implement tier enums and quota constants (server-side only)
-- [ ] Add RPC functions:
+- [x] Implement `profiles` table + RLS
+- [x] Implement tier enums and quota constants (server-side only)
+- [x] Add RPC functions:
   - `wallet_debit`
   - `consume_daily_prompt`
   - `consume_monthly_credits`
-- [ ] Build UI: Settings (tier, usage, wallet)
+- [x] Build UI: Settings (tier, usage, wallet)
 
 ## Phase 2 — Templates + project creation
-- [ ] Implement `project_templates`, `projects`, `project_repos`
-- [ ] Add Edge Fn: `git/create-project-from-template`
+- [x] Implement `project_templates`, `projects`, `project_repos`
+- [x] Add Edge Fn: `git/create-project-from-template`
   - checks repo quota
   - creates repo from template
   - writes DB rows
-- [ ] Build UI: New Project flow + template gallery
+- [x] Build UI: New Project flow + template gallery
 
 ## Phase 3 — Git browser + editor core
-- [ ] Git proxy endpoints:
+- [x] Git proxy endpoints:
   - list tree, read file, write file, commit, history, revert
-- [ ] Build UI:
+- [x] Build UI:
   - GitView: history + revert + commit
   - CodeView: file tree + editor
-- [ ] Store workspace edits locally (IndexedDB) before commit (optional)
+- [x] Store workspace edits locally (IndexedDB) before commit (optional)
 
 ## Phase 4 — AI “coding agent” integration
-- [ ] Add `/ai/code-agent` Edge Fn:
+- [x] Add `/ai/code-agent` Edge Fn:
   - validates model selection
   - consumes budget
   - streams response
-- [ ] Implement “agent plan” format:
+- [x] Implement “agent plan” format:
   - agent proposes file edits
   - user approves
   - agent writes via git proxy and commits
-- [ ] Add model selection per task type (rules/code)
+- [x] Add model selection per task type (rules/code)
 
 ## Phase 5 — Assets (R2) + AI art/audio
 - [ ] Implement `assets` table + RLS
@@ -693,6 +693,10 @@ Optional later:
 
 ---
 
-# THe Golden Rule
+# THe Golden Rules
 
-Commit your code changes to git frequently with informative commit messages
+Commit your code changes to git frequently with informative commit messages.
+
+Update your knowledge, whenever you learn something.  
+
+and update teh ToDo lists here by marking an X in the []  when you are done with that task.
