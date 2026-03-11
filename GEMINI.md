@@ -692,3 +692,7 @@ Optional later:
 5) Use scoped play session tokens; never leak full auth tokens into game runtime.
 
 ---
+
+# THe Golden Rule
+
+Commit your code changes to git frequently with informative commit messages
