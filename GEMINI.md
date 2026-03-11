@@ -488,282 +488,36 @@ Optional later:
 
 ---
 
-# TODO — Coding Agent (Phased, Implementable)
+# Infrastructure Specifics & Going Live
 
-## Phase 0 — Repo + environments
-- [x] Create monorepo structure:
-  - `apps/web` (React app)
-  - `supabase/` (migrations, functions)
-  - `packages/sdk` (game runtime SDK)
-  - `packages/ui` (shared UI)
-- [x] Add `.env.example` with all required variables (no secrets)
-- [x] Add basic CI lint/typecheck
+## 1. Hosting (Cloudflare & R2)
+- **Frontend App**: Deployed on Cloudflare Pages `turnbased.app`.
+- **Game Builds**: Served from Cloudflare R2 bucket `turnbased-builds` via proxy to `play.turnbased.app`.
+- **Assets**: Stored in R2 bucket `turnbased-assets`.
+- *CORS*: Configured locally and globally for these buckets to support in-browser uploads.
 
-## Phase 1 — Auth, profiles, tiers, quotas
-- [x] Implement `profiles` table + RLS
-- [x] Implement tier enums and quota constants (server-side only)
-- [x] Add RPC functions:
-  - `wallet_debit`
-  - `consume_daily_prompt`
-  - `consume_monthly_credits`
-- [x] Build UI: Settings (tier, usage, wallet)
+## 2. Backend (Supabase)
+- **Database**: Pro tier database handles profiles, matchmaking, AI ledger, and strict RLS rules. 
+- **Edge Functions**: `npx supabase functions deploy` to push proxy, ai, and commerce logic.
+- **Secrets Management**: Local development uses `.env`. Production reads from the encrypted vault. Push new keys cleanly by pasting them into `.env.prod` and running:
+  `npx supabase secrets set --env-file .env.prod`
 
-## Phase 2 — Templates + project creation
-- [x] Implement `project_templates`, `projects`, `project_repos`
-- [x] Add Edge Fn: `git/create-project-from-template`
-  - checks repo quota
-  - creates repo from template
-  - writes DB rows
-- [x] Build UI: New Project flow + template gallery
+## 3. Git Proxies (Droplet & Gitea)
+- **Server**: 1GB DigitalOcean Droplet running Docker.
+- **Service**: Gitea container storing the raw game workspaces securely.
+- **Security (HTTPS)**: Cloudflare proxy maps `git.turnbased.app` to the Droplet via "Flexible" SSL/TLS.
+- **Integration**: A Personal Access Token (PAT) from Gitea is stored in the Supabase vault (`GIT_SERVICE_TOKEN`). The React frontend asks Supabase Edge Functions to proxy all Git commands, preventing browser token leakage.
 
-## Phase 3 — Git browser + editor core
-- [x] Git proxy endpoints:
-  - list tree, read file, write file, commit, history, revert
-- [x] Build UI:
-  - GitView: history + revert + commit
-  - CodeView: file tree + editor
-- [x] Store workspace edits locally (IndexedDB) before commit (optional)
+## 4. Webhook & AI Secrets
+- **OpenRouter**: Shared across dev/prod environments as a simple wallet debit.
+- **Stripe**: The Edge Function listens for `checkout.session.completed` to grant game entitlements.
 
-## Phase 4 — AI “coding agent” integration
-- [x] Add `/ai/code-agent` Edge Fn:
-  - validates model selection
-  - consumes budget
-  - streams response
-- [x] Implement “agent plan” format:
-  - agent proposes file edits
-  - user approves
-  - agent writes via git proxy and commits
-- [x] Add model selection per task type (rules/code)
-
-## Phase 5 — Assets (R2) + AI art/audio
-- [x] Implement `assets` table + RLS
-- [x] Add Edge Fn:
-  - `r2/sign-upload`
-  - `r2/finalize-upload` (HEAD object, enforce quota, insert row)
-- [x] Build UI: Asset gallery + uploader
-- [x] Add `/ai/image` with tier routing + ledger
-- [x] Stub `/ai/audio` (interface + placeholder provider)
-
-## Phase 6 — Preview + Build publishing
-- [x] Implement in-browser bundling for preview
-- [x] Implement `project_builds` + publish flow:
-  - publish build snapshot to R2
-  - record build row (commit SHA)
-- [x] Create PlayView:
-  - iframe to `play.<domain>` build URL
-  - session token handshake (if gating enabled)
-
-## Phase 7 — Multiplayer playtests
-- [x] Implement `mp.*` tables + RLS
-- [x] Implement RPC:
-  - `mp.create_room`
-  - `mp.join_room`
-  - `mp.append_move` (atomic seq)
-- [x] Build UI:
-  - LobbyView (players, join code)
-  - In-game overlay (invite link, reconnect)
-- [x] Add Presence integration
-
-## Phase 8 — Marketplace + purchases
-- [x] Implement `listings`, `purchases`, `entitlements`
-- [x] Developer UI: create listing from a build
-- [x] Player UI: browse listings + buy
-- [x] Stripe webhook Edge Fn:
-  - verify signature
-  - write purchase + entitlement
-- [x] Enforce licensing in room joins:
-  - owned_required vs playtest
-
-## Phase 9 — “One friend owns” session enforcement
-- [x] Implement entitlement checks in:
-  - room create
-  - room join
-- [x] Add rules:
-  - require entitlement holder present OR enforce grace timer
-- [x] Add UX messages (why join denied)
-
-## Phase 10 — Abuse controls
-- [x] Rate limiting per user for:
-  - room joins
-  - move appends
-  - anonymous sign-ins
-- [ ] CAPTCHA integration for anonymous sign-in
-- [x] Move payload size enforcement
-
----
-
-# TODO — Human Requirements (Accounts, Keys & Production Deployment)
-
-## 1. Hosting the Web App & Static Assets (Cloudflare)
-- [X] **Create an Account**: Sign up at [Cloudflare](https://dash.cloudflare.com) and bought custom domain `turnbased.app`.
-- [X] **Deploy App Frontend**:
-  - Go to Workers & Pages -> "Create Application" -> "Pages" -> Connect your GitHub repo.
-  - Set build framework to "Vite" or use standard command: `npm run build --workspace=web` with target output folder `apps/web/dist`.
-- [X] **Setup Storage (R2)**:
-  - Go to R2 in the Cloudflare dashboard and create two independent buckets: `turnbased-assets` and `turnbased-builds`.
-  - For each bucket, navigate to its "Settings" tab.
-  - Scroll down to "CORS Rules" and click "Add Rule".
-  - Paste the following JSON to allow browser uploads from the development and production origins:
-    ```json
-    [
-    {
-        "AllowedOrigins": [
-        "http://localhost:5173",
-        "https://turnbased.app"
-        ],
-        "AllowedMethods": [
-        "GET",
-        "PUT",
-        "POST",
-        "DELETE",
-        "HEAD"
-        ],
-        "AllowedHeaders": [
-        "*"
-        ],
-        "ExposeHeaders": [
-        "ETag"
-        ],
-        "MaxAgeSeconds": 3600
-    }
-    ]
-    ```
-- [X] **Serve Play Subdomain (`play.turnbased.app`)**:
-  - Because untrusted game code runs on `play.turnbased.app`, we need to serve the `turnbased-builds` bucket directly to that subdomain.
-  - Go to your `turnbased-builds` bucket settings in R2.
-  - Under "Public Access" -> "Custom Domains", click "Connect Domain".
-  - Enter `play.turnbased.app` and follow the prompts to configure the DNS record. (Cloudflare automatically manages the SSL cert and routing).
-
-## 2. Managing the Backend (Supabase)
-- [X] **Create Cloud DB (Pro Tier)**: Spin up a new production [Supabase](https://supabase.com) project.
-  - Under the Pro tier ($25/mo), your project comes with: an inherently scalable dedicated Postgres DB (8GB default, scalable to 100GB+ auto-scaling, daily backups, no auto-pausing), 100,000 Monthly Active Auth Users, 5GB of robust S3 storage, and 100GB bandwidth.
-  - *Note:* Because we actively off-load heavy game builds/assets to Cloudflare R2 (which has zero egress fees), Supabase's storage and bandwidth limits are heavily optimized here simply to serve JSON payloads and realtime presence!
-  - **Crucial**: Select a Datacenter Region geographically centered on your expected user-base (e.g. US-East or US-West) as this completely dictates your multiplayer tick latency!
-- [X] **Apply Database Migrations**: 
-  - Find your Project Reference ID in your Supabase dashboard URL (`https://supabase.com/dashboard/project/<your-prod-ref>`).
-  - Run `npx supabase link --project-ref your-prod-ref` strictly from your local `TurnBased` terminal.
-  - Run `npx supabase db push` to synchronize all local `migrations/*.sql` files. This seamlessly instantiates your profiles, playtest lobbies, AI ledgers, logic, and strict Row Level Security (RLS) tables in production.
-- [X] **Deploy Edge Functions**:
-  - Run `npx supabase functions deploy` to push your `build-manager`, `ai-code-agent`, `ai-image-agent`, `assets-manager`, `git-create-project`, `git-proxy`, and `stripe-webhook` logic to the global Edge network.
-- [ ] **Inject Environment Secrets**:
-  - Create a `.env.prod` file on your machine (DO NOT commit it). Fill it out copying `.env.example` but applying real Stripe, OpenRouter, and your VPS Git keys.
-  - Use `npx supabase secrets set --env-file .env.prod` to ship all 3rd-party API keys natively into Supabase's encrypted vault. *These secrets run exclusively in Edge Functions; they never touch the browser!*
-- [X] **Configure Project AuthSettings**:
-  - In the Supabase Dashboard, go to **Authentication -> Providers -> Email** and register your domain (`turnbased.app`) so password resets hit your inbox natively.
-  - Go to **Authentication -> Providers** and explicitly toggle on **Anonymous users**. This is critical for frictionless "Guest" playtest participation.
-  - In **Authentication -> URL Configuration**, add `https://turnbased.app` to your "Site URL" to ensure redirect headers flow properly.
-
-## 3. Git Proxies (Repository Storage)
-
-**Why is this needed?**
-The core developer experience of TurnBased is a "Browser-First Editor." When a user creates a game, they are actually creating a Git repository that stores their code, rules, and logic. However, exposing a Git server directly to a browser app is extremely dangerous. 
-Instead of browsers talking directly to Git, the React frontend talks to **Supabase Edge Functions** (the "Git Proxies"). These Edge Functions act as a secure middleman: they verify the user's Auth token against the Supabase DB to ensure they own the project, check their tier quotas (so Free users can't create 1,000 repos), and *then* use a securely hidden `GIT_SERVICE_TOKEN` to privately interact with the actual Git server on the backend. This keeps the Git server entirely isolated and secure.
-
-- [X] **Provision Server (DigitalOcean)**:
-  - Log into your [DigitalOcean](https://cloud.digitalocean.com) account and click **Create -> Droplets**.
-  - **Region**: Choose the same data center region you selected for your Supabase database (e.g., San Francisco for US-West) for the lowest latency.
-  - **Image**: Click on the **Marketplace** tab and search for **Docker**. Select the "Docker on Ubuntu" image. (This saves you the step of installing Docker manually!).
-  - **Size**: Choose the **Basic** plan -> Regular SSD with **1GB RAM / 1 CPU** (typically $4 or $6/mo).
-  - **Authentication**: Set a secure root Password or add your SSH key.
-  - **Hostname**: Name it something recognizable like `turnbased-git-proxy`.
-  - Click **Create Droplet**. Once it boots up, copy the IPv4 address it assigns you!
-- [X] **Install Git Backend (Gitea via Docker)**:
-  - SSH into your new Droplet: `ssh root@<your-droplet-ip>`
-  - Create a directory for Gitea: `mkdir -p /opt/gitea && cd /opt/gitea`
-  - Create a Docker Compose file: `nano docker-compose.yml`
-  - Paste the following configuration to spin up a lightweight, production-ready Gitea instance:
-    ```yaml
-    services:
-      server:
-        image: gitea/gitea:latest
-        container_name: gitea
-        environment:
-          - USER_UID=1000
-          - USER_GID=1000
-        restart: always
-        volumes:
-          - ./gitea:/data
-          - /etc/timezone:/etc/timezone:ro
-          - /etc/localtime:/etc/localtime:ro
-        ports:
-          - "80:3000"
-          - "222:22"
-    ```
-  - Save and exit (`Ctrl+O`, `Enter`, `Ctrl+X`).
-  - Boot the server: `docker compose up -d`
-  - You can now access your Git server by typing `http://<your-droplet-ip>` in your browser! Complete the initial Setup screen using SQLite (it is plenty fast for MVP text code) and create the first Admin account.
-- [X] **Secure the Git Server (HTTPS via Cloudflare)**: 
-  - Go to your Cloudflare Dashboard -> **DNS**.
-  - Add a new **A Record**:
-    - **Name**: `git`
-    - **IPv4 address**: Your Droplet's IP (`209.38.75.89`).
-    - **Proxy status**: Ensure the orange cloud is **ON** (Proxied).
-  - Go to **SSL/TLS** in Cloudflare and ensure your encryption mode is **Flexible**. This makes Cloudflare provide free HTTPS to the world, while securely forwarding to your Droplet's port 80!
-  - **Fix the Base URL Warning**: Because we installed Gitea via IP address first, it thinks its home is the IP. To fix the warning banner:
-    - SSH back into your Droplet: `ssh root@209.38.75.89`
-    - Open the config: `nano /opt/gitea/gitea/gitea/conf/app.ini`
-    - Find the line `ROOT_URL = http://209.38.75.89/` and change it to `ROOT_URL = https://git.turnbased.app/`
-    - Find the line `DOMAIN = 209.38.75.89` and change it to `DOMAIN = git.turnbased.app`
-    - Save (`Ctrl+O`, `Enter`, `Ctrl+X`) and restart Gitea: `docker restart gitea`
-  - You can now safely access Gitea at `https://git.turnbased.app` without any warnings!
-- [X] **Mint Service Token (PAT)**: 
-  - Log into `https://git.turnbased.app` with your Admin account.
-  - Click your Profile Picture (top right) -> **Settings**.
-  - Click the **Applications** tab on the left.
-  - Under "Generate New Token", name it `turnbased-edge`, leave all permissions checked, and click **Generate Token**.
-  - *Copy this long string immediately! It will never be shown to you again.*
-- [ ] **Create Quickstart Templates**: In your Forgejo/Gitea instance, create the base template repositories (e.g., a "Basic Card Game" repo, a "Grid Mover" repo) that the Edge Functions will clone when a user clicks "New Project". 
-- [X] **Save the Token to Supabase**: Take your generated PAT and store it in your Supabase Edge Function Secrets.
-  - Run: `npx supabase secrets set GIT_SERVICE_TOKEN="your_pat_here"`
-  - *Never put this token in `.env` or anywhere the React frontend can see it!*
-
-## 4. Monetization (Stripe)
-- [X] **Create Account**: Register at [Stripe](https://stripe.com).
-- [X] **Configure Webhook**:
-  - Go to Developers -> Webhooks.
-  - Add your Supabase edge function URL: `https://vwyxnvgpofvayjnltzrf.supabase.co/functions/v1/stripe-webhook`.
-  - Listen exactly for the `checkout.session.completed` event.
-- [ ] **Save Webhook Secret**: Grab the Signing Secret (`whsec_...`) and add it to your `.env` (Local) and Supabase Secrets (Production) under `STRIPE_WEBHOOK_SECRET`.
-
-## 5. External AI Providers
-- [ ] **Text/Code Model Keys**: Generate an API key at [OpenRouter](https://openrouter.ai/) for `OPENROUTER_API_KEY`.
-
-
----
-
-## “Make it awesome” Extras (Post-MVP, Still Low Infra)
-- Deterministic replay + shareable match replays (store move log)
-- Built-in bug report: attach build id + move sequence + state hash
-- Spectator mode using broadcast fan-out (avoid DB auth bottlenecks)
-- Creator analytics: playtest funnel, retention
-- Print-and-ship integration later:
-  - export printable assets (PDF)
-  - partner fulfillment API
-  - versioned print packs
-
----
-
-## Acceptance Criteria (MVP Definition of Done)
-
-### Developer can:
-- create project from template
-- edit files in browser
-- run instant preview
-- publish a build snapshot
-- start a multiplayer playtest room
-- invite others with link/code
-
-### Player can:
-- join a playtest room (anonymous or account)
-- play multiplayer with friends (move sync + presence)
-- buy a game listing
-- host/join a purchased game session where “one owner” rule is enforced
-
-### Platform enforces:
-- tier quotas (repos, storage, AI)
-- AI billing + markup ledger
-- RLS isolation for private projects/assets
-- safe origin separation for untrusted game code
+## How to Switch to Live Production Mode
+1. **Toggle "Test Mode" OFF** in the upper right corner of the Stripe Dashboard.
+2. In the Stripe Webhooks section, click *Add Destination* to create a new live webhook pointing to your Supabase Edge Function (`https://[ref].supabase.co/functions/v1/stripe-webhook`) for the exact same `checkout.session.completed` event.
+3. Grab your new **Live Secret Key** (`sk_live_...`) and **Live Webhook Secret** (`whsec_...`).
+4. In your project, update `.env.prod` with these new live keys.
+5. Run the deployment command `npx supabase secrets set --env-file .env.prod` to flash the cloud vault with the live keys. The platform is now accepting real money transactions!
 
 ---
 
