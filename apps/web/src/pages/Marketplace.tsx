@@ -105,8 +105,10 @@ export const Marketplace = () => {
                          <div key={listing.id} style={{ display: 'flex', flexDirection: 'column', background: 'white', borderRadius: '8px', overflow: 'hidden', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
                              
                              {/* Cover Image Placeholder */}
-                             <div style={{ height: '160px', background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                 <span style={{ fontSize: '48px' }}>🎲</span>
+                             <div style={{ height: '160px', background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent-primary)' }}>
+                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="64" height="64" fill="currentColor">
+                                     <path d="M256 0 C300 0, 316 40, 316 65 C316 90, 300 115, 256 115 C212 115, 196 90, 196 65 C196 40, 212 0, 256 0 Z M256 125 C310 125, 360 140, 420 200 C430 210, 440 240, 420 250 C400 260, 370 230, 360 230 C340 230, 330 250, 330 300 L360 490 C360 510, 310 510, 300 480 L256 320 L212 480 C202 510, 152 510, 152 490 L182 300 C182 250, 172 230, 152 230 C142 230, 112 260, 92 250 C72 240, 82 210, 92 200 C152 140, 202 125, 256 125 Z" />
+                                 </svg>
                              </div>
                              
                              <div style={{ padding: '1.5rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
