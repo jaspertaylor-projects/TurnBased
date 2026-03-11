@@ -565,13 +565,13 @@ Optional later:
 - [x] Add Presence integration
 
 ## Phase 8 — Marketplace + purchases
-- [ ] Implement `listings`, `purchases`, `entitlements`
-- [ ] Developer UI: create listing from a build
-- [ ] Player UI: browse listings + buy
-- [ ] Stripe webhook Edge Fn:
+- [x] Implement `listings`, `purchases`, `entitlements`
+- [x] Developer UI: create listing from a build
+- [x] Player UI: browse listings + buy
+- [x] Stripe webhook Edge Fn:
   - verify signature
   - write purchase + entitlement
-- [ ] Enforce licensing in room joins:
+- [x] Enforce licensing in room joins:
   - owned_required vs playtest
 
 ## Phase 9 — “One friend owns” session enforcement
