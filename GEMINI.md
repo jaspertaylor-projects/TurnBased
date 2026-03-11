@@ -575,12 +575,12 @@ Optional later:
   - owned_required vs playtest
 
 ## Phase 9 — “One friend owns” session enforcement
-- [ ] Implement entitlement checks in:
+- [x] Implement entitlement checks in:
   - room create
   - room join
-- [ ] Add rules:
+- [x] Add rules:
   - require entitlement holder present OR enforce grace timer
-- [ ] Add UX messages (why join denied)
+- [x] Add UX messages (why join denied)
 
 ## Phase 10 — Abuse controls
 - [ ] Rate limiting per user for:

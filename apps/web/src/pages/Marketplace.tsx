@@ -121,12 +121,20 @@ export const Marketplace = () => {
                                      </span>
                                      
                                      {listing.isOwned ? (
-                                         <button 
-                                            onClick={() => window.location.hash = '#/lobby'}
-                                            style={{ background: '#10b981', color: 'white', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
-                                         >
-                                            Play Now
-                                         </button>
+                                         <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                             <button 
+                                                 onClick={() => window.location.hash = '#/lobby'}
+                                                 style={{ background: '#10b981', color: 'white', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
+                                             >
+                                                 Play
+                                             </button>
+                                             <button
+                                                 onClick={() => alert('Mock: Create a new room with license_mode="owned_required" & listing_id=' + listing.id)}
+                                                 style={{ background: '#f59e0b', color: 'white', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
+                                             >
+                                                Host
+                                             </button>
+                                         </div>
                                      ) : (
                                          <button 
                                              onClick={() => handleMockPurchase(listing)}

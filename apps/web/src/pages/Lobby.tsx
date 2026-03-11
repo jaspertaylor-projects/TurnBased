@@ -49,7 +49,13 @@ export const Lobby = () => {
             window.location.hash = `#/play/room/${roomId}`;
             
         } catch (err: any) {
-            setError(err.message || 'Failed to join room');
+            const msg = err.message || 'Failed to join room';
+            setError(msg);
+            
+            // Provide a helpful hint if it's an ownership issue
+            if (msg.includes('Requires game ownership')) {
+                setError(msg + " You can purchase access in the Marketplace.");
+            }
         } finally {
             setLoading(false);
         }
