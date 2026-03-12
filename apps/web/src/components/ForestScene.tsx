@@ -224,7 +224,10 @@ function ContinuousWorld({ scrollProgress }: { scrollProgress: number }) {
     for (let i = 0; i < 20; i++) {
       const a = rng1() * Math.PI * 2;
       const r = 5 + rng1() * 6;
-      list.push({ pos: [Math.cos(a) * r, 0, Math.sin(a) * r], s: 0.6 + rng1() * 0.6 });
+      const manual_adjust = i == 15 ? -6 : 0;
+      const manual_adjust_2 = i == 3 ? 9.8 : 0;
+      const manual_adjust_3 = i == 11 ? -4 : 0;
+      list.push({ pos: [manual_adjust + manual_adjust_3 + Math.cos(a) * r, 0, manual_adjust_2 + Math.sin(a) * r], s: 0.6 + rng1() * 0.6 });
     }
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -326,10 +329,10 @@ function ContinuousWorld({ scrollProgress }: { scrollProgress: number }) {
 
       {/* ── Zone 4: CTA – Golden Grove + Giant Meeple ── */}
       {zone4Trees.map((t, i) => <Tree key={`z4-${i}`} position={t.pos} scale={t.s} />)}
-      <Meeple position={[0, 0, -44]} color="#b45309" scale={1.8} bobSpeed={0.6} />
-      <Dice position={[-2, 0.4, -43]} color="#fde68a" scale={0.5} />
+      <Meeple position={[-4.9, 0, -42]} color="#b45309" scale={1.8} bobSpeed={0.6} />
+      <Dice position={[0.5, 0.4, -48]} color="#fde68a" scale={0.5} />
       <Dice position={[2.2, 0.4, -44.8]} color="#c4b5fd" scale={0.5} />
-      <Dice position={[0.5, 0.4, -41.5]} color="#a7f3d0" scale={0.4} />
+      <Dice position={[2.0, 0.4, -46.5]} color="#a7f3d0" scale={0.4} />
 
       {/* ── Connector trees (fill gaps between zones) ── */}
       {connectorTrees.map((t, i) => <Tree key={`ct-${i}`} position={t.pos} scale={t.s} />)}

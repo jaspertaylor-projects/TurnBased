@@ -151,8 +151,7 @@ export const Home = () => {
               lineHeight: 1.7, fontWeight: 500,
               textShadow: '0 1px 6px rgba(0,0,0,0.3), 0 0 20px rgba(0,0,0,0.15)',
             }}>
-              Create, playtest, and sell board games — all from the magic of your browser.
-              No downloads. No servers. Just pure creative power.
+              Create, Iterate, Playtest, Sell and Play Board Games
             </p>
 
             <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -190,14 +189,6 @@ export const Home = () => {
             </div>
           </div>
 
-          {/* Scroll indicator */}
-          <div style={{
-            position: 'absolute', bottom: '2rem', left: '50%', transform: 'translateX(-50%)',
-            animation: 'float 3s ease-in-out infinite', textAlign: 'center',
-          }}>
-            <span style={{ fontSize: '0.75rem', color: '#064e3b', letterSpacing: '0.1em', textTransform: 'uppercase', fontWeight: 600, textShadow: '0 1px 8px rgba(255,255,255,0.5)' }}>Scroll to explore</span>
-            <div style={{ fontSize: '1.3rem', color: '#064e3b', marginTop: '0.2rem' }}>↓</div>
-          </div>
         </section>
 
         {/* ─── FEATURES ─── */}
@@ -207,14 +198,11 @@ export const Home = () => {
               <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
                 <h2 style={{
                   fontSize: 'clamp(2rem, 4vw, 2.8rem)', fontWeight: 800,
-                  marginBottom: '0.8rem', color: '#064e3b',
-                  textShadow: '0 2px 12px rgba(255,255,255,0.6)',
+                  marginBottom: '0.8rem', color: 'white',
+                  textShadow: '0 2px 8px rgba(0,0,0,0.3), 0 0 20px rgba(0,0,0,0.15)',
                 }}>
                   Everything You Need to Build
                 </h2>
-                <p style={{ color: 'white', fontSize: '1.1rem', maxWidth: '560px', margin: '0 auto', lineHeight: 1.7, fontWeight: 600, textShadow: '0 1px 6px rgba(0,0,0,0.3), 0 0 20px rgba(0,0,0,0.15)' }}>
-                  From your first prototype to your thousandth sale — TurnBased gives indie creators super powers.
-                </p>
               </div>
             </RevealSection>
 
@@ -251,8 +239,8 @@ export const Home = () => {
             <RevealSection>
               <h2 style={{
                 fontSize: 'clamp(2rem, 4vw, 2.8rem)', fontWeight: 800,
-                textAlign: 'center', marginBottom: '3rem', color: '#064e3b',
-                textShadow: '0 2px 12px rgba(255,255,255,0.6)',
+                textAlign: 'center', marginBottom: '3rem', color: 'white',
+                textShadow: '0 2px 8px rgba(0,0,0,0.3), 0 0 20px rgba(0,0,0,0.15)',
               }}>
                 From Idea to Game Night in Minutes
               </h2>
@@ -319,7 +307,7 @@ export const Home = () => {
           background: 'rgba(255,255,255,0.7)',
           borderTop: '1px solid rgba(16,185,129,0.15)',
         }}>
-          © {new Date().getFullYear()} TurnBased. Crafted with 🌿 for indie creators everywhere.
+          © {new Date().getFullYear()} TurnBased.
         </footer>
 
       </div>
