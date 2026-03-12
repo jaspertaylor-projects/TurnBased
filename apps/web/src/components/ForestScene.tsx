@@ -1,5 +1,5 @@
 import { useRef, useMemo } from 'react';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { Canvas, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
 /* ── seeded random ── */
@@ -169,11 +169,10 @@ const BG_COLORS = [
 ];
 
 function ScrollCamera({ scrollProgress }: { scrollProgress: number }) {
-  const { scene } = useThree();
   const tmpColor = useMemo(() => new THREE.Color(), []);
   const lookTarget = useMemo(() => new THREE.Vector3(), []);
 
-  useFrame(({ camera }) => {
+  useFrame(({ camera, scene }) => {
     const t = scrollProgress * (WAYPOINTS.length - 1);
     const idx = Math.min(Math.floor(t), WAYPOINTS.length - 2);
     const frac = t - idx;

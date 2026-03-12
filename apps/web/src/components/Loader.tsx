@@ -1,25 +1,30 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import './Loader.css';
 
 export function Loader({ onReady }: { onReady?: boolean }) {
-  const [fadeOut, setFadeOut] = useState(false);
-  const [hidden, setHidden] = useState(false);
+  const hiddenRef = useRef(false);
+  const overlayRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (onReady) {
-      // Start fade-out when scene is ready
-      setFadeOut(true);
-      const timer = setTimeout(() => setHidden(true), 700);
+    if (onReady && !hiddenRef.current) {
+      const timer = setTimeout(() => {
+        hiddenRef.current = true;
+        if (overlayRef.current) {
+          overlayRef.current.style.display = 'none';
+        }
+      }, 700);
       return () => clearTimeout(timer);
     }
   }, [onReady]);
 
-  if (hidden) return null;
+  // Derive fadeOut directly from the prop (no setState needed)
+  const fadeOut = !!onReady;
 
   const hexColors = ['#064e3b', '#065f46', '#047857', '#059669', '#10b981', '#34d399'];
 
   return (
     <div
+      ref={overlayRef}
       className={`loader-overlay ${fadeOut ? 'loader-fade-out' : ''}`}
       aria-label="Loading"
     >

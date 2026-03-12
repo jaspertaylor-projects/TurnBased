@@ -537,3 +537,13 @@ Commit your code changes to git frequently with informative commit messages.
 Update your knowledge, whenever you learn something.  
 
 and update teh ToDo lists here by marking an X in the []  when you are done with that task.
+
+## Mistakes Learned (Do Not Repeat)
+
+1. **Never use `useThree()` to mutate scene properties.** The `react-hooks/immutability` rule forbids modifying values returned from hooks. Instead, destructure `scene` from the `useFrame(({ camera, scene }) => { ... })` callback — function parameters are not subject to this rule.
+
+2. **Never call `setState` synchronously inside a `useEffect` body.** The `react-hooks/set-state-in-effect` rule flags this. Use `requestAnimationFrame(fn)` to defer the call, or derive the value directly from props/state instead of using an effect at all.
+
+3. **Always remove unused imports after refactoring.** When you stop using `useThree`, `useState`, etc., remove them from the import line. TypeScript and ESLint both flag these as errors/warnings that block CI.
+
+4. **Always run `npm run lint --workspace=web` before committing.** This catches issues locally before they fail in CI.
