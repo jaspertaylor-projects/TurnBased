@@ -63,7 +63,7 @@ function App() {
 
   return (
     <>
-      <nav style={{ padding: '1rem', borderBottom: '1px solid var(--glass-border)', display: 'flex', alignItems: 'center', gap: '1.5rem', background: 'var(--bg-secondary)', position: 'sticky', top: 0, zIndex: 50 }}>
+      <nav style={{ padding: '1rem', display: 'flex', alignItems: 'center', gap: '1.5rem', background: 'rgba(240,253,244,0.85)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', position: 'sticky', top: 0, zIndex: 50 }}>
         <a href="#/" style={{ fontWeight: 'bold', fontSize: '1.25rem', color: 'var(--text-primary)', marginRight: 'auto' }}>TurnBased.</a>
         
         <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
