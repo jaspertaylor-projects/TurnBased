@@ -1,0 +1,8 @@
+{
+  "name": "@turnbased/play-host",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "echo 'play-host: no dev server yet'"
+  }
+}
