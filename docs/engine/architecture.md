@@ -51,7 +51,7 @@ The TurnBased engine is a **deterministic, event-sourced game state machine** de
 | Package | Responsibility |
 |---------|---------------|
 | `engine-core` | Reducer, actions, events, triggers, turns, visibility, legal moves |
-| `engine-sdk` | Author-facing APIs: game definitions, rules, hooks, manifests |
+| `engine-sdk` | Author-facing APIs: declarative rulebooks, expressions, hooks, manifests |
 | `engine-components` | Built-in placeable components and schemas |
 | `engine-ui` | Interaction affordance adapters, highlighting, drag/drop |
 | `engine-ai` | AI play contracts, bots, state summarizers |

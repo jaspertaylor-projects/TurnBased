@@ -81,6 +81,19 @@ interface GameDefinition {
 }
 ```
 
+## Creator Workflow
+
+Advanced Extension Mode is the supported path for custom hook work inside TurnBased.
+
+Recommended workflow:
+- stay in Standard Mode unless declarative rules and built-in components are clearly insufficient
+- upgrade the project to Advanced Extension Mode
+- register hook stubs for the smallest surface that solves the problem
+- document the hook purpose, inputs, and expected outputs alongside the stub
+- keep hooks deterministic and browser-safe
+
+Advanced Mode is still considered marketplace-ready as long as projects stay inside these documented hook contracts.
+
 ## Boundaries
 
 Extensions **can**:
@@ -93,3 +106,13 @@ Extensions **cannot**:
 - Override core reducer logic (that requires experimental mode)
 - Access other players' hidden state
 - Make network calls or side effects
+
+## Support Policy
+
+In Advanced Extension Mode, the platform still guarantees:
+- browser-only execution
+- compatibility with the documented hook interfaces
+- normal AI assistance quality
+- normal marketplace eligibility
+
+The platform does not guarantee support for behaviors that bypass these hook contracts. Projects that need reducer, visibility, or turn-flow overrides must move to Experimental Engine Override Mode and accept reduced guarantees.

@@ -61,4 +61,8 @@ Each sample game will be implemented as:
 2. A **test suite** validating game flow, win conditions, and edge cases
 3. A **simulation harness** for AI vs AI automated play
 
-Sample games live in `docs/examples/games/` as TypeScript definitions that can be imported by the test runner and simulation harness.
+Phase 16 implementation lives in [`packages/sample-games`](../../packages/sample-games):
+
+- `src/games.ts` contains the four reference game definitions plus regression cases
+- `src/harness.ts` contains random-play, self-play, replay, and regression helpers
+- `src/cli.ts` provides a small simulation runner via `npm run simulate --workspace @turnbased/sample-games -- --game <id> --mode <random|self-play>`

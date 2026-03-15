@@ -1,39 +1,189 @@
+import { useEffect, useState } from 'react';
 
-
-// Mock data until Supabase client is connected
-const MOCK_PROJECTS = [
-  { id: '1', name: 'My First Game', created_at: new Date().toISOString() },
-];
+import { getProjectModeLabel, getProjectModeSupportSummary } from '../editor/capabilities';
+import { listProjectGitCommits } from '../editor/git';
+import { getLatestBuild } from '../editor/shipping';
+import { deleteEditorProject, loadEditorProjects } from '../editor/storage';
+import type { EditorProject } from '../editor/types';
 
 export const Dashboard = () => {
-    return (
-        <div style={{ padding: '2rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h1>My Projects</h1>
-                <a href="#/templates" style={{ padding: '0.5rem 1rem', background: '#3b82f6', color: 'white', textDecoration: 'none', borderRadius: '4px' }}>
-                    + New Project
-                </a>
-            </div>
+  const [projects, setProjects] = useState<EditorProject[]>([]);
 
-            <div style={{ marginTop: '2rem' }}>
-                {MOCK_PROJECTS.length === 0 ? (
-                    <p>No projects found. Create one from a template!</p>
-                ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                        {MOCK_PROJECTS.map(proj => (
-                            <div key={proj.id} style={{ padding: '1rem', border: '1px solid #eee', borderRadius: '8px', display: 'flex', justifyContent: 'space-between' }}>
-                                <div>
-                                    <h3 style={{ margin: '0 0 0.5rem 0' }}>{proj.name}</h3>
-                                    <span style={{ fontSize: '0.875rem', color: '#666' }}>Created: {new Date(proj.created_at).toLocaleDateString()}</span>
-                                </div>
-                                <button style={{ padding: '0.5rem 1rem', background: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
-                                    Open Editor
-                                </button>
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </div>
+  useEffect(() => {
+    setProjects(loadEditorProjects());
+  }, []);
+
+  function handleDelete(projectId: string) {
+    deleteEditorProject(projectId);
+    setProjects(loadEditorProjects());
+  }
+
+  function getProjectSummary(project: EditorProject) {
+    const support = getProjectModeSupportSummary(project);
+    return {
+      modeLabel: getProjectModeLabel(project.manifest.capabilities.mode),
+      marketplaceEligible: support.marketplaceEligible,
+      latestPreview: getLatestBuild(project.id, 'preview'),
+      latestRelease: getLatestBuild(project.id, 'release'),
+      commitCount: listProjectGitCommits(project.id).length,
+    };
+  }
+
+  return (
+    <div style={{ padding: '2rem', maxWidth: '1100px', margin: '0 auto' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+        <div>
+          <p style={{ textTransform: 'uppercase', letterSpacing: '0.08em', color: '#0f766e', fontSize: '0.82rem', marginBottom: '0.45rem' }}>
+            Creator Dashboard
+          </p>
+          <h1 style={{ marginBottom: '0.35rem' }}>My Prototypes</h1>
+          <p style={{ margin: 0, color: '#0f766e' }}>
+            Component-first workspaces, live preview, and local playtest state.
+          </p>
         </div>
-    )
-}
+        <a
+          href="#/templates"
+          style={{
+            padding: '0.8rem 1rem',
+            background: 'linear-gradient(135deg, #064e3b, #10b981)',
+            color: 'white',
+            textDecoration: 'none',
+            borderRadius: '999px',
+            boxShadow: '0 16px 32px rgba(6,78,59,0.16)',
+          }}
+        >
+          + New Blank Project
+        </a>
+      </div>
+
+      <div style={{ marginTop: '1.5rem' }}>
+        {projects.length === 0 ? (
+          <div style={{ padding: '1.4rem', borderRadius: '20px', background: 'rgba(255,255,255,0.82)', border: '1px solid rgba(16,185,129,0.14)' }}>
+            <p style={{ color: '#0f766e', margin: 0 }}>
+              No local projects yet. Create a blank workspace and start placing components.
+            </p>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gap: '0.9rem' }}>
+            {projects.map((project) => (
+              (() => {
+                const summary = getProjectSummary(project);
+
+                return (
+                  <div
+                    key={project.id}
+                    style={{
+                      padding: '1.15rem',
+                      border: '1px solid rgba(16,185,129,0.14)',
+                      borderRadius: '22px',
+                      background: 'rgba(255,255,255,0.86)',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      gap: '1rem',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <div style={{ minWidth: '240px', flex: '1 1 320px' }}>
+                      <h3 style={{ marginBottom: '0.35rem' }}>{project.name}</h3>
+                      <div style={{ color: '#0f766e', fontSize: '0.9rem', marginBottom: '0.35rem' }}>{project.description}</div>
+                      <div style={{ color: '#155e75', fontSize: '0.8rem' }}>
+                        Updated {new Date(project.updatedAt).toLocaleString()}
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
+                        <span style={{ padding: '0.35rem 0.65rem', borderRadius: '999px', background: project.manifest.capabilities.mode === 'experimental' ? 'rgba(254,226,226,0.85)' : project.manifest.capabilities.mode === 'advanced' ? 'rgba(254,249,195,0.9)' : 'rgba(240,253,244,0.9)', color: project.manifest.capabilities.mode === 'experimental' ? '#991b1b' : project.manifest.capabilities.mode === 'advanced' ? '#854d0e' : '#065f46', fontSize: '0.78rem' }}>
+                          {summary.modeLabel}
+                        </span>
+                        <span style={{ padding: '0.35rem 0.65rem', borderRadius: '999px', background: 'rgba(16,185,129,0.12)', color: '#065f46', fontSize: '0.78rem' }}>
+                          {summary.commitCount} commit{summary.commitCount === 1 ? '' : 's'}
+                        </span>
+                        <span style={{ padding: '0.35rem 0.65rem', borderRadius: '999px', background: 'rgba(14,165,233,0.12)', color: '#075985', fontSize: '0.78rem' }}>
+                          Preview {summary.latestPreview?.commitSha ?? 'not built'}
+                        </span>
+                        <span style={{ padding: '0.35rem 0.65rem', borderRadius: '999px', background: 'rgba(59,130,246,0.12)', color: '#1d4ed8', fontSize: '0.78rem' }}>
+                          Release {summary.latestRelease?.commitSha ?? 'not published'}
+                        </span>
+                        {!summary.marketplaceEligible && (
+                          <span style={{ padding: '0.35rem 0.65rem', borderRadius: '999px', background: 'rgba(254,226,226,0.85)', color: '#991b1b', fontSize: '0.78rem' }}>
+                            Marketplace restricted
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap' }}>
+                      <a
+                        href={`#/editor/${project.id}`}
+                        style={{
+                          padding: '0.75rem 0.95rem',
+                          borderRadius: '999px',
+                          background: 'rgba(16,185,129,0.12)',
+                          color: '#065f46',
+                          textDecoration: 'none',
+                        }}
+                      >
+                        Open Editor
+                      </a>
+                      {summary.latestPreview && (
+                        <a
+                          href={`#/play/local/${summary.latestPreview.id}`}
+                          style={{
+                            padding: '0.75rem 0.95rem',
+                            borderRadius: '999px',
+                            background: 'rgba(14,165,233,0.12)',
+                            color: '#075985',
+                            textDecoration: 'none',
+                          }}
+                        >
+                          Open Preview
+                        </a>
+                      )}
+                      {summary.latestRelease && (
+                        <a
+                          href={`#/play/local/${summary.latestRelease.id}`}
+                          style={{
+                            padding: '0.75rem 0.95rem',
+                            borderRadius: '999px',
+                            background: 'rgba(59,130,246,0.12)',
+                            color: '#1d4ed8',
+                            textDecoration: 'none',
+                          }}
+                        >
+                          Open Release
+                        </a>
+                      )}
+                      <a
+                        href={`#/lobby?mode=playtest&projectId=${project.id}`}
+                        style={{
+                          padding: '0.75rem 0.95rem',
+                          borderRadius: '999px',
+                          background: 'rgba(14,165,233,0.12)',
+                          color: '#075985',
+                          textDecoration: 'none',
+                        }}
+                      >
+                        Start Playtest Room
+                      </a>
+                      <button
+                        onClick={() => handleDelete(project.id)}
+                        style={{
+                          padding: '0.75rem 0.95rem',
+                          borderRadius: '999px',
+                          border: '1px solid rgba(239,68,68,0.18)',
+                          background: 'rgba(254,226,226,0.8)',
+                          color: '#b91c1c',
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};

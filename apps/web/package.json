@@ -14,6 +14,12 @@
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.5.0",
     "@supabase/supabase-js": "^2.99.0",
+    "@turnbased/engine-ai": "*",
+    "@turnbased/engine-components": "*",
+    "@turnbased/engine-core": "*",
+    "@turnbased/engine-ui": "*",
+    "@turnbased/shared-types": "*",
+    "@turnbased/shared-utils": "*",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "three": "^0.183.2"

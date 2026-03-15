@@ -131,7 +131,13 @@ export const Marketplace = () => {
                                                  Play
                                              </button>
                                              <button
-                                                 onClick={() => alert('Mock: Create a new room with license_mode="owned_required" & listing_id=' + listing.id)}
+                                                 onClick={() => {
+                                                     const params = new URLSearchParams({
+                                                         mode: 'owned_required',
+                                                         listingId: listing.id,
+                                                     });
+                                                     window.location.hash = `#/lobby?${params.toString()}`;
+                                                 }}
                                                  style={{ background: '#f59e0b', color: 'white', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
                                              >
                                                 Host

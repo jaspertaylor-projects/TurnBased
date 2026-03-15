@@ -25,10 +25,13 @@ interface TurnState {
   currentStep: string;
   phaseIndex: number;
   stepIndex: number;
+  basePhases: PhaseDefinition[];
   phases: PhaseDefinition[];
   turnDirection: 'forward' | 'reverse';
+  currentTurnKind: 'normal' | 'extra';
   extraTurns: PlayerId[];
-  skippedPlayers: Set<PlayerId>;
+  skippedPlayers: PlayerId[];
+  completedPlayerIdsThisRound: PlayerId[];
 }
 
 interface PhaseDefinition {
@@ -82,10 +85,22 @@ interface StepDefinition {
 ```typescript
 // Add a temporary phase to the current turn
 { type: 'INSERT_PHASE', phase: { name: 'bonus_action', steps: [...] }, afterPhase: 'main' }
+
+// Add a temporary step to the current or named phase
+{ type: 'INSERT_STEP', step: { name: 'resolve_bonus', autoAdvance: false, requiresPlayerAction: true }, phaseName: 'combat', afterStep: 'declare_attackers' }
 ```
 
 ### Modified Player Order
 Turn order can change at any time. The `playerOrder` array in state is the source of truth.
+
+## Mutation Policy
+
+- `basePhases` is the immutable template for each new turn.
+- `phases` is the live copy for the current turn and may be mutated by `INSERT_PHASE` and `INSERT_STEP`.
+- Temporary inserts last only for the current turn. When the turn ends, the engine resets `phases` from `basePhases`.
+- Extra turns resolve before normal order advances and are marked with `currentTurnKind: 'extra'`.
+- `SKIP_TURN` is consumed when that player is passed over during normal turn selection.
+- Round numbers are bookkeeping, not fairness guarantees. If a mutation would hand the next normal turn to a player already listed in `completedPlayerIdsThisRound`, the current round closes and a new round begins with that player.
 
 ## Common Turn Structures
 

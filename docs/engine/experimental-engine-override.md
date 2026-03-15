@@ -64,3 +64,20 @@ The middleware contract is narrow: you receive state and action, you return modi
   }
 }
 ```
+
+## Support Policy
+
+Experimental projects are intentionally outside the mainstream creator path.
+
+Current policy:
+- experimental mode is a permanent per-project flag
+- release snapshots can still be generated
+- marketplace publishing is restricted until override review tooling exists
+- AI agents should warn before proposing engine-adjacent changes
+- support assumes creators can maintain their own override logic
+
+Recommended workflow:
+1. exhaust Standard Mode and Advanced Extension Mode first
+2. choose the smallest override surface possible
+3. record the enabled override ids in the project manifest
+4. document why the override exists and what would break if it were removed

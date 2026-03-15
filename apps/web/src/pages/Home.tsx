@@ -155,7 +155,7 @@ export const Home = () => {
             </p>
 
             <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-              <a href="#/auth" id="cta-start" style={{
+              <a href="#/templates" id="cta-start" style={{
                 padding: '1rem 2.2rem',
                 background: '#064e3b', color: '#fff',
                 borderRadius: 'var(--radius-md)',
@@ -248,10 +248,10 @@ export const Home = () => {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               <RevealSection delay={0.1}>
-                <StepCard num={1} title="Pick a Template" desc="Choose from hand-crafted quickstart templates — card games, grid movers, party games, and more. Each comes pre-wired with multiplayer and an instant preview." />
+                <StepCard num={1} title="Start with Components" desc="Open a blank workspace, then assemble boards, spaces, zones, counters, and pieces from the built-in catalog. The engine handles turn flow and legal move wiring underneath." />
               </RevealSection>
               <RevealSection delay={0.2}>
-                <StepCard num={2} title="Edit in the Browser" desc="Use the built-in code editor and AI assistant to modify rules, generate art assets, and tweak game logic. Commit changes with one click." />
+                <StepCard num={2} title="Tune Rules and Layout" desc="Adjust turn phases, target score, ownership, and placement directly in the browser. The editor previews legal move overlays as you iterate." />
               </RevealSection>
               <RevealSection delay={0.3}>
                 <StepCard num={3} title="Invite & Playtest" desc="Generate a shareable link. Friends join your multiplayer room instantly — no accounts required for guest testers." />

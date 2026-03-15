@@ -30,7 +30,7 @@ export const idSchema = z.string().trim().min(1);
 export const positiveInt = z.number().int().positive();
 
 /** Zod schema for a non-negative integer */
-export const nonNegativeInt = z.number().int().nonneg();
+export const nonNegativeInt = z.number().int().nonnegative();
 
 // ─── Serialization ──────────────────────────────────────────────────
 
@@ -50,6 +50,14 @@ export function canonicalSerialize(value: unknown): string {
     }
     return val as unknown;
   });
+}
+
+/**
+ * Parse canonical JSON into a typed value.
+ * Useful for replay fixtures and deterministic snapshot loading.
+ */
+export function canonicalDeserialize<T>(value: string): T {
+  return JSON.parse(value) as T;
 }
 
 /**

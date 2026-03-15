@@ -1,0 +1,193 @@
+import { Visibility } from '@turnbased/shared-types';
+import { z } from 'zod';
+
+export const builtInComponentTypeSchema = z.enum([
+  'board',
+  'space',
+  'track',
+  'zone',
+  'deck',
+  'hand',
+  'discard',
+  'bag',
+  'piece',
+  'token',
+  'counter',
+  'score-track',
+]);
+
+export const componentCategorySchema = z.enum(['container', 'collection', 'entity', 'counter']);
+export const componentSurfaceSchema = z.enum([
+  'board',
+  'space',
+  'track',
+  'zone',
+  'collection',
+  'entity',
+  'counter',
+]);
+export const componentLayoutSchema = z.enum([
+  'grid',
+  'hex',
+  'graph',
+  'freeform',
+  'linear',
+  'circular',
+  'branching',
+  'stack',
+  'fan',
+  'pile',
+]);
+export const componentOrientationSchema = z.enum(['none', 'horizontal', 'vertical', 'radial']);
+export const componentSelectionModeSchema = z.enum(['none', 'single', 'multiple']);
+export const componentPrimaryActionSchema = z.enum([
+  'select',
+  'place',
+  'move',
+  'open',
+  'draw',
+  'inspect',
+  'increment',
+]);
+export const componentOccupancyModeSchema = z.enum([
+  'none',
+  'single',
+  'multiple',
+  'stack',
+  'slots',
+  'track',
+]);
+export const componentCompositionStrategySchema = z.enum(['leaf', 'children', 'referential']);
+export const componentPropertyKindSchema = z.enum([
+  'string',
+  'number',
+  'boolean',
+  'enum',
+  'string_array',
+  'number_array',
+  'json',
+]);
+
+export const componentPropertyDefinitionSchema = z.object({
+  kind: componentPropertyKindSchema,
+  label: z.string().trim().min(1),
+  description: z.string().trim().min(1).optional(),
+  required: z.boolean().optional(),
+  options: z.array(z.string().trim().min(1)).optional(),
+});
+
+export const componentRenderHintsSchema = z.object({
+  surface: componentSurfaceSchema,
+  layout: componentLayoutSchema,
+  orientation: componentOrientationSchema,
+  showLabel: z.boolean(),
+  showCount: z.boolean(),
+  showOccupancy: z.boolean(),
+  showOwnership: z.boolean(),
+  showCapacity: z.boolean(),
+  supportsCoordinates: z.boolean(),
+});
+
+export const componentInteractionDefaultsSchema = z.object({
+  selectionMode: componentSelectionModeSchema,
+  primaryAction: componentPrimaryActionSchema,
+  dragEnabled: z.boolean(),
+  dropEnabled: z.boolean(),
+  keyboardNavigable: z.boolean(),
+  highlightValidDestinations: z.boolean(),
+});
+
+export const componentVisibilityDefaultsSchema = z.object({
+  zoneVisibility: z.nativeEnum(Visibility).optional(),
+  contentsVisibility: z.nativeEnum(Visibility).optional(),
+  ownerPrivate: z.boolean().optional(),
+  faceUpByDefault: z.boolean().optional(),
+});
+
+export const componentSlotDefinitionSchema = z.object({
+  id: z.string().trim().min(1),
+  label: z.string().trim().min(1),
+  acceptsCategories: z.array(componentCategorySchema),
+  acceptsTypes: z.array(z.string().trim().min(1)),
+  minChildren: z.number().int().nonnegative(),
+  maxChildren: z.number().int().positive().nullable(),
+});
+
+export const componentCompositionSchema = z.object({
+  strategy: componentCompositionStrategySchema,
+  childSlots: z.array(componentSlotDefinitionSchema),
+});
+
+export const componentPlacementConstraintsSchema = z.object({
+  requiresParent: z.boolean(),
+  allowedParentCategories: z.array(componentCategorySchema),
+  allowedParentTypes: z.array(z.string().trim().min(1)),
+  allowedChildCategories: z.array(componentCategorySchema),
+  allowedChildTypes: z.array(z.string().trim().min(1)),
+  minChildren: z.number().int().nonnegative(),
+  maxChildren: z.number().int().nonnegative().nullable(),
+});
+
+export const componentOccupancyRulesSchema = z.object({
+  mode: componentOccupancyModeSchema,
+  capacity: z.number().int().nonnegative().nullable(),
+  occupantCategories: z.array(componentCategorySchema),
+  occupantTypes: z.array(z.string().trim().min(1)),
+  allowMixedOccupants: z.boolean(),
+  allowSharedControl: z.boolean(),
+  perPlayerLimit: z.number().int().positive().nullable(),
+});
+
+export const zodSchemaSchema = z.custom<z.ZodTypeAny>(
+  (value) => value instanceof z.ZodType,
+  'Expected a zod schema.',
+);
+
+export const componentManifestSchema = z.object({
+  type: z.string().trim().min(1),
+  category: componentCategorySchema,
+  displayName: z.string().trim().min(1),
+  description: z.string().trim().min(1),
+  propertyDefinitions: z.record(z.string(), componentPropertyDefinitionSchema),
+  propertiesSchema: zodSchemaSchema,
+  defaultProperties: z.record(z.string(), z.unknown()),
+  renderHints: componentRenderHintsSchema,
+  interactionDefaults: componentInteractionDefaultsSchema,
+  placementConstraints: componentPlacementConstraintsSchema,
+  occupancyRules: componentOccupancyRulesSchema,
+  visibilityDefaults: componentVisibilityDefaultsSchema,
+  composition: componentCompositionSchema,
+  tags: z.array(z.string().trim().min(1)),
+});
+
+export const componentPlacementSchema = z.object({
+  slotId: z.string().trim().min(1).optional(),
+  index: z.number().int().nonnegative().optional(),
+  coordinates: z
+    .object({
+      x: z.number(),
+      y: z.number(),
+    })
+    .optional(),
+  trackPosition: z.number().int().nonnegative().optional(),
+});
+
+export const componentBindingsSchema = z.object({
+  zoneId: z.string().trim().min(1).optional(),
+  entityIds: z.array(z.string().trim().min(1)).optional(),
+  ownerId: z.string().trim().min(1).nullable().optional(),
+});
+
+export const componentInstanceSchema = z.object({
+  instanceId: z.string().trim().min(1),
+  componentType: z.string().trim().min(1),
+  category: componentCategorySchema,
+  displayName: z.string().trim().min(1).optional(),
+  properties: z.record(z.string(), z.unknown()),
+  children: z.array(z.string().trim().min(1)),
+  parentId: z.string().trim().min(1).nullable(),
+  placement: componentPlacementSchema.nullable(),
+  bindings: componentBindingsSchema,
+  renderOverrides: componentRenderHintsSchema.partial().optional(),
+  interactionOverrides: componentInteractionDefaultsSchema.partial().optional(),
+});

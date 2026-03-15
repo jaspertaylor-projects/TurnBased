@@ -1,0 +1,6 @@
+{
+  "compilerOptions": {
+    "allowJs": false,
+    "lib": ["deno.window", "dom", "dom.iterable", "esnext"]
+  }
+}

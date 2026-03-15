@@ -1,0 +1,22 @@
+{
+  "name": "@turnbased/sample-games",
+  "version": "1.0.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "simulate": "vite-node ./src/cli.ts"
+  },
+  "dependencies": {
+    "@turnbased/engine-ai": "*",
+    "@turnbased/engine-core": "*",
+    "@turnbased/shared-types": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "typescript": "^5.2.2",
+    "vitest": "^3.0.0"
+  }
+}

@@ -70,6 +70,7 @@ function App() {
             {session ? (
                 <>
                     <a href="#/marketplace" style={{ color: 'var(--text-secondary)' }}>Marketplace</a>
+                    <a href="#/lobby" style={{ color: 'var(--text-secondary)' }}>Rooms</a>
                     {!isGuest && <a href="#/dashboard" style={{ color: 'var(--text-secondary)' }}>Dashboard</a>}
                     {!isGuest && <a href="#/settings" style={{ color: 'var(--text-secondary)' }}>Settings</a>}
                     <button 
@@ -82,6 +83,7 @@ function App() {
             ) : (
                 <>
                     <a href="#/marketplace" style={{ color: 'var(--text-secondary)' }}>Marketplace</a>
+                    <a href="#/lobby" style={{ color: 'var(--text-secondary)' }}>Rooms</a>
                     <a href="#/auth" style={{ background: 'var(--text-primary)', color: 'var(--bg-primary)', padding: '0.5rem 1.25rem', borderRadius: '4px', fontWeight: 'bold' }}>
                          Sign In
                     </a>

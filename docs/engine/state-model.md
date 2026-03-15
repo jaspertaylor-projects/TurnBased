@@ -28,6 +28,7 @@ interface GameState {
   // ─── Decision/Response ────────
   pendingDecisions: PendingDecision[];
   stack: StackItem[];
+  priorityWindow: PriorityWindowState;
 
   // ─── Visibility ───────────────
   visibilityMap: VisibilityMap;
@@ -108,12 +109,19 @@ interface TurnState {
   currentStep: string;
   phaseIndex: number;
   stepIndex: number;
+  basePhases: PhaseDefinition[];
   phases: PhaseDefinition[];
   turnDirection: 'forward' | 'reverse';
+  currentTurnKind: 'normal' | 'extra';
   extraTurns: PlayerId[];       // Queue of players with extra turns
-  skippedPlayers: Set<PlayerId>;
+  skippedPlayers: PlayerId[];
+  completedPlayerIdsThisRound: PlayerId[];
 }
 ```
+
+- `basePhases` is the canonical per-turn template.
+- `phases` is the mutable runtime copy for the current turn, so inserted phases/steps reset automatically on the next turn.
+- `completedPlayerIdsThisRound` tracks normal-turn round progress. If turn-order mutations would revisit one of those players, the engine increments the round before starting that turn.
 
 ## Pending Decision
 
@@ -127,6 +135,7 @@ interface PendingDecision {
   minChoices: number;
   maxChoices: number;
   timeoutMs?: number;
+  metadata?: Record<string, unknown>;
 }
 ```
 
@@ -140,6 +149,39 @@ interface StackItem {
   controllerId: PlayerId;
   priority: number;
   isResolved: boolean;
+}
+```
+
+## Priority Window
+
+```typescript
+interface PriorityWindowState {
+  isOpen: boolean;
+  currentPlayerId: PlayerId | null;
+  passedPlayerIds: PlayerId[];
+  openedBy: 'action' | 'stack' | null;
+}
+```
+
+- `currentPlayerId` is the responder who may currently act or pass.
+- `passedPlayerIds` resets whenever a new response is added or a stack item resolves.
+- A player with a matching `pendingDecision` cannot pass until that decision is resolved.
+
+## Trigger Subscription
+
+```typescript
+interface TriggerSubscription {
+  id: TriggerId;
+  type: 'automatic' | 'optional' | 'replacement' | 'prevention';
+  event: string;
+  effect: CanonicalActionTemplate | CanonicalActionTemplate[];
+  controllerId: PlayerId;
+  sourceEntityId?: EntityId;
+  priority: number;
+  resolution: 'immediate' | 'stack';
+  once: boolean;
+  phase?: string;
+  prompt?: string;
 }
 ```
 
@@ -160,6 +202,38 @@ interface VisibilityMap {
   zoneVisibility: Record<ZoneId, Record<PlayerId, boolean>>;
 }
 ```
+
+## Player-Visible Projection
+
+The full `GameState` is never handed directly to UI, spectators, or AI seats. Instead, `engine-core` projects a `PlayerVisibleState` for a specific viewer:
+
+```typescript
+interface PlayerVisibleState {
+  gameId: GameId;
+  version: number;
+  status: GameStatus;
+  winner: PlayerId | PlayerId[] | null;
+  players: Record<PlayerId, PlayerState>;
+  zones: Record<ZoneId, VisibleZone>;
+  entities: Record<string, VisibleEntity>;
+  turnState: TurnState;
+  pendingDecisions: VisiblePendingDecision[];
+  stack: VisibleStackItem[];
+  priorityWindow: PriorityWindowState;
+  actionLog: VisibleActionLogEntry[];
+  viewer: ResolvedViewerContext;
+  redactions: VisibilityRedaction[];
+}
+```
+
+Projection rules:
+- Private or hidden zones stay in the view, but their `entityIds` are removed and counted via `hiddenEntityCount`.
+- Face-down entities in otherwise visible zones remain present but downgrade to `presence_only` entries with redacted type/component/property data.
+- Player `properties` default to owner-only unless field policies explicitly mark them public.
+- Pending decisions are only visible to the deciding player, unless the viewer is an omniscient spectator/host.
+- Action-log and stack payloads are sanitized so hidden entity IDs, zone IDs, and private decision payloads do not leak.
+
+Spectators default to `public_only` access. Omniscient spectator tooling must opt in explicitly.
 
 ## ID System
 

@@ -24,9 +24,17 @@ serve(async (req: Request) => {
     if (!user) throw new Error('Not Authenticated');
 
     const body = await req.json();
-    const { prompt, modelId, contextFiles } = body;
+    const { prompt, modelId, contextFiles, projectMode, projectCapabilities, projectManifest } = body;
 
     if (!prompt || !modelId) throw new Error('Missing input');
+
+    const resolvedCapabilities = projectCapabilities ?? projectManifest?.capabilities ?? null;
+    const resolvedMode = resolvedCapabilities?.mode ?? projectMode ?? 'standard';
+    const modeInstruction = resolvedMode === 'experimental'
+      ? 'Project mode is experimental. Warn explicitly about reduced guarantees, weaker AI certainty, and marketplace restrictions before suggesting engine-adjacent changes.'
+      : resolvedMode === 'advanced'
+        ? 'Project mode is advanced. Prefer documented extension hooks and avoid recommending reducer or engine overrides.'
+        : 'Project mode is standard. Prefer built-in components, declarative rules, and standard engine policies unless the user explicitly asks to upgrade capabilities.';
 
     // 1. Verify Model + Tier
     const { data: modelObj, error: modelErr } = await supabaseClient
@@ -57,7 +65,15 @@ serve(async (req: Request) => {
         body: JSON.stringify({
             model: modelObj.model_id,
             messages: [
-                { role: 'system', content: 'You are an AI coding agent for a web-based game engine. Return code changes format. Context: ' + JSON.stringify(contextFiles) },
+                {
+                  role: 'system',
+                  content: 'You are an AI coding agent for a web-based game engine. Return code changes format. '
+                    + modeInstruction
+                    + ' Capability context: '
+                    + JSON.stringify(resolvedCapabilities ?? { mode: resolvedMode })
+                    + '. Context: '
+                    + JSON.stringify(contextFiles),
+                },
                 { role: 'user', content: prompt }
             ]
         })

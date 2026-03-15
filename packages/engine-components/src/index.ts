@@ -1,4 +1,68 @@
 // @turnbased/engine-components
-// Built-in placeable game components: boards, zones, decks, pieces, counters, tracks
+// Built-in placeable game components, schemas, and composition helpers.
 
-export const COMPONENTS_VERSION = '0.1.0';
+export const COMPONENTS_VERSION = '0.2.0';
+
+export { builtInComponentCatalog } from './catalog';
+export {
+  builtInCatalog,
+  createComponentCatalog,
+  createComponentInstance,
+  getBuiltInComponentManifest,
+  listBuiltInComponents,
+  validateComponentOccupancy,
+  validateComponentPlacement,
+  validateComponentTree,
+} from './helpers';
+export {
+  builtInComponentTypeSchema,
+  componentBindingsSchema,
+  componentCategorySchema,
+  componentCompositionSchema,
+  componentInstanceSchema,
+  componentInteractionDefaultsSchema,
+  componentLayoutSchema,
+  componentManifestSchema,
+  componentOccupancyModeSchema,
+  componentOccupancyRulesSchema,
+  componentOrientationSchema,
+  componentPlacementConstraintsSchema,
+  componentPlacementSchema,
+  componentPrimaryActionSchema,
+  componentPropertyDefinitionSchema,
+  componentPropertyKindSchema,
+  componentRenderHintsSchema,
+  componentSelectionModeSchema,
+  componentSlotDefinitionSchema,
+  componentSurfaceSchema,
+  componentVisibilityDefaultsSchema,
+} from './schemas';
+export type {
+  BuiltInComponentType,
+  ComponentBindings,
+  ComponentCatalog,
+  ComponentCategory,
+  ComponentComposition,
+  ComponentCompositionStrategy,
+  ComponentInstanceModel,
+  ComponentInteractionDefaults,
+  ComponentLayout,
+  ComponentManifest,
+  ComponentOccupancyMode,
+  ComponentOccupancyRules,
+  ComponentOrientation,
+  ComponentPlacement,
+  ComponentPlacementConstraints,
+  ComponentPrimaryAction,
+  ComponentPropertyDefinition,
+  ComponentPropertyKind,
+  ComponentRenderHints,
+  ComponentSelectionMode,
+  ComponentSlotDefinition,
+  ComponentSurface,
+  ComponentValidationIssue,
+  ComponentValidationResult,
+  ComponentVisibilityDefaults,
+  CreateComponentInstanceOptions,
+  OccupancyValidationContext,
+} from './types';
