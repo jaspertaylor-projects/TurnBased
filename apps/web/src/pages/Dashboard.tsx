@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { getProjectModeLabel, getProjectModeSupportSummary } from '../editor/capabilities';
 import { listProjectGitCommits } from '../editor/git';
@@ -7,11 +7,7 @@ import { deleteEditorProject, loadEditorProjects } from '../editor/storage';
 import type { EditorProject } from '../editor/types';
 
 export const Dashboard = () => {
-  const [projects, setProjects] = useState<EditorProject[]>([]);
-
-  useEffect(() => {
-    setProjects(loadEditorProjects());
-  }, []);
+  const [projects, setProjects] = useState<EditorProject[]>(() => loadEditorProjects());
 
   function handleDelete(projectId: string) {
     deleteEditorProject(projectId);

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import type { Session } from '@supabase/supabase-js'
 import { supabase } from './lib/supabaseClient'
 import { Home } from './pages/Home'
 import { Auth } from './pages/Auth'
@@ -13,7 +14,7 @@ import { Marketplace } from './pages/Marketplace'
 
 function App() {
   const [route, setRoute] = useState(window.location.hash);
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<Session | null>(null);
 
   useEffect(() => {
     // Read route on load

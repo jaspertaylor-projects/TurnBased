@@ -176,6 +176,15 @@ function getHookLabel(hookType: ProjectAdvancedHookType): string {
   return advancedHookCatalog.find((hook) => hook.type === hookType)?.label ?? hookType;
 }
 
+function createPreviewSignature(project: EditorProject): string {
+  return JSON.stringify({
+    rootInstanceIds: project.rootInstanceIds,
+    instances: project.instances,
+    rules: project.rules,
+    seats: project.seats,
+  });
+}
+
 export const Editor = () => {
   const [projectId, setProjectId] = useState<string | null>(null);
   const [project, setProject] = useState<EditorProject | null>(null);
@@ -192,8 +201,6 @@ export const Editor = () => {
   const [buildNotes, setBuildNotes] = useState('Browser-generated snapshot');
   const [releaseTitle, setReleaseTitle] = useState('');
   const [releaseDescription, setReleaseDescription] = useState('');
-  const [buildHistory, setBuildHistory] = useState<ReturnType<typeof listProjectBuilds>>([]);
-  const [gitHistory, setGitHistory] = useState<ReturnType<typeof listProjectGitCommits>>([]);
   const [showExperimentalSetup, setShowExperimentalSetup] = useState(false);
   const [experimentalAcknowledgements, setExperimentalAcknowledgements] = useState<ProjectAcknowledgedWarningId[]>([]);
   const [experimentalOverrideSelections, setExperimentalOverrideSelections] = useState<ProjectExperimentalOverrideId[]>([]);
@@ -202,11 +209,29 @@ export const Editor = () => {
   useEffect(() => {
     const syncRoute = () => {
       const nextProjectId = readProjectIdFromHash();
+      const nextProject = nextProjectId ? loadEditorProject(nextProjectId) : null;
+
       setProjectId(nextProjectId);
-      setProject(nextProjectId ? loadEditorProject(nextProjectId) : null);
+      setProject(nextProject);
       setSelectedComponentId(null);
-      setSelectedHookId(null);
+      setSelectedHookId(nextProject?.manifest.customHooks[0]?.id ?? null);
       setSelection(EMPTY_SELECTION);
+      setPreviewState(nextProject ? buildPreviewRuntime(nextProject).initialState : null);
+      setReleaseTitle(nextProject?.name ?? '');
+      setReleaseDescription(nextProject?.description ?? '');
+      setShowExperimentalSetup(false);
+      if (nextProject) {
+        setExperimentalAcknowledgements(
+          getRequiredWarningsForMode('experimental').filter((warningId) => (
+            nextProject.manifest.capabilities.acknowledgedWarnings.includes(warningId)
+          )),
+        );
+        setExperimentalOverrideSelections(nextProject.manifest.capabilities.enabledOverrides);
+      } else {
+        setExperimentalAcknowledgements([]);
+        setExperimentalOverrideSelections([]);
+      }
+      setExperimentalConfirmationText('');
     };
 
     syncRoute();
@@ -222,75 +247,7 @@ export const Editor = () => {
     saveEditorProject(project);
   }, [project]);
 
-  useEffect(() => {
-    if (!project) {
-      return;
-    }
-
-    setReleaseTitle(project.name);
-    setReleaseDescription(project.description);
-  }, [projectId]);
-
-  useEffect(() => {
-    if (!project) {
-      return;
-    }
-
-    setExperimentalAcknowledgements(
-      getRequiredWarningsForMode('experimental').filter((warningId) => (
-        project.manifest.capabilities.acknowledgedWarnings.includes(warningId)
-      )),
-    );
-    setExperimentalOverrideSelections(project.manifest.capabilities.enabledOverrides);
-    setExperimentalConfirmationText('');
-  }, [project?.id, project?.manifest.capabilities]);
-
-  useEffect(() => {
-    if (!projectId) {
-      setBuildHistory([]);
-      setGitHistory([]);
-      return;
-    }
-
-    setBuildHistory(listProjectBuilds(projectId));
-    setGitHistory(listProjectGitCommits(projectId));
-  }, [projectId]);
-
-  useEffect(() => {
-    if (!project) {
-      setSelectedHookId(null);
-      return;
-    }
-
-    const hooks = project.manifest.customHooks;
-    if (hooks.length === 0) {
-      setSelectedHookId(null);
-      return;
-    }
-
-    if (!selectedHookId || !hooks.some((hook) => hook.id === selectedHookId)) {
-      setSelectedHookId(hooks[0].id);
-    }
-  }, [project, selectedHookId]);
-
   const runtime = project ? buildPreviewRuntime(project) : null;
-  const projectSignature = project ? JSON.stringify({
-    rootInstanceIds: project.rootInstanceIds,
-    instances: project.instances,
-    rules: project.rules,
-    seats: project.seats,
-  }) : '';
-
-  useEffect(() => {
-    if (!runtime || !projectSignature) {
-      setPreviewState(null);
-      return;
-    }
-
-    setPreviewState(runtime.initialState);
-    setSelection(EMPTY_SELECTION);
-  }, [projectSignature, runtime]);
-
   const moveTree = previewState && runtime ? createPreviewMoveTree(previewState, runtime) : null;
   const affordances = moveTree ? createUIAffordanceState(moveTree, { selection }) : null;
   const selectedComponent = project && selectedComponentId ? project.instances[selectedComponentId] : null;
@@ -319,8 +276,13 @@ export const Editor = () => {
   const modeSupport = getProjectModeSupportSummary(currentProject);
   const currentModeLabel = getProjectModeLabel(currentProject.manifest.capabilities.mode);
   const requiredExperimentalWarnings = getRequiredWarningsForMode('experimental');
-  const selectedHook = selectedHookId
-    ? currentProject.manifest.customHooks.find((hook) => hook.id === selectedHookId) ?? null
+  const buildHistory = listProjectBuilds(currentProject.id);
+  const gitHistory = listProjectGitCommits(currentProject.id);
+  const activeHookId = selectedHookId && currentProject.manifest.customHooks.some((hook) => hook.id === selectedHookId)
+    ? selectedHookId
+    : currentProject.manifest.customHooks[0]?.id ?? null;
+  const selectedHook = activeHookId
+    ? currentProject.manifest.customHooks.find((hook) => hook.id === activeHookId) ?? null
     : null;
   const experimentalReady = (
     requiredExperimentalWarnings.every((warningId) => experimentalAcknowledgements.includes(warningId)) &&
@@ -329,13 +291,20 @@ export const Editor = () => {
   );
 
   function commitProject(nextProject: EditorProject) {
-    setProject(nextProject);
-    setEditorNotice(null);
-  }
+    const shouldResetPreview = !project || createPreviewSignature(project) !== createPreviewSignature(nextProject);
+    const nextHookId = nextProject.manifest.customHooks.length === 0
+      ? null
+      : selectedHookId && nextProject.manifest.customHooks.some((hook) => hook.id === selectedHookId)
+        ? selectedHookId
+        : nextProject.manifest.customHooks[0].id;
 
-  function refreshArtifacts(projectToRefresh: EditorProject = currentProject) {
-    setBuildHistory(listProjectBuilds(projectToRefresh.id));
-    setGitHistory(listProjectGitCommits(projectToRefresh.id));
+    setProject(nextProject);
+    setSelectedHookId(nextHookId);
+    if (shouldResetPreview) {
+      setPreviewState(buildPreviewRuntime(nextProject).initialState);
+      setSelection(EMPTY_SELECTION);
+    }
+    setEditorNotice(null);
   }
 
   function handleAddComponent(type: BuiltInComponentType) {
@@ -413,7 +382,6 @@ export const Editor = () => {
 
     saveLocalBuildRecord(build);
     commitProject(pinnedProject);
-    refreshArtifacts(pinnedProject);
     setShippingNotice(
       kind === 'release'
         ? `Published ${build.releaseTitle ?? build.projectName} as snapshot ${build.commitSha}.`
@@ -424,7 +392,6 @@ export const Editor = () => {
   function handleCreateCommit() {
     try {
       const commit = commitProjectToGit(currentProject, currentRuntime, commitMessage);
-      refreshArtifacts();
       setCommitMessage('Checkpoint current prototype');
       setShippingNotice(`Saved commit ${commit.commitSha}.`);
     } catch (error) {
@@ -436,7 +403,6 @@ export const Editor = () => {
     try {
       const restoredProject = restoreProjectFromCommit(currentProject.id, commitSha);
       commitProject(restoredProject);
-      refreshArtifacts(restoredProject);
       setSelectedComponentId(null);
       setShippingNotice(`Restored workspace to commit ${commitSha}.`);
     } catch (error) {
@@ -1234,8 +1200,8 @@ export const Editor = () => {
                         textAlign: 'left',
                         padding: '0.75rem 0.8rem',
                         borderRadius: '14px',
-                        border: selectedHookId === hook.id ? '1px solid rgba(16,185,129,0.35)' : '1px solid rgba(15,118,110,0.12)',
-                        background: selectedHookId === hook.id ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.86)',
+                        border: activeHookId === hook.id ? '1px solid rgba(16,185,129,0.35)' : '1px solid rgba(15,118,110,0.12)',
+                        background: activeHookId === hook.id ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.86)',
                       }}
                     >
                       <div style={{ fontWeight: 700, color: '#064e3b' }}>{hook.name}</div>

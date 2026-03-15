@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 
 type AssetItem = {
@@ -10,34 +10,66 @@ type AssetItem = {
     created_at: string;
 }
 
+function readProjectIdFromHash(): string | null {
+  const hash = window.location.hash;
+  const parts = hash.split('/');
+  return parts.length > 2 ? parts[2] ?? null : null;
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
+}
+
+async function fetchProjectAssets(projectId: string): Promise<AssetItem[]> {
+  const { data, error } = await supabase
+    .from('assets')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    throw error;
+  }
+
+  return data ?? [];
+}
+
 export const Assets = () => {
-  const [projectId, setProjectId] = useState<string | null>(null);
+  const [projectId, setProjectId] = useState<string | null>(() => readProjectIdFromHash());
   const [assets, setAssets] = useState<AssetItem[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
 
   useEffect(() => {
-    const hash = window.location.hash;
-    const parts = hash.split('/');
-    if (parts.length > 2) {
-      setProjectId(parts[2]);
-    }
+    const syncProjectId = () => setProjectId(readProjectIdFromHash());
+    window.addEventListener('hashchange', syncProjectId);
+    return () => window.removeEventListener('hashchange', syncProjectId);
   }, []);
 
   useEffect(() => {
-    if (projectId) fetchAssets();
+    if (!projectId) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadAssets = async () => {
+      try {
+        const nextAssets = await fetchProjectAssets(projectId);
+        if (!cancelled) {
+          setAssets(nextAssets);
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    void loadAssets();
+
+    return () => {
+      cancelled = true;
+    };
   }, [projectId]);
-
-  const fetchAssets = async () => {
-      const { data, error } = await supabase
-        .from('assets')
-        .select('*')
-        .eq('project_id', projectId)
-        .order('created_at', { ascending: false });
-
-      if (data) setAssets(data);
-      if (error) console.error(error);
-  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
@@ -76,10 +108,10 @@ export const Assets = () => {
 
           if (finalizeErr || !finalizeData?.success) throw new Error(finalizeErr?.message || 'Failed to finalize');
 
-          fetchAssets();
+          setAssets(await fetchProjectAssets(projectId));
 
-      } catch (err: any) {
-          setUploadError(err.message);
+      } catch (error: unknown) {
+          setUploadError(getErrorMessage(error, 'Upload failed.'));
       } finally {
           setIsUploading(false);
           // clear input
@@ -97,9 +129,9 @@ export const Assets = () => {
             body: { projectId, prompt }
         });
         if (error) throw error;
-        fetchAssets();
-    } catch (err: any) {
-        alert("Gen Failed: " + err.message);
+        setAssets(await fetchProjectAssets(projectId));
+    } catch (error: unknown) {
+        alert("Gen Failed: " + getErrorMessage(error, 'Image generation failed.'));
     } finally {
         setIsUploading(false);
     }

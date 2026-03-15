@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useEffectEvent, useMemo, useState } from 'react';
 
 import { loadEditorProjects } from '../editor/storage';
 import type { EditorProject } from '../editor/types';
@@ -65,6 +65,50 @@ export const Lobby = () => {
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState('');
 
+  const fetchMyRooms = useEffectEvent(async (currentUserId: string) => {
+    const { data, error } = await supabase
+      .from('mp_rooms')
+      .select('id, join_code, status, license_mode, project_name, last_activity_at, mp_room_members!inner(user_id)')
+      .eq('mp_room_members.user_id', currentUserId)
+      .order('last_activity_at', { ascending: false });
+
+    if (!error && data) {
+      setMyRooms(data as RoomSummary[]);
+    }
+  });
+
+  const fetchOwnedListings = useEffectEvent(async (currentUserId: string, guest: boolean) => {
+    if (guest) {
+      setOwnedListings([]);
+      return;
+    }
+
+    const [{ data: listings }, { data: entitlements }] = await Promise.all([
+      supabase
+        .from('listings')
+        .select('id, title, build_id, dev_id')
+        .eq('status', 'published'),
+      supabase
+        .from('entitlements')
+        .select('listing_id')
+        .eq('buyer_id', currentUserId),
+    ]);
+
+    const entitlementIds = new Set((entitlements ?? []).map((entry) => entry.listing_id));
+    const owned = (listings ?? [])
+      .filter((listing) => listing.build_id && (listing.dev_id === currentUserId || entitlementIds.has(listing.id)))
+      .map((listing) => ({
+        id: listing.id,
+        title: listing.title,
+        build_id: listing.build_id,
+      }));
+
+    setOwnedListings(owned);
+    if (!selectedListingId && owned[0]) {
+      setSelectedListingId(owned[0].id);
+    }
+  });
+
   useEffect(() => {
     const syncPageState = async () => {
       const params = readLobbyParams();
@@ -104,50 +148,6 @@ export const Lobby = () => {
     () => ownedListings.find((listing) => listing.id === selectedListingId) ?? null,
     [ownedListings, selectedListingId],
   );
-
-  async function fetchMyRooms(currentUserId: string) {
-    const { data, error } = await supabase
-      .from('mp_rooms')
-      .select('id, join_code, status, license_mode, project_name, last_activity_at, mp_room_members!inner(user_id)')
-      .eq('mp_room_members.user_id', currentUserId)
-      .order('last_activity_at', { ascending: false });
-
-    if (!error && data) {
-      setMyRooms(data as RoomSummary[]);
-    }
-  }
-
-  async function fetchOwnedListings(currentUserId: string, guest: boolean) {
-    if (guest) {
-      setOwnedListings([]);
-      return;
-    }
-
-    const [{ data: listings }, { data: entitlements }] = await Promise.all([
-      supabase
-        .from('listings')
-        .select('id, title, build_id, dev_id')
-        .eq('status', 'published'),
-      supabase
-        .from('entitlements')
-        .select('listing_id')
-        .eq('buyer_id', currentUserId),
-    ]);
-
-    const entitlementIds = new Set((entitlements ?? []).map((entry) => entry.listing_id));
-    const owned = (listings ?? [])
-      .filter((listing) => listing.build_id && (listing.dev_id === currentUserId || entitlementIds.has(listing.id)))
-      .map((listing) => ({
-        id: listing.id,
-        title: listing.title,
-        build_id: listing.build_id,
-      }));
-
-    setOwnedListings(owned);
-    if (!selectedListingId && owned[0]) {
-      setSelectedListingId(owned[0].id);
-    }
-  }
 
   async function handlePreviewJoin(nextCode: string) {
     if (nextCode.trim().length < 3) {

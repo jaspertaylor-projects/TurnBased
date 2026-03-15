@@ -1,6 +1,10 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
 
+function getErrorMessage(error: unknown, fallback: string): string {
+    return error instanceof Error ? error.message : fallback;
+}
+
 export const Auth = () => {
     const [mode, setMode] = useState<'login' | 'register'>('login');
     const [email, setEmail] = useState('');
@@ -41,8 +45,8 @@ export const Auth = () => {
                 if (signInError) throw signInError;
                 window.location.hash = '#/dashboard';
             }
-        } catch (err: any) {
-            setError(err.message || 'Authentication failed');
+        } catch (error: unknown) {
+            setError(getErrorMessage(error, 'Authentication failed'));
         } finally {
             setLoading(false);
         }
@@ -55,8 +59,8 @@ export const Auth = () => {
             const { error: anonErr } = await supabase.auth.signInAnonymously();
             if (anonErr) throw anonErr;
             window.location.hash = '#/dashboard';
-        } catch (err: any) {
-            setError(err.message || 'Guest login failed');
+        } catch (error: unknown) {
+            setError(getErrorMessage(error, 'Guest login failed'));
             setLoading(false);
         }
     };

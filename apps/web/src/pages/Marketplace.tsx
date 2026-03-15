@@ -1,8 +1,20 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
 
+interface MarketplaceListing {
+    id: string;
+    title: string;
+    description: string | null;
+    price_cents: number;
+    isOwned?: boolean;
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+    return error instanceof Error ? error.message : fallback;
+}
+
 export const Marketplace = () => {
-    const [listings, setListings] = useState<any[]>([]);
+    const [listings, setListings] = useState<MarketplaceListing[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [buyingId, setBuyingId] = useState<string | null>(null);
@@ -25,26 +37,27 @@ export const Marketplace = () => {
 
             // Fetch user's entitlements to mark things as "Owned"
             const { data: { user } } = await supabase.auth.getUser();
-            if (user && data) {
+            const baseListings = (data ?? []) as MarketplaceListing[];
+            if (user) {
                 const { data: entitlements } = await supabase
                     .from('entitlements')
                     .select('listing_id')
                     .eq('buyer_id', user.id);
                 
                 const ownedSet = new Set(entitlements?.map(e => e.listing_id) || []);
-                const enriched = data.map(l => ({ ...l, isOwned: ownedSet.has(l.id) }));
+                const enriched = baseListings.map((listing) => ({ ...listing, isOwned: ownedSet.has(listing.id) }));
                 setListings(enriched);
             } else {
-                setListings(data || []);
+                setListings(baseListings);
             }
-        } catch (err: any) {
-             setError(err.message || 'Error loading marketplace');
+        } catch (error: unknown) {
+             setError(getErrorMessage(error, 'Error loading marketplace'));
         } finally {
              setLoading(false);
         }
     };
 
-    const handleMockPurchase = async (listing: any) => {
+    const handleMockPurchase = async (listing: MarketplaceListing) => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
              alert("Please login to purchase");
@@ -79,8 +92,8 @@ export const Marketplace = () => {
             alert("Purchase successful! You now own " + listing.title);
             fetchListings(); // Refresh to show "Owned"
 
-        } catch (err: any) {
-             alert("Test Purchase Failed: " + err.message);
+        } catch (error: unknown) {
+             alert("Test Purchase Failed: " + getErrorMessage(error, 'Mock purchase failed.'));
         } finally {
              setBuyingId(null);
         }
