@@ -4,13 +4,13 @@ import { supabase } from './lib/supabaseClient'
 import { Home } from './pages/Home'
 import { Auth } from './pages/Auth'
 import { Settings } from './pages/Settings'
-import { Templates } from './pages/Templates'
 import { Dashboard } from './pages/Dashboard'
 import { Editor } from './pages/Editor'
 import { Assets } from './pages/Assets'
 import { Play } from './pages/Play'
 import { Lobby } from './pages/Lobby'
 import { Marketplace } from './pages/Marketplace'
+import { CreateBlankProject } from './pages/CreateBlankProject'
 
 function App() {
   const [route, setRoute] = useState(window.location.hash);
@@ -18,7 +18,14 @@ function App() {
 
   useEffect(() => {
     // Read route on load
-    const onHashChange = () => setRoute(window.location.hash || '#/');
+    const onHashChange = () => {
+      const nextRoute = window.location.hash || '#/';
+      if (nextRoute === '#/templates') {
+        window.location.hash = '#/new';
+        return;
+      }
+      setRoute(nextRoute);
+    };
     window.addEventListener('hashchange', onHashChange);
     onHashChange();
 
@@ -52,9 +59,9 @@ function App() {
       if (route.startsWith('#/lobby')) return <Lobby />
       switch (route) {
           case '#/auth': return <Auth />
+          case '#/new': return <CreateBlankProject />
           case '#/marketplace': return <Marketplace />
           case '#/settings': return <Settings />
-          case '#/templates': return <Templates />
           case '#/dashboard': return <Dashboard />
           default: return <Home />
       }

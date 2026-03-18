@@ -198,8 +198,12 @@ export function createCompatibilityWarnings(project: EditorProject, runtime: Pre
 export function createWorkspaceFiles(project: EditorProject, runtime: PreviewRuntime): Record<string, string> {
   const manifestFile = canonicalSerialize(project.manifest);
   const projectFile = canonicalSerialize(project);
+  const briefFile = canonicalSerialize(project.brief);
+  const viewsFile = canonicalSerialize(project.views);
+  const appLayoutFile = canonicalSerialize(project.appLayout);
   const support = getProjectModeSupportSummary(project);
   const capabilitiesFile = canonicalSerialize({
+    phase: project.phase,
     mode: project.manifest.capabilities.mode,
     label: getProjectModeLabel(project.manifest.capabilities.mode),
     acknowledgedWarnings: project.manifest.capabilities.acknowledgedWarnings,
@@ -226,7 +230,10 @@ export function createWorkspaceFiles(project: EditorProject, runtime: PreviewRun
     support.supportDescription,
     '',
     '## Seats',
-    ...project.seats.map((seat) => `- ${seat.name} (${seat.id})`),
+    ...project.seats.map((seat) => `- ${seat.name} (${seat.id}) · ${seat.resources.startingBlocks} ${seat.resources.resourceLabel.toLowerCase()} · icon ${seat.identity.iconKey}`),
+    '',
+    '## Views',
+    ...project.views.items.map((view) => `- ${view.label} (${view.kind}${view.linkedSeatId ? ` -> ${view.linkedSeatId}` : ''})`),
     '',
     '## Rules',
     project.rules.rulesText,
@@ -236,6 +243,9 @@ export function createWorkspaceFiles(project: EditorProject, runtime: PreviewRun
 
   return {
     'turnbased.project.json': projectFile,
+    'turnbased.brief.json': briefFile,
+    'turnbased.views.json': viewsFile,
+    'turnbased.app-layout.json': appLayoutFile,
     'turnbased.manifest.json': manifestFile,
     'turnbased.capabilities.json': capabilitiesFile,
     'turnbased.extensions.json': extensionsFile,

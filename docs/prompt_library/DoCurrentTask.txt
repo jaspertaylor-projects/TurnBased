@@ -1,0 +1,1 @@
+Read Agents.md to understand the project, then read CurrentTask.md and execute the plan.   Commit to git with an appropriate message, once your done.

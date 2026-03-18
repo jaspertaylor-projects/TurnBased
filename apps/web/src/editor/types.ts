@@ -79,6 +79,27 @@ export interface EditorSeat {
   id: string;
   name: string;
   color: string;
+  identity: {
+    badgeLabel: string;
+    iconKey: string;
+    customAvatarUrl: string | null;
+  };
+  resources: {
+    startingBlocks: number;
+    resourceLabel: string;
+  };
+}
+
+export type EditorProjectPhase = 'brief' | 'building' | 'ready';
+
+export interface RulesBuilderBrief {
+  name: string;
+  minPlayers: number;
+  maxPlayers: number;
+  hasDistinctSoloMode: boolean;
+  isCampaignGame: boolean;
+  theme: string;
+  artStyle: string;
 }
 
 export interface EditorRuleConfig {
@@ -90,17 +111,59 @@ export interface EditorRuleConfig {
   designerNotes: string;
 }
 
+export type EditorTimeControlMode = 'none' | 'per_turn' | 'per_match';
+
+export interface EditorSettings {
+  timeControlMode: EditorTimeControlMode;
+  timeControlSeconds: number;
+}
+
+export type EditorProjectViewKind = 'shared' | 'player';
+
+export interface EditorProjectView {
+  id: string;
+  kind: EditorProjectViewKind;
+  label: string;
+  linkedSeatId: string | null;
+  parentViewId: string | null;
+  description: string;
+}
+
+export interface EditorProjectViews {
+  defaultViewId: string;
+  selectedViewId: string;
+  items: EditorProjectView[];
+}
+
+export interface EditorAppLayout {
+  shellTitle: string;
+  introText: string;
+  hudItems: string[];
+  sidePanels: string[];
+  primaryActionLabel: string;
+  summaryStripLabel: string;
+  linkedViewLabel: string;
+  resourceSummaryLabel: string;
+  navigationMode: 'summary_strip';
+  avatarStyle: 'lucide';
+}
+
 export interface EditorProject {
   id: string;
   name: string;
   description: string;
   createdAt: string;
   updatedAt: string;
+  phase: EditorProjectPhase;
   manifest: ProjectManifest;
+  brief: RulesBuilderBrief;
   seats: EditorSeat[];
+  views: EditorProjectViews;
   rootInstanceIds: string[];
   instances: Record<string, ComponentInstanceModel>;
   rules: EditorRuleConfig;
+  settings: EditorSettings;
+  appLayout: EditorAppLayout;
 }
 
 export interface StoredEditorProjects {

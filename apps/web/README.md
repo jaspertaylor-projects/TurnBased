@@ -1,73 +1,43 @@
-# React + TypeScript + Vite
+# Web App
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This app hosts the creator dashboard, editor, local preview flows, and marketplace-facing browser UI for TurnBased.
 
-Currently, two official plugins are available:
+## Editor Structure
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+The creator flow is intentionally split into two phases:
 
-## React Compiler
+- Pre-build: the `#/new` rules builder collects player count, player colors, theme, components, and the first rules draft, then offers `Get AI rule suggestions / clarifications` and `Build with AI`.
+- Post-build: the generated workspace opens in the editor shell with focused modules for `Visual`, `Preview`, `Versions`, `Component Editor`, and `App Layout`.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+The post-build editor is intentionally split into a thin page shell plus focused modules:
 
-## Expanding the ESLint configuration
+- `src/pages/Editor.tsx`
+  Orchestrates project loading, persistence, preview runtime state, version history, workspace syncing, routing from the hash, and cross-section actions.
+- `src/editor/components/`
+  Shared shell pieces such as the compact sidebar and requirements notice.
+- `src/editor/sections/`
+  One file per top-level editor area. Right now that is `Visual`, `Preview`, `Versions`, `Component Editor`, and `App Layout`.
+- `src/editor/helpers.ts`, `src/editor/styles.ts`, `src/editor/constants.ts`
+  Shared non-domain helpers, editor UI styles, and section metadata.
+- `src/editor/project.ts`, `src/editor/runtime.ts`, `src/editor/storage.ts`, `src/editor/workspace.ts`, `src/editor/git.ts`, `src/editor/aiBuilder.ts`
+  Domain logic for editing project data, compiling preview runtime state, persisting project records, maintaining the per-project workspace boundary, version history, and AI project generation.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Scaling Rules
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+When the creator grows, keep these boundaries intact:
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+- Add new editor views as new files under `src/editor/sections/` instead of expanding `Editor.tsx`.
+- Keep the rules-builder flow separate from the post-build editor shell.
+- Keep `Editor.tsx` responsible for shared state and coordination only, not detailed rendering.
+- Put reusable sidebar, navigation, notices, and future workspace chrome in `src/editor/components/`.
+- Keep business logic in `src/editor/*.ts` modules rather than embedding it in React components.
+- If a section needs its own internal workflow, split that section into subcomponents before it becomes another large mixed-responsibility file.
+- Treat the per-project workspace as the writable boundary for generated artifacts and version history. AI builders may read broader repo context, but generated files should land inside the project workspace only.
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+## AI-First Project Flow
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+The old templates screen has been removed. New project entry points now go through `#/new`, which opens the AI-first rules builder instead of a blank editor.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Until there is a rules brief, there is no game. `Build with AI` generates the initial project scaffold, writes the workspace files, creates the first local version checkpoint, and then opens the editor.
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+Legacy `#/templates` hashes are redirected to `#/new` in the router so old links do not strand users.

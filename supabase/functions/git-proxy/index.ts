@@ -154,6 +154,21 @@ serve(async (req: Request) => {
           ? commitSha.trim()
           : `mock-sha-${Date.now()}`;
 
+        const { error: projectUpdateErr } = await supabaseAdmin
+          .from('projects')
+          .update({
+            name: typeof projectSnapshot?.name === 'string' ? projectSnapshot.name : undefined,
+            description: typeof projectSnapshot?.description === 'string' ? projectSnapshot.description : null,
+            project_kind: 'engine_first',
+            engine_manifest: projectSnapshot?.manifest ?? {},
+            editor_snapshot: projectSnapshot,
+          })
+          .eq('id', projectId);
+
+        if (projectUpdateErr) {
+          throw new Error('Failed to sync project snapshot: ' + projectUpdateErr.message);
+        }
+
         const { error: insertErr } = await supabaseAdmin
           .from('project_git_commits')
           .insert({

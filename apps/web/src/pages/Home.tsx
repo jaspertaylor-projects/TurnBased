@@ -155,7 +155,7 @@ export const Home = () => {
             </p>
 
             <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-              <a href="#/templates" id="cta-start" style={{
+              <a href="#/new" id="cta-start" style={{
                 padding: '1rem 2.2rem',
                 background: '#064e3b', color: '#fff',
                 borderRadius: 'var(--radius-md)',
@@ -210,8 +210,8 @@ export const Home = () => {
               <RevealSection delay={0.1}>
                 <FeatureCard icon="🍃" title="AI-Powered Browser Editor" accent="#10b981">
                   <p style={{ margin: 0 }}>
-                    Write game logic, design rules, and generate assets — all in your browser. No downloads required.
-                    Built-in AI agents help you code, write rules text, and create art.
+                    Start with a lightweight setup form, then let AI generate a linked multi-view workspace in the browser. No downloads required.
+                    The editor opens into visual, preview, versions, component editor, and app layout tabs after the first build.
                   </p>
                 </FeatureCard>
               </RevealSection>
@@ -248,13 +248,13 @@ export const Home = () => {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               <RevealSection delay={0.1}>
-                <StepCard num={1} title="Start with Components" desc="Open a blank workspace, then assemble boards, spaces, zones, counters, and pieces from the built-in catalog. The engine handles turn flow and legal move wiring underneath." />
+                <StepCard num={1} title="Start with Setup" desc="Enter the game name, player range, solo and campaign flags, theme, and art style. AI uses that setup to create the initial linked-view scaffold." />
               </RevealSection>
               <RevealSection delay={0.2}>
-                <StepCard num={2} title="Tune Rules and Layout" desc="Adjust turn phases, target score, ownership, and placement directly in the browser. The editor previews legal move overlays as you iterate." />
+                <StepCard num={2} title="Build with AI" desc="Generate the first workspace from the setup form and engine APIs. The result opens straight into visual editing, version history, component editing, and runtime preview." />
               </RevealSection>
               <RevealSection delay={0.3}>
-                <StepCard num={3} title="Invite & Playtest" desc="Generate a shareable link. Friends join your multiplayer room instantly — no accounts required for guest testers." />
+                <StepCard num={3} title="Refine and Playtest" desc="Adjust components, app layout, and version checkpoints while preview shows the current playable state and legal move flow." />
               </RevealSection>
               <RevealSection delay={0.4}>
                 <StepCard num={4} title="Publish & Sell" desc="List your game on the TurnBased marketplace. Players purchase access, and our 'one friend owns' model means game night stays effortless." />

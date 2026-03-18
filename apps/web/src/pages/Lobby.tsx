@@ -250,7 +250,7 @@ export const Lobby = () => {
         </p>
         <h1 style={{ marginBottom: '0.65rem' }}>Playtest snapshots and entitlement-gated rooms share one flow.</h1>
         <p style={{ color: '#0f766e', lineHeight: 1.7, margin: 0 }}>
-          Create live playtest rooms from your local component-first projects, or launch ownership-gated rooms from marketplace listings.
+          Create live playtest rooms from your local AI-generated projects, or launch ownership-gated rooms from marketplace listings.
           Joining automatically validates seat capacity, guest policy, and one-owner-present access rules before anyone enters the match.
         </p>
       </div>

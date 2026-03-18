@@ -16,26 +16,25 @@ The original platform design was template-first: creators would pick a game temp
 
 ## Decision
 
-**The platform ships with a powerful built-in game engine and a hierarchical component library. Creators assemble games from reusable components rather than starting from templates.**
+**The platform ships with a powerful built-in game engine and a hierarchical component library. Creators begin from a lightweight setup form and AI-guided project generation rather than from templates, then refine the result through reusable components and engine-backed tooling.**
 
 ### How it works
 
-1. **New project creation** starts with an empty game definition, not a template picker.
-2. Creators compose games from a **component catalog**: boards, spaces, tracks, zones, decks, hands, counters, resources, tokens, pieces, prompts, and rule definitions.
-3. The **engine** handles all core mechanics (state, turns, triggers, visibility, legal moves) so creators focus on game design, not engine implementation.
-4. **AI agents** assist with rules authoring, component placement, logic generation, and asset creation — all grounded in engine documentation and the component catalog.
-5. **Sample games** serve as learning references, not starting points. They demonstrate how to use built-in components and rules.
+1. **New project creation** starts with a lightweight setup form, not a template picker.
+2. **AI project generation** turns that setup into a first playable linked multi-view workspace grounded in engine docs, the component catalog, and preview/runtime constraints.
+3. Creators refine the generated project through a **component catalog**: boards, spaces, tracks, zones, decks, hands, counters, resources, tokens, pieces, prompts, and rule definitions.
+4. The **engine** handles all core mechanics (state, turns, triggers, visibility, legal moves) so creators focus on game design, not engine implementation.
+5. **AI agents** remain the primary accelerator for rules authoring, component shaping, logic generation, and asset creation — all grounded in engine documentation and the component catalog.
+6. **Sample games** serve as learning references and regression targets, not starting points.
 
 ### Component-first workflow
 
 ```
 Creator opens new project
-  → Empty game definition
-  → Opens component palette
-  → Adds board (square grid, hex, graph, etc.)
-  → Adds zones (deck, hand, discard, etc.)
-  → Adds pieces/tokens/cards
-  → Defines rules (turn structure, move permissions, win conditions)
+  → Enters setup form
+  → Builds with AI
+  → Reviews generated workspace
+  → Refines boards, zones, pieces, and rules
   → Previews live
   → Publishes
 ```
@@ -51,7 +50,8 @@ Creator opens new project
 
 ### What replaces templates
 
-- **Component catalog** replaces template picker for structure.
+- **Lightweight setup form + AI generation** replaces template picker for the first playable build.
+- **Component catalog** replaces template-specific structure for ongoing refinement.
 - **Declarative rules** replace template-specific logic files.
 - **Sample games** replace template cloning for learning.
 - **AI agents** replace manual boilerplate generation.
@@ -99,6 +99,6 @@ Creator opens new project
 
 ## References
 
-- GEMINI.md: Paradigm Update section
-- GEMINI.md: Component System section
-- GEMINI.md: Rules Authoring Model section
+- Agents.md
+- docs/engine/component-model.md
+- docs/engine/rules-authoring.md

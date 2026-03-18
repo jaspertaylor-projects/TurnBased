@@ -20,6 +20,7 @@
     "@turnbased/engine-ui": "*",
     "@turnbased/shared-types": "*",
     "@turnbased/shared-utils": "*",
+    "lucide-react": "^0.552.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "three": "^0.183.2"

@@ -34,11 +34,11 @@ export const Dashboard = () => {
           </p>
           <h1 style={{ marginBottom: '0.35rem' }}>My Prototypes</h1>
           <p style={{ margin: 0, color: '#0f766e' }}>
-            Component-first workspaces, live preview, and local playtest state.
+            AI-built workspaces, live preview, and version history with optional Supabase backup.
           </p>
         </div>
         <a
-          href="#/templates"
+          href="#/new"
           style={{
             padding: '0.8rem 1rem',
             background: 'linear-gradient(135deg, #064e3b, #10b981)',
@@ -48,7 +48,7 @@ export const Dashboard = () => {
             boxShadow: '0 16px 32px rgba(6,78,59,0.16)',
           }}
         >
-          + New Blank Project
+          + New AI Project
         </a>
       </div>
 
@@ -56,7 +56,7 @@ export const Dashboard = () => {
         {projects.length === 0 ? (
           <div style={{ padding: '1.4rem', borderRadius: '20px', background: 'rgba(255,255,255,0.82)', border: '1px solid rgba(16,185,129,0.14)' }}>
             <p style={{ color: '#0f766e', margin: 0 }}>
-              No local projects yet. Create a blank workspace and start placing components.
+              No projects yet. Start with the lightweight setup form and let AI generate the first linked multi-view workspace.
             </p>
           </div>
         ) : (
@@ -87,6 +87,9 @@ export const Dashboard = () => {
                         Updated {new Date(project.updatedAt).toLocaleString()}
                       </div>
                       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
+                        <span style={{ padding: '0.35rem 0.65rem', borderRadius: '999px', background: project.phase === 'ready' ? 'rgba(240,253,244,0.9)' : project.phase === 'building' ? 'rgba(254,249,195,0.9)' : 'rgba(239,246,255,0.92)', color: project.phase === 'ready' ? '#065f46' : project.phase === 'building' ? '#854d0e' : '#155e75', fontSize: '0.78rem' }}>
+                          {project.phase === 'ready' ? 'Generated workspace' : project.phase === 'building' ? 'AI building' : 'Rules brief'}
+                        </span>
                         <span style={{ padding: '0.35rem 0.65rem', borderRadius: '999px', background: project.manifest.capabilities.mode === 'experimental' ? 'rgba(254,226,226,0.85)' : project.manifest.capabilities.mode === 'advanced' ? 'rgba(254,249,195,0.9)' : 'rgba(240,253,244,0.9)', color: project.manifest.capabilities.mode === 'experimental' ? '#991b1b' : project.manifest.capabilities.mode === 'advanced' ? '#854d0e' : '#065f46', fontSize: '0.78rem' }}>
                           {summary.modeLabel}
                         </span>
