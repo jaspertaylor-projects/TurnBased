@@ -27,8 +27,31 @@ import {
 
 import type { EditorProject, PreviewRuntime } from './types';
 
-const ZONE_TYPES = new Set(['space', 'zone', 'track', 'deck', 'hand', 'discard', 'bag', 'score-track']);
+const ZONE_TYPES = new Set(['space', 'zone', 'resource-pile', 'track', 'deck', 'hand', 'discard', 'bag', 'score-track']);
 const DESTINATION_TYPES = new Set(['space', 'zone']);
+
+export function toPreviewZoneId(instanceId: string): ZoneId {
+  return createZoneId(`zone_${instanceId}`);
+}
+
+export function toPreviewEntityId(instanceId: string, copyIndex?: number) {
+  if (typeof copyIndex === 'number') {
+    return createEntityId(`ent_${instanceId}_${copyIndex + 1}`);
+  }
+
+  return createEntityId(`ent_${instanceId}`);
+}
+
+function getEntityQuantity(instance: EditorProject['instances'][string]): number {
+  if (instance.componentType !== 'piece' && instance.componentType !== 'token') {
+    return 0;
+  }
+
+  const quantity = instance.properties.quantity;
+  return typeof quantity === 'number' && Number.isFinite(quantity) && quantity > 0
+    ? Math.max(1, Math.trunc(quantity))
+    : 1;
+}
 
 function clonePhases(phases: readonly string[]) {
   return phases.map((phase) => ({
@@ -53,10 +76,10 @@ function isDestinationType(componentType: string): boolean {
 
 function getZoneCapacity(componentType: string, properties: Record<string, unknown>): number | null {
   if (componentType === 'space') {
-    return 1;
+    return typeof properties.maxCapacity === 'number' ? properties.maxCapacity : null;
   }
 
-  if (componentType === 'zone') {
+  if (componentType === 'zone' || componentType === 'resource-pile') {
     return typeof properties.maxCapacity === 'number' ? properties.maxCapacity : null;
   }
 
@@ -101,7 +124,7 @@ function buildZoneIdsByType(project: EditorProject): Record<string, ZoneId[]> {
     }
 
     const list = groups[instance.componentType] ?? [];
-    list.push(createZoneId(instance.instanceId));
+    list.push(toPreviewZoneId(instance.instanceId));
     groups[instance.componentType] = list;
     return groups;
   }, {});
@@ -113,8 +136,10 @@ function buildZones(project: EditorProject): Record<string, Zone> {
       return zones;
     }
 
-    zones[instance.instanceId] = {
-      id: createZoneId(instance.instanceId),
+    const zoneId = toPreviewZoneId(instance.instanceId);
+
+    zones[zoneId] = {
+      id: zoneId,
       type: instance.componentType,
       name: getZoneName(instance),
       ownerId: instance.bindings.ownerId ? createPlayerId(instance.bindings.ownerId) : null,
@@ -123,7 +148,14 @@ function buildZones(project: EditorProject): Record<string, Zone> {
           const child = project.instances[childId];
           return child && (child.componentType === 'piece' || child.componentType === 'token');
         })
-        .map((childId) => createEntityId(childId)),
+        .flatMap((childId) => {
+          const child = project.instances[childId];
+          const quantity = child ? getEntityQuantity(child) : 1;
+
+          return Array.from({ length: quantity }, (_unused, copyIndex) => (
+            quantity > 1 ? toPreviewEntityId(childId, copyIndex) : toPreviewEntityId(childId)
+          ));
+        }),
       maxCapacity: getZoneCapacity(instance.componentType, instance.properties),
       visibility: {
         defaultVisibility: getZoneVisibility(instance.componentType),
@@ -150,21 +182,30 @@ function buildEntities(project: EditorProject): GameState['entities'] {
     }
 
     const ownerId = instance.bindings.ownerId ?? parent.bindings.ownerId ?? project.seats[0]?.id ?? null;
-    entities[instance.instanceId] = {
-      id: createEntityId(instance.instanceId),
-      type: instance.componentType,
-      componentType: instance.componentType,
-      zoneId: createZoneId(parent.instanceId),
-      ownerId: ownerId ? createPlayerId(ownerId) : null,
-      controllerId: ownerId ? createPlayerId(ownerId) : null,
-      position: typeof instance.placement?.index === 'number' ? instance.placement.index : 0,
-      faceUp: getZoneVisibility(parent.componentType) !== Visibility.Hidden,
-      properties: {
-        ...instance.properties,
-        instanceId: instance.instanceId,
-      },
-      tags: [instance.componentType],
-    };
+    const quantity = getEntityQuantity(instance);
+
+    for (let copyIndex = 0; copyIndex < quantity; copyIndex += 1) {
+      const entityId = quantity > 1
+        ? toPreviewEntityId(instance.instanceId, copyIndex)
+        : toPreviewEntityId(instance.instanceId);
+      entities[entityId] = {
+        id: entityId,
+        type: instance.componentType,
+        componentType: instance.componentType,
+        zoneId: toPreviewZoneId(parent.instanceId),
+        ownerId: ownerId ? createPlayerId(ownerId) : null,
+        controllerId: ownerId ? createPlayerId(ownerId) : null,
+        position: typeof instance.placement?.index === 'number' ? instance.placement.index + copyIndex : copyIndex,
+        faceUp: getZoneVisibility(parent.componentType) !== Visibility.Hidden,
+        properties: {
+          ...instance.properties,
+          instanceId: instance.instanceId,
+          copyIndex,
+        },
+        tags: [instance.componentType],
+      };
+    }
+
     return entities;
   }, {});
 }
@@ -299,6 +340,70 @@ export function applyPreviewActions(
   return nextState;
 }
 
+export function normalizePreviewActions(
+  project: EditorProject,
+  state: GameState,
+  actions: readonly CanonicalAction[],
+): CanonicalAction[] {
+  return actions.map((action) => {
+    if (action.type !== 'MOVE_ENTITY') {
+      return action;
+    }
+
+    const entityId = action.payload.entityId.startsWith('ent_')
+      ? action.payload.entityId
+      : (project.instances[action.payload.entityId]
+        ? toPreviewEntityId(action.payload.entityId)
+        : action.payload.entityId);
+    const fromZoneId = action.payload.fromZoneId.startsWith('zone_')
+      ? action.payload.fromZoneId
+      : (project.instances[action.payload.fromZoneId]
+        ? toPreviewZoneId(action.payload.fromZoneId)
+        : state.entities[entityId]?.zoneId ?? action.payload.fromZoneId);
+    const toZoneId = action.payload.toZoneId.startsWith('zone_')
+      ? action.payload.toZoneId
+      : (project.instances[action.payload.toZoneId]
+        ? toPreviewZoneId(action.payload.toZoneId)
+        : action.payload.toZoneId);
+    const sourceEntity = state.entities[entityId];
+    const sourceInstanceId = typeof sourceEntity?.properties.instanceId === 'string'
+      ? sourceEntity.properties.instanceId
+      : null;
+    const sourceInstance = sourceInstanceId ? project.instances[sourceInstanceId] : null;
+    const isInfiniteSupply = sourceInstance?.componentType === 'piece' || sourceInstance?.componentType === 'token'
+      ? sourceInstance.properties.supplyMode === 'infinite'
+      : false;
+
+    if (isInfiniteSupply && sourceEntity) {
+      const createdEntityId = createEntityId(`ent_${sourceEntity.properties.instanceId}_${state.version + 1}_${toZoneId}`);
+      return {
+        type: 'CREATE_ENTITY',
+        payload: {
+          entity: {
+            ...sourceEntity,
+            id: createdEntityId,
+            zoneId: toZoneId,
+            position: state.zones[toZoneId]?.entityIds.length ?? 0,
+          },
+          zoneId: toZoneId,
+        },
+        source: action.source,
+        timestamp: action.timestamp,
+      };
+    }
+
+    return {
+      ...action,
+      payload: {
+        ...action.payload,
+        entityId,
+        fromZoneId,
+        toZoneId,
+      },
+    };
+  });
+}
+
 function createTerritoryMoveDefinition(destinationZoneIds: readonly ZoneId[]): LegalMoveDefinition {
   return {
     id: 'territory-move',
@@ -394,7 +499,7 @@ export function buildPreviewRuntime(project: EditorProject): PreviewRuntime {
   const zoneIdsByType = buildZoneIdsByType(project);
   const scoringZoneIds = Object.values(project.instances)
     .filter((instance) => isDestinationType(instance.componentType))
-    .map((instance) => createZoneId(instance.instanceId));
+    .map((instance) => toPreviewZoneId(instance.instanceId));
   const destinationZoneIds = [...scoringZoneIds];
   const entities = buildEntities(project);
   const players = buildPlayers(project);

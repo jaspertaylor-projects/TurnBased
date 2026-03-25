@@ -4,7 +4,10 @@ import {
 } from '@turnbased/shared-types';
 import {
   createComponentInstance,
+  getGridCellLabel,
+  getGridCoordinateKey,
   getBuiltInComponentManifest,
+  readGridCellCoordinates,
   validateComponentPlacement,
 } from '@turnbased/engine-components';
 import type {
@@ -15,6 +18,7 @@ import type {
 import { generateId } from '@turnbased/shared-utils';
 
 import { createDefaultProjectManifest } from './manifest';
+import { createDefaultProjectColorPalette } from './projectPalette';
 import type {
   EditorAppLayout,
   EditorProject,
@@ -51,6 +55,7 @@ export function createDefaultProjectSettings(): EditorSettings {
   return {
     timeControlMode: 'none',
     timeControlSeconds: 300,
+    colorPalette: createDefaultProjectColorPalette(),
   };
 }
 
@@ -87,10 +92,24 @@ export function createDefaultRulesBrief(): RulesBuilderBrief {
   };
 }
 
+export function normalizeRulesBuilderBrief(brief: RulesBuilderBrief): RulesBuilderBrief {
+  const normalizedMin = Math.max(1, Math.min(6, Math.trunc(brief.minPlayers || 1)));
+  const normalizedMax = Math.max(normalizedMin, Math.min(6, Math.trunc(brief.maxPlayers || normalizedMin)));
+
+  return {
+    ...brief,
+    name: brief.name.trim(),
+    minPlayers: normalizedMin,
+    maxPlayers: normalizedMax,
+    theme: brief.theme.trim() || 'none',
+    artStyle: brief.artStyle.trim() || 'none',
+  };
+}
+
 export function createDefaultAppLayout(name = 'New Prototype'): EditorAppLayout {
   return {
     shellTitle: name,
-    introText: 'A linked multi-view match opens with the shared board and lets you jump into any player area from the summary strip.',
+    introText: 'A linked multi-view match opens with the shared board and lets you jump into each player resources area from the summary strip.',
     hudItems: ['Turn tracker', 'Blocks', 'Active player'],
     sidePanels: ['Rules', 'Players', 'Board context'],
     primaryActionLabel: 'Take turn',
@@ -119,7 +138,7 @@ export function createDefaultProjectViews(seats: EditorSeat[], projectName = 'Ne
       label: `${seat.name} View`,
       linkedSeatId: seat.id,
       parentViewId: sharedViewId,
-      description: `${seat.name}'s personal area stays linked to the shared board shell.`,
+      description: `${seat.name}'s resources view stays linked to the shared board shell.`,
     })),
   ];
 
@@ -168,6 +187,30 @@ function countSiblings(project: EditorProject, parentId: string | null, componen
   return Object.values(project.instances).filter((instance) => (
     instance.parentId === parentId && instance.componentType === componentType
   )).length;
+}
+
+function isBoardGridComponentType(componentType: string): componentType is 'hex-grid' | 'square-grid' | 'checkerboard-grid' {
+  return componentType === 'hex-grid' || componentType === 'square-grid' || componentType === 'checkerboard-grid';
+}
+
+function getGridCells(instance: ComponentInstanceModel) {
+  const fallbackRows = typeof instance.properties.rows === 'number' && Number.isFinite(instance.properties.rows)
+    ? Math.max(1, Math.trunc(instance.properties.rows))
+    : 1;
+  const fallbackColumns = typeof instance.properties.columns === 'number' && Number.isFinite(instance.properties.columns)
+    ? Math.max(1, Math.trunc(instance.properties.columns))
+    : 1;
+
+  return readGridCellCoordinates(instance.properties.cells, fallbackRows, fallbackColumns);
+}
+
+function collectRemovedInstanceIds(project: EditorProject, instanceId: string): string[] {
+  const instance = project.instances[instanceId];
+  if (!instance) {
+    return [];
+  }
+
+  return instance.children.flatMap((childId) => [childId, ...collectRemovedInstanceIds(project, childId)]);
 }
 
 function inferPlacement(
@@ -241,7 +284,7 @@ export function createBlankProject(name = 'Untitled Prototype'): EditorProject {
       targetScore: 3,
       maxTurns: 12,
       rulesText: 'Players alternate taking a turn. Each seat begins with 6 block resources in a linked personal view, and occupying public spaces increases score.',
-      designerNotes: 'This workspace can be generated from a lightweight setup form, then refined across visual, preview, versions, component editor, and app layout tabs.',
+      designerNotes: 'This workspace can be generated from a lightweight setup form, then refined across the component editor, preview, versions, and app layout sections.',
     },
     settings: createDefaultProjectSettings(),
     appLayout: createDefaultAppLayout(name),
@@ -423,6 +466,104 @@ export function updateComponentInstance(
       [instanceId]: updater(current),
     },
   });
+}
+
+export function syncGeneratedBoardChildren(project: EditorProject, instanceId: string): EditorProject {
+  const instance = project.instances[instanceId];
+  if (!instance || !isBoardGridComponentType(instance.componentType)) {
+    return project;
+  }
+
+  const desiredCells = getGridCells(instance);
+  const existingCellIds = instance.children
+    .map(String)
+    .filter((childId) => project.instances[childId]?.componentType === 'space');
+  const existingCellsByCoordinate = new Map(
+    existingCellIds.map((childId) => {
+      const child = project.instances[childId];
+      const coordinate = {
+        x: typeof child?.placement?.coordinates?.x === 'number' ? Math.trunc(child.placement.coordinates.x) : 0,
+        y: typeof child?.placement?.coordinates?.y === 'number' ? Math.trunc(child.placement.coordinates.y) : 0,
+      };
+
+      return [getGridCoordinateKey(coordinate), childId] as const;
+    }),
+  );
+  const nextInstances: EditorProject['instances'] = {
+    ...project.instances,
+  };
+  const nextChildIds: string[] = [];
+  const spaceManifest = getBuiltInComponentManifest('space');
+
+  for (const [index, coordinate] of desiredCells.entries()) {
+    const existingCellId = existingCellsByCoordinate.get(getGridCoordinateKey(coordinate)) ?? null;
+    const nextCellId = existingCellId ?? generateId('component_space');
+    const currentCell = existingCellId ? nextInstances[existingCellId] : null;
+    const labelPrefix = typeof instance.properties.cellLabelPrefix === 'string'
+      ? instance.properties.cellLabelPrefix
+      : undefined;
+    const nextLabel = getGridCellLabel(instance.componentType, coordinate, labelPrefix);
+    const nextCell = createComponentInstance(spaceManifest, {
+      instanceId: createComponentInstanceId(nextCellId),
+      displayName: nextLabel,
+      parentId: createComponentInstanceId(instanceId),
+      placement: {
+        index,
+        coordinates: {
+          x: coordinate.x,
+          y: coordinate.y,
+        },
+      },
+      properties: {
+        label: nextLabel,
+        x: coordinate.x,
+        y: coordinate.y,
+        terrain: currentCell?.properties.terrain ?? 'plain',
+        maxCapacity: typeof instance.properties.maxCapacity === 'number' ? instance.properties.maxCapacity : null,
+      },
+      children: currentCell?.children ?? [],
+      bindings: currentCell?.bindings ?? {},
+      frame: currentCell?.frame,
+      renderOverrides: currentCell?.renderOverrides,
+      interactionOverrides: currentCell?.interactionOverrides,
+    });
+
+    nextInstances[nextCellId] = nextCell;
+    nextChildIds.push(nextCellId);
+  }
+
+  const desiredCoordinateKeys = new Set(desiredCells.map((cell) => getGridCoordinateKey(cell)));
+
+  for (const removedCellId of existingCellIds.filter((childId) => {
+    const child = project.instances[childId];
+    const coordinate = {
+      x: typeof child?.placement?.coordinates?.x === 'number' ? Math.trunc(child.placement.coordinates.x) : 0,
+      y: typeof child?.placement?.coordinates?.y === 'number' ? Math.trunc(child.placement.coordinates.y) : 0,
+    };
+
+    return !desiredCoordinateKeys.has(getGridCoordinateKey(coordinate));
+  })) {
+    for (const descendantId of [removedCellId, ...collectRemovedInstanceIds(project, removedCellId)]) {
+      delete nextInstances[descendantId];
+    }
+  }
+
+  return touchProject({
+    ...project,
+    instances: {
+      ...nextInstances,
+      [instanceId]: {
+        ...instance,
+        children: nextChildIds.map((childId) => createComponentInstanceId(childId)),
+      },
+    },
+  });
+}
+
+export function syncAllGeneratedBoardChildren(project: EditorProject): EditorProject {
+  return Object.keys(project.instances).reduce((nextProject, instanceId) => (
+    syncGeneratedBoardChildren(nextProject, instanceId)
+  ), project);
 }
 
 function collectDescendants(project: EditorProject, instanceId: string): string[] {

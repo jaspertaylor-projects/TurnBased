@@ -48,7 +48,7 @@ export const Dashboard = () => {
             boxShadow: '0 16px 32px rgba(6,78,59,0.16)',
           }}
         >
-          + New AI Project
+          New Game
         </a>
       </div>
 

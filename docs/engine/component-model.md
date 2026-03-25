@@ -12,6 +12,13 @@
 
 Phase 13 establishes the shared foundation for boards, spaces, tracks, zones, collections, entities, and counters so creators can compose substantial games without starting from a game-specific template.
 
+The current authoring direction also distinguishes between:
+
+- author-time component templates stored in the project tree
+- runtime entities materialized from those templates for preview and shipped play
+
+That matters most for repeated per-player resources. A creator may author one `piece` or `token` template with a `quantity` and `colorMode`, while preview/runtime expands it into multiple concrete movable entities.
+
 ## Manifest Shape
 
 ```typescript
@@ -61,6 +68,16 @@ interface ComponentInstanceModel<TProperties extends Record<string, unknown> = R
     zoneId?: ZoneId;
     entityIds?: EntityId[];
     ownerId?: PlayerId | null;
+  };
+  frame?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    background: string | null;
+    borderColor: string | null;
+    borderWidth: number;
+    borderRadius: number;
   };
 }
 ```
@@ -118,8 +135,14 @@ These helpers let the editor and future rules SDK share one canonical component 
 - Category: `container`
 - Purpose: top-level spatial surface
 - Default render: `surface: 'board'`, `layout: 'grid'`
-- Allowed children: `space`, `track`, `zone`, `counter`, `score-track`
+- Allowed children: `space`, `track`, `hex-grid`, `square-grid`, `zone`, `counter`, `score-track`
 - Occupancy model: unlimited mixed structural children
+- Important properties:
+  - `surfaceColor`
+  - `surfaceTexture`
+  - `surfaceBorderColor`
+  - `surfaceBorderWidth`
+  - `surfaceBorderStyle`
 
 #### Space
 
@@ -128,7 +151,7 @@ These helpers let the editor and future rules SDK share one canonical component 
 - Default render: `surface: 'space'`, `layout: 'freeform'`
 - Allowed parents: `board`, `track`, `zone`
 - Allowed children: `piece`, `token`
-- Occupancy model: single occupant, one owner at a time
+- Occupancy model: supports configurable capacity through `maxCapacity`
 
 #### Track
 
@@ -137,6 +160,30 @@ These helpers let the editor and future rules SDK share one canonical component 
 - Default render: `surface: 'track'`, `layout: 'linear'`
 - Allowed children: `space`, `piece`, `token`
 - Occupancy model: track-style occupancy with multiple positions
+
+#### Hex Grid
+
+- Category: `container`
+- Purpose: authored board region whose generated hex cells are real `space` components
+- Default render: `surface: 'board'`, `layout: 'hex'`
+- Allowed parents: `board`
+- Allowed children: `space`
+- Important properties:
+  - `cells` as explicit `{ x, y }` coordinates
+  - `cellLabelPrefix`
+  - `maxCapacity` applies to each generated cell space
+
+#### Square Grid
+
+- Category: `container`
+- Purpose: authored board region whose generated square cells are real `space` components
+- Default render: `surface: 'board'`, `layout: 'grid'`
+- Allowed parents: `board`
+- Allowed children: `space`
+- Important properties:
+  - `cells` as explicit `{ x, y }` coordinates
+  - `cellLabelPrefix`
+  - `maxCapacity` applies to each generated cell space
 
 #### Zone
 
@@ -189,6 +236,9 @@ These helpers let the editor and future rules SDK share one canonical component 
 - Allowed parents: `space`, `zone`, `track`, `deck`, `hand`, `discard`, `bag`, `score-track`
 - Children: none
 - Interaction default: drag-enabled move source
+- Important properties:
+  - `quantity`: author one template that can expand into many runtime copies
+  - `colorMode`: `owner` or `neutral`, for reusable per-player coloring
 
 #### Token
 
@@ -197,6 +247,9 @@ These helpers let the editor and future rules SDK share one canonical component 
 - Allowed parents: `space`, `zone`, `track`, `deck`, `hand`, `discard`, `bag`, `score-track`
 - Children: none
 - Interaction default: drag-enabled move source
+- Important properties:
+  - `quantity`: author one template that can expand into many runtime copies
+  - `colorMode`: `owner` or `neutral`, for reusable per-player coloring
 
 ### Counter Components
 
@@ -226,8 +279,60 @@ Examples:
 - hands default to fan layout and multiple selection
 - pieces and tokens default to drag-enabled movement
 - counters default to keyboard-navigable increment interactions
+- owner-colored pieces/tokens should render from seat color when `colorMode` is `owner`
 
 These values are defaults, not lock-in. Instances may override render or interaction metadata when the editor needs a more specific presentation.
+
+## Aggregated Resource Templates
+
+The preferred creator workflow is to avoid authoring one component instance per repeated cube, worker, or marker when those units are identical.
+
+Instead:
+
+- author one `piece` or `token` template inside a permanent nested `resource-pile` that lives in a player-owned `Resources` zone or the shared `Game Supply`
+- set `quantity` to the number of copies that should exist
+- set `colorMode` to `owner` when the runtime should color the copies by player
+- set `supplyMode` to `infinite` when the authored template should behave like a renewable source rather than a draining pile
+
+Preview/runtime can then materialize that template into multiple legal-move entities while the project tree stays compact.
+
+The current editor workflow should reinforce that compact authoring model:
+
+- project settings should carry a named color palette with `primary`, `secondary`, `tertiary`, and `accent 1-6` slots so AI and humans are pulling from the same visual vocabulary
+- shared color picking should route through one alpha-capable reusable picker that can both choose palette colors and save new values back into those named slots
+- the settings UI for that palette should stay compact and live inside the main game setup panel as a 3x3 swatch grid instead of a separate oversized region
+- the left `Component Editor` rail expands into top-level authored components, not a fully exposed raw tree by default
+- movable `piece` and `token` templates should remain directly visible in that outline even when they live inside a nested `resource-pile`, so creators can treat them as first-class authored resources
+- movable nested pieces/tokens should not appear inside the permanent nested-layout canvas
+- use a permanent nested `resource-pile` when a component needs a visible region where movable resources gather
+- permanent nested children should be placed visually with frame metadata such as `x`, `y`, `width`, `height`, `background`, and border styling
+- the current first-class appearance workflow is board-first: `space`, `track`, `hex-grid`, and `square-grid` are manipulated directly on the board surface
+- preview should reuse the same board-surface rendering so authored board appearance corresponds 1:1 with the playable surface
+- board-item trays should be driven by shared presets that materialize into concrete component properties plus frame params, so AI can author against the same board vocabulary
+- the board tray should group `hex-grid` and `square-grid` under a shared `Grid` family while preserving their exact engine component types
+- board-item resizing should happen from the item border rather than a separate visible corner handle so the surface stays visually clean
+- board-child controls should stay compact and focus on placement plus fill/border styling instead of exposing full engine detail
+- when no board child is selected, the same right-side controls should fall back to styling the board surface itself
+- board items should stay visually clean on the surface itself in both editor and preview; title/type metadata should appear once in a selected-item strip above the board with a delete affordance
+- `hex-grid` and `square-grid` should be treated as authored containers whose generated cells are nested `space` instances for move legality and occupancy
+- grid shapes should come from explicit authored cell coordinates so creators can add or delete individual cells without surfacing those coordinates visually on the board
+- grid-shape editing should happen through a small anchored popup on the board surface with lightweight add/delete actions, reclick-to-deselect behavior, and room for a future detail-edit affordance instead of a bulky right-panel explainer or selection menu
+- shared UI rendering for those grids should come from `@turnbased/engine-ui` so editor and preview use the same tiling math
+- board-surface textures and border styles should be shared board params consumed by `BoardSurface`, not editor-only styling state
+- each top-level component should carry a distinct type icon so boards, zones, tracks, and collections scan quickly
+- creating a component should open a focused create surface instead of taking over the main workspace with another broad browsing view
+- the main component workspace should stay centered on the selected component, its permanent authored children, and its editable properties rather than a separate generic inspector pane
+
+This is the default direction for starter scaffolds such as:
+
+- `Player 1 Resources`
+- `Player 2 Resources`
+- `Game Supply`
+- one nested `Resource Pile` region inside each supply-style zone
+- one cube template per player with `quantity = 6`
+- an optional shared block template with `supplyMode = 'infinite'`
+
+That pattern should be preferred over six individually-authored block instances unless the copies need separate authored properties.
 
 ## Placement And Occupancy Validation
 

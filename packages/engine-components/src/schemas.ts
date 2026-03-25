@@ -5,7 +5,11 @@ export const builtInComponentTypeSchema = z.enum([
   'board',
   'space',
   'track',
+  'hex-grid',
+  'square-grid',
+  'checkerboard-grid',
   'zone',
+  'resource-pile',
   'deck',
   'hand',
   'discard',
@@ -178,6 +182,17 @@ export const componentBindingsSchema = z.object({
   ownerId: z.string().trim().min(1).nullable().optional(),
 });
 
+export const componentFrameSchema = z.object({
+  x: z.number(),
+  y: z.number(),
+  width: z.number().positive(),
+  height: z.number().positive(),
+  background: z.string().trim().min(1).nullable(),
+  borderColor: z.string().trim().min(1).nullable(),
+  borderWidth: z.number().nonnegative(),
+  borderRadius: z.number().nonnegative(),
+});
+
 export const componentInstanceSchema = z.object({
   instanceId: z.string().trim().min(1),
   componentType: z.string().trim().min(1),
@@ -188,6 +203,7 @@ export const componentInstanceSchema = z.object({
   parentId: z.string().trim().min(1).nullable(),
   placement: componentPlacementSchema.nullable(),
   bindings: componentBindingsSchema,
+  frame: componentFrameSchema.optional(),
   renderOverrides: componentRenderHintsSchema.partial().optional(),
   interactionOverrides: componentInteractionDefaultsSchema.partial().optional(),
 });

@@ -11,7 +11,11 @@ export type BuiltInComponentType =
   | 'board'
   | 'space'
   | 'track'
+  | 'hex-grid'
+  | 'square-grid'
+  | 'checkerboard-grid'
   | 'zone'
+  | 'resource-pile'
   | 'deck'
   | 'hand'
   | 'discard'
@@ -61,6 +65,8 @@ export type ComponentPropertyKind =
   | 'string_array'
   | 'number_array'
   | 'json';
+export type BoardBorderStyle = 'solid' | 'dashed' | 'dotted' | 'double';
+export type BoardSurfaceTextureId = 'none' | 'felt' | 'wood' | 'marble' | 'leather' | 'stone' | 'sand' | 'metal' | 'water' | 'grass';
 
 export interface ComponentPropertyDefinition {
   kind: ComponentPropertyKind;
@@ -165,6 +171,41 @@ export interface ComponentBindings {
   ownerId?: PlayerId | null;
 }
 
+export interface ComponentFrame {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  background: string | null;
+  textureId?: BoardSurfaceTextureId | null;
+  textureOpacity?: number;
+  borderColor: string | null;
+  borderWidth: number;
+  borderRadius: number;
+}
+
+export interface BoardAppearanceProperties {
+  surfaceColor: string;
+  surfaceTexture: BoardSurfaceTextureId;
+  surfaceTextureOpacity: number;
+  surfaceBorderColor: string;
+  surfaceBorderWidth: number;
+  surfaceBorderStyle: BoardBorderStyle;
+}
+
+export interface GridCellCoordinate {
+  x: number;
+  y: number;
+}
+
+export interface GridCellStyle {
+  background?: string | null;
+  textureId?: BoardSurfaceTextureId | null;
+  textureOpacity?: number;
+  borderWidth?: number;
+  borderRadius?: number;
+}
+
 export interface ComponentInstanceModel<TProperties extends Record<string, unknown> = Record<string, unknown>> {
   instanceId: ComponentInstanceId;
   componentType: string;
@@ -175,12 +216,26 @@ export interface ComponentInstanceModel<TProperties extends Record<string, unkno
   parentId: ComponentInstanceId | null;
   placement: ComponentPlacement | null;
   bindings: ComponentBindings;
+  frame?: ComponentFrame;
   renderOverrides?: Partial<ComponentRenderHints>;
   interactionOverrides?: Partial<ComponentInteractionDefaults>;
 }
 
 export interface ComponentCatalog {
   manifests: Record<string, ComponentManifest>;
+}
+
+export type BoardComponentPresetFamily = 'space' | 'track' | 'grid';
+
+export interface BoardComponentPreset {
+  id: string;
+  family: BoardComponentPresetFamily;
+  familyLabel: string;
+  componentType: BuiltInComponentType;
+  label: string;
+  description: string;
+  properties: Record<string, unknown>;
+  frame: Partial<ComponentFrame>;
 }
 
 export interface CreateComponentInstanceOptions<TProperties extends Record<string, unknown>> {
@@ -191,6 +246,7 @@ export interface CreateComponentInstanceOptions<TProperties extends Record<strin
   parentId?: ComponentInstanceId | null;
   placement?: ComponentPlacement | null;
   bindings?: ComponentBindings;
+  frame?: ComponentFrame;
   renderOverrides?: Partial<ComponentRenderHints>;
   interactionOverrides?: Partial<ComponentInteractionDefaults>;
 }

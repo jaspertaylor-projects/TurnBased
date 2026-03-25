@@ -87,10 +87,12 @@ export interface AIGameBlueprint {
   };
   playerAreas?: Array<{
     ownerId?: string;
+    resourceLabel?: string;
     reserveLabel?: string;
     startingPieces?: number;
     pieceLabelPrefix?: string;
     pieceType?: 'piece' | 'token';
+    supplyMode?: 'finite' | 'infinite';
   }>;
   sharedZones?: Array<{
     label?: string;
@@ -99,6 +101,7 @@ export interface AIGameBlueprint {
     pieceCount?: number;
     pieceLabelPrefix?: string;
     pieceType?: 'piece' | 'token';
+    supplyMode?: 'finite' | 'infinite';
   }>;
 }
 
@@ -116,7 +119,8 @@ const ENGINE_GROUNDING = [
   'Use built-in components and declarative rules whenever possible.',
   'Every generated starter project should open in a linked multi-view shell with one shared board view and one player-linked view per seat.',
   'A previewable project needs at least one public destination surface and at least one owned movable block resource per player.',
-  'Generated projects should preserve the lightweight setup brief and stay easy to refine in the visual editor.',
+  'Prefer the reusable engine-ui linked-view assets for startup chrome: LinkedSeatSummaryStrip, LinkedViewStage, and PlayerLinkedViewStage.',
+  'Generated projects should preserve the lightweight setup brief and stay easy to refine in the component editor.',
   'Prefer a minimal playable interpretation when the setup brief is underspecified.',
 ];
 
@@ -134,14 +138,14 @@ const ACCEPTANCE_CHECKLIST = [
 const PREVIEW_RUNTIME_CONTRACT = [
   'The shared shell keeps the player summary strip visible while the main content swaps between the board and player-linked views.',
   'Public spaces or zones become destination surfaces in preview.',
-  'Owned block resources placed in a player area can move into open public destinations.',
+  'Owned block resources placed in a player resources area can move into open public destinations.',
   'Target score and turn cap should match the board size and pace.',
 ];
 
 const WORKSPACE_POLICY = [
   'Generate only project-workspace artifacts, never shared engine changes.',
   'Stay inside documented component and rules boundaries.',
-  'Prefer a shared board plus player-owned personal areas for the first playable build.',
+  'Prefer a shared board plus player-owned resource areas plus one shared game supply for the first playable build.',
 ];
 
 function toTitleCase(value: string): string {
@@ -183,10 +187,6 @@ function inferPlayerCount(brief: RulesBuilderBrief): number {
   return clamp(Math.max(brief.minPlayers, brief.maxPlayers), 1, 6);
 }
 
-function inferBoardSpaceCount(brief: RulesBuilderBrief): number {
-  return clamp(Math.max(9, inferPlayerCount(brief) * 3), 9, 24);
-}
-
 function inferPhases(brief: RulesBuilderBrief): string[] {
   if (brief.isCampaignGame) {
     return ['setup', 'main', 'campaign', 'end'];
@@ -206,7 +206,7 @@ function inferRulesText(brief: RulesBuilderBrief, projectName: string): string {
     ? ' The campaign flag means progress and naming should feel episodic even in the starter scaffold.'
     : '';
 
-  return `${projectName} is a linked multi-view tabletop prototype for ${playerRange}. Each seat starts with 6 block resources in a personal area, the shared board opens by default, and clicking a player summary should focus that player view while keeping the shared shell intact.${soloNote}${campaignNote}`;
+  return `${projectName} is a linked multi-view tabletop prototype for ${playerRange}. Each seat starts with 6 block resources in a Player Resources area, the shared board opens by default, the scaffold includes a shared Game Supply, and clicking a player summary should focus that player view while keeping the shared shell intact.${soloNote}${campaignNote}`;
 }
 
 function buildDesignerNotes(brief: RulesBuilderBrief, extraNotes: string[] = []): string {
@@ -215,8 +215,8 @@ function buildDesignerNotes(brief: RulesBuilderBrief, extraNotes: string[] = [])
     `Player range: ${brief.minPlayers}-${brief.maxPlayers}`,
     `Distinct solo mode: ${brief.hasDistinctSoloMode ? 'yes' : 'no'}`,
     `Campaign game: ${brief.isCampaignGame ? 'yes' : 'no'}`,
-    `Theme: ${brief.theme || 'Untitled theme'}`,
-    `Art style: ${brief.artStyle || 'Lucide-first default'}`,
+    `Theme: ${brief.theme || 'none'}`,
+    `Art style: ${brief.artStyle || 'none'}`,
     ...extraNotes,
   ].join('\n');
 }
@@ -408,6 +408,7 @@ function addBoardFromPlan(
   brief: RulesBuilderBrief,
   plan: AIGameBlueprint['board'],
 ): EditorProject {
+  void brief;
   const boardResult = addProjectComponent(project, 'board', null, null);
   let nextProject = boardResult.project;
   const boardId = boardResult.instanceId ?? null;
@@ -415,21 +416,9 @@ function addBoardFromPlan(
     return nextProject;
   }
 
-  const spaceCount = clamp(
-    Number.isFinite(plan?.spaceCount) ? Math.trunc(plan?.spaceCount ?? 0) : inferBoardSpaceCount(brief),
-    6,
-    25,
-  );
-  const width = clamp(
-    Number.isFinite(plan?.width) ? Math.trunc(plan?.width ?? 0) : Math.ceil(Math.sqrt(spaceCount)),
-    2,
-    8,
-  );
-  const height = clamp(
-    Number.isFinite(plan?.height) ? Math.trunc(plan?.height ?? 0) : Math.ceil(spaceCount / width),
-    2,
-    8,
-  );
+  const spaceCount = 1;
+  const width = 1;
+  const height = 1;
   const boardLabel = normalizeText(plan?.label, `${nextProject.name} Board`);
   const layout = plan?.layout && ['grid', 'hex', 'graph', 'custom'].includes(plan.layout) ? plan.layout : 'grid';
   const terrainPattern = (plan?.terrainPattern ?? []).map((value) => value.trim()).filter(Boolean);
@@ -467,6 +456,7 @@ function addBoardFromPlan(
         y,
         label,
         terrain,
+        maxCapacity: null,
       },
     }));
   }
@@ -483,6 +473,7 @@ function addZoneWithPieces(
     pieceCount: number;
     pieceType: 'piece' | 'token';
     pieceLabelPrefix: string;
+    supplyMode?: 'finite' | 'infinite';
   },
 ): EditorProject {
   const zoneResult = addProjectComponent(project, 'zone', null, config.ownerId);
@@ -502,25 +493,55 @@ function addZoneWithPieces(
     },
   }));
 
-  for (let index = 0; index < config.pieceCount; index += 1) {
-    const pieceResult = addProjectComponent(nextProject, config.pieceType, zoneId, config.ownerId);
-    nextProject = pieceResult.project;
-    if (!pieceResult.instanceId) {
-      continue;
-    }
-
-    const pieceLabel = `${config.pieceLabelPrefix} ${index + 1}`;
-    nextProject = updateInstance(nextProject, pieceResult.instanceId, (instance) => ({
-      ...instance,
-      displayName: pieceLabel,
-      properties: {
-        ...instance.properties,
-        label: pieceLabel,
-      },
-    }));
+  const resourcePileResult = addProjectComponent(nextProject, 'resource-pile', zoneId, config.ownerId);
+  nextProject = resourcePileResult.project;
+  const resourcePileId = resourcePileResult.instanceId ?? null;
+  if (!resourcePileId) {
+    return nextProject;
   }
 
+  nextProject = updateInstance(nextProject, resourcePileId, (instance) => ({
+    ...instance,
+    displayName: 'Resource Pile',
+    properties: {
+      ...instance.properties,
+      label: 'Resource Pile',
+      maxCapacity: config.maxCapacity,
+    },
+  }));
+
+  if (config.pieceCount <= 0) {
+    return nextProject;
+  }
+
+  const pieceResult = addProjectComponent(nextProject, config.pieceType, resourcePileId, config.ownerId);
+  nextProject = pieceResult.project;
+  if (!pieceResult.instanceId) {
+    return nextProject;
+  }
+
+  const pieceLabel = config.pieceLabelPrefix;
+  nextProject = updateInstance(nextProject, pieceResult.instanceId, (instance) => ({
+    ...instance,
+    displayName: pieceLabel,
+    properties: {
+      ...instance.properties,
+      label: pieceLabel,
+      quantity: config.pieceCount,
+      colorMode: config.ownerId ? 'owner' : 'neutral',
+      supplyMode: config.supplyMode ?? 'finite',
+    },
+  }));
+
   return nextProject;
+}
+
+function getDefaultResourcesLabel(seat: EditorProject['seats'][number]): string {
+  return `${seat.name} Resources`;
+}
+
+function getDefaultGameSupplyLabel(): string {
+  return 'Game Supply';
 }
 
 function countDestinationSurfaces(project: EditorProject): number {
@@ -530,10 +551,33 @@ function countDestinationSurfaces(project: EditorProject): number {
 }
 
 function countOwnedMovers(project: EditorProject, ownerId: string): number {
-  return Object.values(project.instances).filter((instance) => (
-    (instance.componentType === 'piece' || instance.componentType === 'token')
-    && instance.bindings.ownerId === ownerId
-  )).length;
+  return Object.values(project.instances).reduce((total, instance) => {
+    if (
+      (instance.componentType !== 'piece' && instance.componentType !== 'token')
+      || instance.bindings.ownerId !== ownerId
+    ) {
+      return total;
+    }
+
+    const quantity = instance.properties.quantity;
+    return total + (
+      typeof quantity === 'number' && Number.isFinite(quantity) && quantity > 0
+        ? Math.max(1, Math.trunc(quantity))
+        : 1
+    );
+  }, 0);
+}
+
+function hasGameSupply(project: EditorProject): boolean {
+  return project.rootInstanceIds.some((instanceId) => {
+    const instance = project.instances[instanceId];
+    if (!instance || instance.componentType !== 'zone' || instance.bindings.ownerId) {
+      return false;
+    }
+
+    const label = typeof instance.properties.label === 'string' ? instance.properties.label : instance.displayName ?? '';
+    return label.trim().toLowerCase() === getDefaultGameSupplyLabel().toLowerCase();
+  });
 }
 
 function ensureMinimumPreviewableStructure(project: EditorProject, brief: RulesBuilderBrief): EditorProject {
@@ -549,12 +593,25 @@ function ensureMinimumPreviewableStructure(project: EditorProject, brief: RulesB
     }
 
     nextProject = addZoneWithPieces(nextProject, {
-      label: `${seat.name} ${seat.resources.resourceLabel}`,
+      label: getDefaultResourcesLabel(seat),
       ownerId: seat.id,
       maxCapacity: null,
       pieceCount: seat.resources.startingBlocks,
       pieceType: 'piece',
       pieceLabelPrefix: singularize(seat.resources.resourceLabel),
+      supplyMode: 'finite',
+    });
+  }
+
+  if (!hasGameSupply(nextProject)) {
+    nextProject = addZoneWithPieces(nextProject, {
+      label: getDefaultGameSupplyLabel(),
+      ownerId: null,
+      maxCapacity: null,
+      pieceCount: 1,
+      pieceType: 'piece',
+      pieceLabelPrefix: singularize(nextProject.seats[0]?.resources.resourceLabel ?? 'Blocks'),
+      supplyMode: 'infinite',
     });
   }
 
@@ -670,13 +727,14 @@ export function buildProjectFromAIBlueprint(brief: RulesBuilderBrief, blueprint:
       pieceCount: clamp(Number.isFinite(sharedZone.pieceCount) ? Math.trunc(sharedZone.pieceCount ?? 0) : 0, 0, 12),
       pieceType: sharedZone.pieceType === 'token' ? 'token' : 'piece',
       pieceLabelPrefix: normalizeText(sharedZone.pieceLabelPrefix, 'Shared Piece'),
+      supplyMode: sharedZone.supplyMode === 'infinite' ? 'infinite' : 'finite',
     });
   }
 
   for (const seat of project.seats) {
     const matchingArea = (blueprint.playerAreas ?? []).find((area) => area.ownerId === seat.id);
     project = addZoneWithPieces(project, {
-      label: normalizeText(matchingArea?.reserveLabel, `${seat.name} ${seat.resources.resourceLabel}`),
+      label: normalizeText(matchingArea?.resourceLabel ?? matchingArea?.reserveLabel, getDefaultResourcesLabel(seat)),
       ownerId: seat.id,
       maxCapacity: null,
       pieceCount: clamp(
@@ -689,6 +747,7 @@ export function buildProjectFromAIBlueprint(brief: RulesBuilderBrief, blueprint:
         matchingArea?.pieceLabelPrefix,
         singularize(seat.resources.resourceLabel),
       ),
+      supplyMode: matchingArea?.supplyMode === 'infinite' ? 'infinite' : 'finite',
     });
   }
 

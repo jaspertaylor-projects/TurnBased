@@ -232,7 +232,7 @@ export function ComponentEditorSection({
             </button>
           </>
         ) : (
-          <p style={mutedTextStyle}>Select a component from the tree or visual surface to edit it here.</p>
+          <p style={mutedTextStyle}>Select a component from the tree or component surface to edit it here.</p>
         )}
       </div>
     </div>

@@ -1,12 +1,45 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ArrowRightLeft, Blocks, Eye, LayoutPanelTop } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import type { DragEvent } from 'react';
+import { Bot, RotateCcw, UserRound } from 'lucide-react';
 import type { CompiledLegalMoveTree, GameState } from '@turnbased/engine-core';
+import { resolveBoardAppearanceProperties } from '@turnbased/engine-components';
+import {
+  BoardGrid,
+  BoardSurface,
+  getAffordancePulseStyle,
+  GameInfoPanel,
+  GameTableHeader,
+  GamePreviewWindow,
+  GameSurfacePopup,
+  LinkedSeatSummaryStrip,
+  PlayerLinkedViewStage,
+  ResourceDock,
+  useEngineUiMotionStyles,
+} from '@turnbased/engine-ui';
 import type { UIAffordanceState, UISelectionState } from '@turnbased/engine-ui';
 
+import {
+  BOARD_SURFACE_HEIGHT,
+  BOARD_SURFACE_WIDTH,
+  getBoardGridCells,
+  getResolvedBoardItemFrame,
+  isBoardGridComponentType,
+  isMovableComponentType,
+} from '../boardLayout';
+import { renderComponentIcon } from '../componentMeta';
 import { getOwnerColor } from '../helpers';
 import { renderIcon } from '../iconography';
-import { mutedTextStyle, panelStyle, sectionTitleStyle } from '../styles';
+import { toPreviewZoneId } from '../runtime';
 import type { EditorProject } from '../types';
+
+const EMPTY_SELECTION: UISelectionState = {
+  selectedActionId: null,
+  selectedEntityId: null,
+  selectedZoneId: null,
+  selectedTargetEntityId: null,
+  dragEntityId: null,
+  subChoiceSelections: {},
+};
 
 export function PreviewSection({
   project,
@@ -30,16 +63,17 @@ export function PreviewSection({
   moveTree: CompiledLegalMoveTree | null;
   selection: UISelectionState;
   onResetPreview: () => void;
-  onExecuteMove: (actionId: string) => void;
+  onExecuteMove: (actionId: string, overrides?: Partial<UISelectionState>) => void;
   onSetSelection: (selection: UISelectionState) => void;
   onEntityClick: (entityId: string) => void;
   onZoneClick: (zoneId: string) => void;
 }) {
-  const [activeViewId, setActiveViewId] = useState(project.views.selectedViewId || project.views.defaultViewId);
+  useEngineUiMotionStyles();
 
-  useEffect(() => {
-    setActiveViewId(project.views.selectedViewId || project.views.defaultViewId);
-  }, [project.id, project.views.defaultViewId, project.views.selectedViewId]);
+  const [activeViewId, setActiveViewId] = useState(project.views.selectedViewId || project.views.defaultViewId);
+  const [hasStarted, setHasStarted] = useState(false);
+  const [showStartPopup, setShowStartPopup] = useState(false);
+  const [playMode, setPlayMode] = useState<'manual' | 'ai'>('manual');
 
   const viewMap = useMemo(
     () => new Map(project.views.items.map((view) => [view.id, view])),
@@ -49,342 +83,721 @@ export function PreviewSection({
   const linkedSeat = activeView?.linkedSeatId
     ? project.seats.find((seat) => seat.id === activeView.linkedSeatId) ?? null
     : null;
-  const sharedZoneIds = topLevelSupportZones.filter((instanceId) => !project.instances[instanceId]?.bindings.ownerId);
-  const linkedZoneIds = linkedSeat
-    ? topLevelSupportZones.filter((instanceId) => project.instances[instanceId]?.bindings.ownerId === linkedSeat.id)
+
+  const mainBoardId = boardInstances[0] ?? null;
+  const mainBoard = mainBoardId ? project.instances[mainBoardId] : null;
+  const mainBoardChildIds = mainBoard
+    ? mainBoard.children.map(String).filter((childId) => {
+      const child = project.instances[childId];
+      return child && !isMovableComponentType(child.componentType);
+    })
     : [];
+  const playerZoneIdsBySeat = Object.fromEntries(project.seats.map((seat) => [
+    seat.id,
+    topLevelSupportZones.filter((instanceId) => project.instances[instanceId]?.bindings.ownerId === seat.id),
+  ]));
+  const sharedZoneIds = topLevelSupportZones.filter((instanceId) => !project.instances[instanceId]?.bindings.ownerId);
+  const linkedZoneIds = linkedSeat ? playerZoneIdsBySeat[linkedSeat.id] ?? [] : [];
+  const activePlayerName = previewState
+    ? previewState.players[previewState.turnState.activePlayerId]?.displayName ?? 'Unknown player'
+    : 'Ready to start';
+  const endTurnAction = hasStarted
+    ? affordances?.availableActions.find((action) => action.id === 'territory:end-turn' || action.label.toLowerCase() === 'end turn') ?? null
+    : null;
+
+  function collectNestedResourcePileIds(instanceId: string): string[] {
+    const instance = project.instances[instanceId];
+    if (!instance) {
+      return [];
+    }
+
+    return instance.children.flatMap((childId) => {
+      const child = project.instances[childId];
+      if (!child) {
+        return [];
+      }
+
+      if (child.componentType === 'resource-pile') {
+        return [String(child.instanceId)];
+      }
+
+      return collectNestedResourcePileIds(String(child.instanceId));
+    });
+  }
+
+  function getRenderableZoneIds(instanceId: string): string[] {
+    const resourcePileIds = collectNestedResourcePileIds(instanceId);
+    return resourcePileIds.length > 0 ? resourcePileIds : [instanceId];
+  }
+
+  function getZoneEntityIds(instanceId: string): string[] {
+    if (!previewState) {
+      return [];
+    }
+
+    return getRenderableZoneIds(instanceId).flatMap((zoneId) => previewState.zones[toPreviewZoneId(zoneId)]?.entityIds ?? []);
+  }
+
+  function hasInfiniteSupply(instanceId: string): boolean {
+    const instance = project.instances[instanceId];
+    if (!instance) {
+      return false;
+    }
+
+    return instance.children.some((childId) => {
+      const child = project.instances[childId];
+      if (!child) {
+        return false;
+      }
+
+      if ((child.componentType === 'piece' || child.componentType === 'token') && child.properties.supplyMode === 'infinite') {
+        return true;
+      }
+
+      return hasInfiniteSupply(String(child.instanceId));
+    });
+  }
+
+  function getSeatReserveEntityIds(seatId: string): string[] {
+    if (!previewState) {
+      return [];
+    }
+
+    const zoneIds = playerZoneIdsBySeat[seatId] ?? [];
+    return zoneIds.flatMap((zoneId) => getZoneEntityIds(zoneId));
+  }
 
   function countSeatResources(seatId: string): number {
     if (!previewState) {
       return project.seats.find((seat) => seat.id === seatId)?.resources.startingBlocks ?? 0;
     }
 
-    return Object.values(previewState.entities).filter((entity) => entity.ownerId === seatId).length;
+    return getSeatReserveEntityIds(seatId).length;
   }
 
-  function renderPreviewEntityChips(zoneId: string) {
-    if (!previewState) {
-      return null;
+  function handleResetGame() {
+    onResetPreview();
+    onSetSelection(EMPTY_SELECTION);
+    setActiveViewId(project.views.defaultViewId);
+    setShowStartPopup(false);
+    setHasStarted(false);
+  }
+
+  function handleOpenStartPopup() {
+    setPlayMode('manual');
+    setShowStartPopup(true);
+  }
+
+  function handleConfirmStart() {
+    onResetPreview();
+    onSetSelection(EMPTY_SELECTION);
+    setActiveViewId(project.views.defaultViewId);
+    setShowStartPopup(false);
+    setHasStarted(true);
+  }
+
+  function handleEntityDragStart(entityId: string) {
+    if (!hasStarted) {
+      return;
     }
 
-    const entityIds = previewState.zones[zoneId]?.entityIds ?? [];
-    if (entityIds.length === 0) {
-      return <span style={{ fontSize: '0.82rem', color: '#6b7280' }}>Empty</span>;
-    }
-
-    return entityIds.map((entityId) => {
-      const entity = previewState.entities[entityId];
-      const entityState = affordances?.entityStates[entityId];
-
-      return (
-        <button
-          key={entityId}
-          onClick={() => onEntityClick(entityId)}
-          style={{
-            border: entityState?.selected ? '2px solid #f97316' : '1px solid rgba(15,118,110,0.2)',
-            background: entityState?.interactable ? 'rgba(16,185,129,0.15)' : 'rgba(240,253,244,0.9)',
-            borderRadius: '999px',
-            padding: '0.4rem 0.75rem',
-            color: '#064e3b',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.45rem',
-            cursor: entityState?.interactable ? 'pointer' : 'default',
-          }}
-        >
-          <span
-            style={{
-              width: '0.75rem',
-              height: '0.75rem',
-              borderRadius: '999px',
-              background: getOwnerColor(project, entity.ownerId),
-              display: 'inline-block',
-            }}
-          />
-          <span>{String(entity.properties.label ?? entity.type)}</span>
-        </button>
-      );
+    onSetSelection({
+      ...EMPTY_SELECTION,
+      selectedEntityId: entityId,
+      dragEntityId: entityId,
     });
   }
 
-  function renderPreviewZoneCard(instanceId: string) {
+  function handleEntityDragEnd() {
+    if (!selection.dragEntityId) {
+      return;
+    }
+
+    onSetSelection({
+      ...selection,
+      dragEntityId: null,
+    });
+  }
+
+  function handleZoneDrop(zoneId: string) {
+    if (!moveTree || !selection.dragEntityId) {
+      return;
+    }
+
+    const typedZoneId = toPreviewZoneId(zoneId);
+    const matchingAction = moveTree.availableActions.find((action) => (
+      action.interactableEntities.includes(selection.dragEntityId ?? '')
+      && action.validDestinations.includes(typedZoneId)
+    ));
+
+    if (matchingAction) {
+      onExecuteMove(matchingAction.id, {
+        selectedEntityId: selection.dragEntityId,
+        selectedZoneId: typedZoneId,
+        dragEntityId: null,
+      });
+      return;
+    }
+
+    onSetSelection({
+      ...selection,
+      dragEntityId: null,
+    });
+  }
+
+  function renderCube(entityId: string) {
     if (!previewState) {
       return null;
     }
 
-    const instance = project.instances[instanceId];
-    const zoneState = affordances?.zoneStates[instanceId];
-    const selected = selection.selectedZoneId === instanceId;
-    const zone = previewState.zones[instanceId];
+    const entity = previewState.entities[entityId];
+    const entityState = affordances?.entityStates[entityId];
+    const canInteract = hasStarted && Boolean(entityState?.interactable);
+    const shouldPulse = hasStarted && Boolean(
+      entityState?.interactable
+      || entityState?.highlighted
+      || entityState?.dragSource
+      || entityState?.selected
+    );
 
     return (
       <button
-        key={instanceId}
-        onClick={() => onZoneClick(instanceId)}
-        style={{
-          width: '100%',
-          textAlign: 'left',
-          borderRadius: '18px',
-          border: zoneState?.dropTarget || selected ? '2px solid #f97316' : '1px solid rgba(15,118,110,0.18)',
-          background: zoneState?.highlighted ? 'rgba(250,204,21,0.16)' : 'rgba(255,255,255,0.82)',
-          padding: '0.85rem',
-          boxSizing: 'border-box',
-          cursor: zoneState?.interactable || selection.selectedEntityId ? 'pointer' : 'default',
+        key={entityId}
+        type="button"
+        draggable={canInteract}
+        onDragStart={() => handleEntityDragStart(entityId)}
+        onDragEnd={handleEntityDragEnd}
+        onClick={() => {
+          if (hasStarted) {
+            onEntityClick(entityId);
+          }
         }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem' }}>
-          <div>
-            <div style={{ fontWeight: 700, color: '#064e3b' }}>{zone?.name ?? instance.displayName}</div>
-            <div style={{ fontSize: '0.82rem', color: '#0f766e' }}>{instance.componentType}</div>
-          </div>
-          <div style={{ fontSize: '0.82rem', color: '#0f766e' }}>
-            {zone?.entityIds.length ?? 0}
-            {zone?.maxCapacity !== null ? ` / ${zone?.maxCapacity}` : ''}
-          </div>
-        </div>
-        <div style={{ marginTop: '0.75rem', minHeight: '2rem', display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
-          {renderPreviewEntityChips(instanceId)}
-        </div>
-      </button>
+        title={entity.ownerId ? `${previewState.players[entity.ownerId]?.displayName ?? 'Player'} cube` : 'Cube'}
+        style={{
+          width: '20px',
+          height: '20px',
+          padding: 0,
+          borderRadius: '6px',
+          appearance: 'none',
+          border: entityState?.selected ? '2px solid #f97316' : '1px solid rgba(15,118,110,0.16)',
+          backgroundColor: entity.properties.colorMode === 'owner'
+            ? getOwnerColor(project, entity.ownerId)
+            : '#94a3b8',
+          backgroundImage: 'none',
+          backgroundClip: 'padding-box',
+          display: 'inline-block',
+          lineHeight: 0,
+          cursor: canInteract ? 'grab' : 'default',
+          boxShadow: entityState?.dragSource ? '0 0 0 3px rgba(14,165,233,0.18)' : 'none',
+          transition: 'transform 140ms ease, filter 140ms ease',
+          ...getAffordancePulseStyle(shouldPulse, 'entity'),
+        }}
+      />
     );
   }
 
-  function renderBoardCollection() {
-    if (boardInstances.length === 0) {
+  function renderMainBoard() {
+    if (!previewState || !mainBoard) {
       return (
-        <div style={{ padding: '2rem', borderRadius: '18px', border: '1px dashed rgba(15,118,110,0.25)', textAlign: 'center', color: '#0f766e' }}>
-          Add a board or a zone in the Visuals section to preview gameplay.
+        <div style={{ padding: '2rem', borderRadius: '24px', border: '1px dashed rgba(15,118,110,0.24)', textAlign: 'center', color: '#0f766e', background: 'rgba(255,255,255,0.8)' }}>
+          Add a board in the component editor to launch the preview.
         </div>
       );
     }
 
-    return boardInstances.map((boardId) => {
-      const board = project.instances[boardId];
-      const width = Number(board.properties.width ?? 3) || 3;
-      const spaces = board.children.filter((childId) => project.instances[childId]?.componentType === 'space');
-      const nestedZones = board.children.filter((childId) => project.instances[childId]?.componentType !== 'space');
+    const boardAppearance = resolveBoardAppearanceProperties(mainBoard.properties);
 
-      return (
-        <div key={boardId} style={{ borderRadius: '24px', padding: '1rem', background: 'linear-gradient(145deg, rgba(16,185,129,0.12), rgba(250,204,21,0.10))' }}>
-          <div style={{ marginBottom: '0.9rem' }}>
-            <div style={{ fontWeight: 800, color: '#064e3b' }}>{String(board.properties.label ?? board.displayName ?? 'Board')}</div>
-            <div style={{ color: '#0f766e', fontSize: '0.82rem' }}>shared board · {width} columns</div>
+    return (
+      <BoardSurface
+        items={mainBoardChildIds.map((childId, index) => {
+          const child = project.instances[childId];
+          if (!child) {
+            return null;
+          }
+
+          const frame = getResolvedBoardItemFrame(child, index);
+          const isGrid = isBoardGridComponentType(child.componentType);
+          const zoneId = toPreviewZoneId(childId);
+          const zone = previewState.zones[zoneId];
+          const zoneState = affordances?.zoneStates[zoneId];
+          const isDropSurface = child.componentType === 'space' || child.componentType === 'zone';
+          const gridCellIds = isGrid
+            ? child.children.map(String).filter((cellId) => project.instances[cellId]?.componentType === 'space')
+            : [];
+          const shouldPulse = isGrid
+            ? hasStarted && gridCellIds.some((cellId) => {
+              const cellState = affordances?.zoneStates[toPreviewZoneId(cellId)];
+              return Boolean(
+                cellState?.interactable
+                || cellState?.highlighted
+                || cellState?.dropTarget
+                || cellState?.selected
+              );
+            })
+            : hasStarted && Boolean(
+              zoneState?.interactable
+              || zoneState?.highlighted
+              || zoneState?.dropTarget
+              || zoneState?.selected
+            );
+          const dropTarget = isGrid
+            ? gridCellIds.some((cellId) => Boolean(affordances?.zoneStates[toPreviewZoneId(cellId)]?.dropTarget))
+            : Boolean(zoneState?.dropTarget);
+          const selected = isGrid
+            ? gridCellIds.some((cellId) => Boolean(affordances?.zoneStates[toPreviewZoneId(cellId)]?.selected))
+            : Boolean(zoneState?.selected);
+
+          return {
+            id: childId,
+            label: String(child.properties.label ?? child.displayName ?? 'Board Item'),
+            typeLabel: child.componentType.replace('-', ' '),
+            icon: renderComponentIcon(child.componentType, { size: 16, style: { color: '#064e3b' } }),
+            x: frame.x,
+            y: frame.y,
+            width: frame.width,
+            height: frame.height,
+            background: dropTarget ? 'rgba(250,204,21,0.18)' : frame.background,
+            borderColor: dropTarget ? '#f97316' : frame.borderColor,
+            borderWidth: dropTarget ? 3 : frame.borderWidth,
+            borderRadius: frame.borderRadius,
+            selected,
+            highlighted: shouldPulse,
+            dropTarget,
+            onClick: !isGrid && isDropSurface && hasStarted ? () => onZoneClick(childId) : undefined,
+            onDragOver: isDropSurface
+              ? (event: DragEvent<HTMLDivElement>) => {
+                if (hasStarted && selection.dragEntityId) {
+                  event.preventDefault();
+                }
+              }
+              : undefined,
+            onDrop: isDropSurface
+              ? (event: DragEvent<HTMLDivElement>) => {
+                event.preventDefault();
+                handleZoneDrop(childId);
+              }
+              : undefined,
+            content: isGrid
+              ? (() => {
+                const gridCells = getBoardGridCells(child);
+
+                return (
+                  <BoardGrid
+                    kind={child.componentType as 'hex-grid' | 'square-grid' | 'checkerboard-grid'}
+                    cells={gridCellIds.map((cellId, cellIndex) => {
+                      const cell = project.instances[cellId];
+                      const cellZoneId = toPreviewZoneId(cellId);
+                      const cellZone = previewState.zones[cellZoneId];
+                      const cellState = affordances?.zoneStates[cellZoneId];
+                      const row = typeof cell?.placement?.coordinates?.y === 'number'
+                        ? cell.placement.coordinates.y
+                        : (gridCells[cellIndex]?.y ?? cellIndex);
+                      const column = typeof cell?.placement?.coordinates?.x === 'number'
+                        ? cell.placement.coordinates.x
+                        : (gridCells[cellIndex]?.x ?? 0);
+
+                      return {
+                        id: cellId,
+                        row,
+                        column,
+                        label: String(cell?.properties.label ?? cell?.displayName ?? `Cell ${cellIndex + 1}`),
+                        background: cellState?.dropTarget
+                          ? 'rgba(250,204,21,0.24)'
+                          : 'rgba(255,255,255,0.92)',
+                        borderColor: cellState?.dropTarget
+                          ? '#f97316'
+                          : (child.componentType === 'hex-grid' ? undefined : 'rgba(15,118,110,0.18)'),
+                        borderWidth: cellState?.dropTarget ? 2 : 1,
+                        selected: Boolean(cellState?.selected),
+                        highlighted: Boolean(cellState?.highlighted || cellState?.interactable),
+                        dropTarget: Boolean(cellState?.dropTarget),
+                        onClick: hasStarted ? () => onZoneClick(cellId) : undefined,
+                        onDragOver: (event: DragEvent<HTMLDivElement>) => {
+                          if (hasStarted && selection.dragEntityId) {
+                            event.preventDefault();
+                          }
+                        },
+                        onDrop: (event: DragEvent<HTMLDivElement>) => {
+                          event.preventDefault();
+                          handleZoneDrop(cellId);
+                        },
+                        content: (cellZone?.entityIds ?? []).length
+                          ? (
+                            <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
+                              {cellZone?.entityIds.map((entityId) => renderCube(entityId))}
+                            </div>
+                          )
+                          : null,
+                      };
+                    })}
+                  />
+                );
+              })()
+              : (
+                <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
+                  {(zone?.entityIds ?? []).length
+                    ? zone?.entityIds.map((entityId) => renderCube(entityId))
+                    : (
+                      <span style={{ color: '#94a3b8', fontSize: '0.88rem', textAlign: 'center' }}>
+                        {isDropSurface ? 'Drop pieces here' : 'Styled board item'}
+                      </span>
+                    )}
+                </div>
+              ),
+          };
+        }).filter((item): item is NonNullable<typeof item> => Boolean(item))}
+        width={BOARD_SURFACE_WIDTH}
+        height={BOARD_SURFACE_HEIGHT}
+        minHeight={520}
+        surfaceAppearance={{
+          background: boardAppearance.surfaceColor,
+          textureId: boardAppearance.surfaceTexture,
+          borderColor: boardAppearance.surfaceBorderColor,
+          borderWidth: boardAppearance.surfaceBorderWidth,
+          borderStyle: boardAppearance.surfaceBorderStyle,
+        }}
+        showItemHeader={false}
+        emptyState={(
+          <div style={{ maxWidth: '320px', display: 'grid', gap: '0.55rem', color: '#0f766e' }}>
+            <strong style={{ color: '#064e3b' }}>Add spaces, tracks, or board grids to the editor</strong>
+            <span>The preview board mirrors that authored board surface directly.</span>
           </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${width}, minmax(0, 1fr))`, gap: '0.75rem' }}>
-            {spaces.map((spaceId) => renderPreviewZoneCard(spaceId))}
-          </div>
-
-          {nestedZones.length > 0 && (
-            <div style={{ marginTop: '1rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
-              {nestedZones.map((zoneId) => renderPreviewZoneCard(zoneId))}
-            </div>
-          )}
-        </div>
-      );
-    });
+        )}
+      />
+    );
   }
 
-  function renderZoneCollection(zoneIds: string[], emptyMessage: string) {
+  function getZoneMeta(instanceId: string): string {
+    const instance = project.instances[instanceId];
+    if (!instance) {
+      return 'Shared zone';
+    }
+
+    return hasInfiniteSupply(instanceId) ? 'Infinite source' : 'Shared zone';
+  }
+
+  function renderSupportDock() {
+    if (!previewState) {
+      return null;
+    }
+
+    return (
+      <ResourceDock
+        sections={[
+          ...project.seats.map((seat) => {
+            const entityIds = getSeatReserveEntityIds(seat.id);
+
+            return {
+              id: seat.id,
+              title: seat.name,
+              meta: `${entityIds.length} cubes`,
+              accent: seat.color,
+              content: (
+                <div style={{ display: 'grid', gap: '0.7rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => setActiveViewId(project.views.items.find((view) => view.linkedSeatId === seat.id)?.id ?? project.views.defaultViewId)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.55rem',
+                      border: 'none',
+                      background: 'transparent',
+                      padding: 0,
+                      color: '#064e3b',
+                      cursor: 'pointer',
+                      justifySelf: 'start',
+                    }}
+                  >
+                    {renderIcon(seat.identity.iconKey, { size: 16, style: { color: '#064e3b' } })}
+                    View
+                  </button>
+                  <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
+                    {entityIds.length ? entityIds.map((entityId) => renderCube(entityId)) : <span style={{ color: '#94a3b8', fontSize: '0.9rem' }}>No cubes</span>}
+                  </div>
+                </div>
+              ),
+            };
+          }),
+          ...sharedZoneIds.map((zoneId) => {
+            const entityIds = getZoneEntityIds(zoneId);
+            return {
+              id: zoneId,
+              title: project.instances[zoneId]?.displayName ?? 'Shared Zone',
+              meta: getZoneMeta(zoneId),
+              accent: '#84cc16',
+              content: (
+                <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
+                  {entityIds.length
+                    ? entityIds.map((entityId) => renderCube(entityId))
+                    : <span style={{ color: '#94a3b8', fontSize: '0.9rem' }}>No pieces here</span>}
+                </div>
+              ),
+            };
+          }),
+        ]}
+      />
+    );
+  }
+
+  function renderPlayerView(zoneIds: string[], emptyMessage: string) {
+    if (!previewState) {
+      return null;
+    }
+
     if (zoneIds.length === 0) {
       return (
-        <div style={{ padding: '1.2rem', borderRadius: '18px', border: '1px dashed rgba(15,118,110,0.25)', textAlign: 'center', color: '#0f766e' }}>
+        <div style={{ padding: '1.8rem', borderRadius: '24px', border: '1px dashed rgba(15,118,110,0.24)', textAlign: 'center', color: '#0f766e', background: 'rgba(255,255,255,0.82)' }}>
           {emptyMessage}
         </div>
       );
     }
 
     return (
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
-        {zoneIds.map((instanceId) => renderPreviewZoneCard(instanceId))}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem', alignContent: 'start' }}>
+        {zoneIds.map((zoneId) => {
+          const zone = project.instances[zoneId];
+          const entityIds = getZoneEntityIds(zoneId);
+          return (
+            <div
+              key={zoneId}
+              style={{
+                padding: '0.95rem',
+                borderRadius: '20px',
+                background: 'rgba(255,255,255,0.9)',
+                border: '1px solid rgba(15,118,110,0.1)',
+                display: 'grid',
+                gap: '0.75rem',
+                minHeight: '220px',
+              }}
+            >
+              <div style={{ fontWeight: 800, color: '#064e3b' }}>{zone?.displayName ?? 'Zone'}</div>
+              <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap', alignContent: 'start' }}>
+                {entityIds.length
+                  ? entityIds.map((entityId) => renderCube(entityId))
+                  : <span style={{ color: '#94a3b8', fontSize: '0.9rem' }}>No cubes here yet.</span>}
+              </div>
+            </div>
+          );
+        })}
       </div>
     );
   }
 
+  const seatItems = project.seats.map((seat) => ({
+    id: seat.id,
+    label: seat.name,
+    color: seat.color,
+    icon: renderIcon(seat.identity.iconKey, { size: 20, style: { color: '#064e3b' } }),
+    summary: `${countSeatResources(seat.id)} cubes`,
+    active: activeView?.linkedSeatId === seat.id,
+    onSelect: () => setActiveViewId(project.views.items.find((view) => view.linkedSeatId === seat.id)?.id ?? project.views.defaultViewId),
+  }));
+
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
-      <div style={panelStyle}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'baseline', flexWrap: 'wrap' }}>
-          <div>
-            <p style={sectionTitleStyle}>Live Preview</p>
-            <h2 style={{ margin: 0 }}>{project.appLayout.shellTitle || project.name}</h2>
-            <p style={{ ...mutedTextStyle, marginTop: '0.45rem' }}>{project.appLayout.introText}</p>
+      <GameTableHeader
+        title={project.name}
+        action={(
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-end' }}>
+            {hasStarted ? (
+              <button
+                type="button"
+                onClick={handleResetGame}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.45rem',
+                  border: '1px solid rgba(15,23,42,0.16)',
+                  background: 'rgba(255,255,255,0.94)',
+                  borderRadius: '999px',
+                  padding: '0.65rem 1rem',
+                  color: '#111827',
+                  fontWeight: 700,
+                }}
+              >
+                <RotateCcw size={16} />
+                Reset Game
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleOpenStartPopup}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.45rem',
+                  border: 'none',
+                  background: 'linear-gradient(135deg, #064e3b, #10b981)',
+                  borderRadius: '999px',
+                  padding: '0.65rem 1rem',
+                  color: 'white',
+                  fontWeight: 700,
+                }}
+                >
+                  <UserRound size={16} />
+                  Start Game
+                </button>
+            )}
           </div>
+        )}
+      />
 
-          <button
-            onClick={onResetPreview}
+      <GamePreviewWindow>
+        <div style={{ display: 'grid', gap: '1rem', height: '100%', alignContent: 'start' }}>
+          <div
             style={{
-              border: '1px solid rgba(15,118,110,0.15)',
-              background: 'rgba(255,255,255,0.82)',
-              borderRadius: '999px',
-              padding: '0.55rem 0.9rem',
-              color: '#064e3b',
+              display: 'grid',
+              gridTemplateColumns: 'minmax(0, 1fr) auto',
+              gap: '1rem',
+              alignItems: 'start',
             }}
           >
-            Reset Preview
-          </button>
-        </div>
-
-        <div style={{ marginTop: '1rem', display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
-          {project.appLayout.hudItems.map((item) => (
-            <span key={item} style={{ padding: '0.5rem 0.8rem', borderRadius: '999px', background: 'rgba(16,185,129,0.12)', color: '#065f46', fontSize: '0.82rem' }}>
-              {item}
-            </span>
-          ))}
-          <span style={{ padding: '0.5rem 0.8rem', borderRadius: '999px', background: 'rgba(14,165,233,0.12)', color: '#075985', fontSize: '0.82rem' }}>
-            {project.appLayout.linkedViewLabel}: {activeView?.label ?? 'Main Board'}
-          </span>
-        </div>
-
-        <div style={{ marginTop: '1rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.75rem', color: '#0f766e', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-            <LayoutPanelTop size={16} />
-            {project.appLayout.summaryStripLabel}
+            <LinkedSeatSummaryStrip items={seatItems} />
+            <GameInfoPanel
+              label="Turn"
+              value={hasStarted ? activePlayerName : 'Ready to start'}
+              action={hasStarted && endTurnAction?.enabled ? (
+                <button
+                  type="button"
+                  onClick={() => onExecuteMove(endTurnAction.id)}
+                  style={{
+                    border: 'none',
+                    background: 'linear-gradient(135deg, #0f766e, #14b8a6)',
+                    color: 'white',
+                    borderRadius: '999px',
+                    padding: '0.55rem 0.85rem',
+                    fontWeight: 700,
+                  }}
+                >
+                  End Turn
+                </button>
+              ) : undefined}
+            />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
-            {project.seats.map((seat) => {
-              const playerView = project.views.items.find((view) => view.linkedSeatId === seat.id);
-              const isSelected = activeView?.linkedSeatId === seat.id;
-              const resourceCount = countSeatResources(seat.id);
+          {activeView?.kind === 'player' && linkedSeat ? (
+            <PlayerLinkedViewStage title={linkedSeat.name} onBack={() => setActiveViewId(project.views.defaultViewId)}>
+              {renderPlayerView(linkedZoneIds, 'No player resources yet.')}
+            </PlayerLinkedViewStage>
+          ) : (
+            <div
+              style={{
+                minHeight: '520px',
+                display: 'grid',
+                gridTemplateRows: '1fr auto',
+                gap: '1rem',
+              }}
+            >
+              <div
+                style={{
+                  borderRadius: '30px',
+                  background: 'linear-gradient(160deg, rgba(16,185,129,0.16), rgba(14,165,233,0.08), rgba(250,204,21,0.12))',
+                  border: '1px solid rgba(15,118,110,0.12)',
+                  display: 'grid',
+                  minHeight: '420px',
+                  padding: '1rem',
+                }}
+              >
+                <div style={{ display: 'grid', placeItems: 'center', minHeight: '0' }}>
+                  {renderMainBoard()}
+                </div>
+              </div>
 
-              return (
+              {renderSupportDock()}
+            </div>
+          )}
+
+          <GameSurfacePopup
+            open={showStartPopup && !hasStarted}
+            title="Choose how to start this match"
+            subtitle="Preview starts on the shared board. For now, manual play lets you control every seat while we finish built-in AI seat support."
+          >
+            <div style={{ display: 'grid', gap: '0.8rem' }}>
+              <div style={{ display: 'grid', gap: '0.65rem' }}>
                 <button
-                  key={seat.id}
-                  onClick={() => setActiveViewId(playerView?.id ?? project.views.defaultViewId)}
+                  type="button"
+                  onClick={() => setPlayMode('manual')}
                   style={{
                     textAlign: 'left',
-                    padding: '0.9rem',
-                    borderRadius: '20px',
-                    border: isSelected ? '2px solid rgba(6,78,59,0.3)' : '1px solid rgba(15,118,110,0.12)',
-                    background: isSelected ? 'rgba(240,253,244,0.95)' : 'rgba(255,255,255,0.82)',
+                    borderRadius: '22px',
+                    border: playMode === 'manual' ? '2px solid rgba(6,78,59,0.24)' : '1px solid rgba(15,118,110,0.14)',
+                    background: playMode === 'manual' ? 'rgba(240,253,244,0.98)' : 'rgba(255,255,255,0.92)',
+                    color: '#064e3b',
+                    padding: '1rem',
                     display: 'grid',
-                    gridTemplateColumns: '48px minmax(0, 1fr) auto',
-                    gap: '0.75rem',
-                    alignItems: 'center',
+                    gap: '0.35rem',
                   }}
                 >
-                  <div style={{ width: '48px', height: '48px', borderRadius: '999px', display: 'grid', placeItems: 'center', background: `color-mix(in srgb, ${seat.color} 28%, white)` }}>
-                    {renderIcon(seat.identity.iconKey, { size: 20, style: { color: '#064e3b' } })}
-                  </div>
-                  <div>
-                    <div style={{ fontWeight: 800, color: '#064e3b' }}>{seat.name}</div>
-                    <div style={{ color: '#0f766e', fontSize: '0.82rem' }}>{resourceCount} {project.appLayout.resourceSummaryLabel.toLowerCase()}</div>
-                  </div>
-                  <ArrowRightLeft size={16} color="#0f766e" />
+                  <span style={{ fontWeight: 800, fontSize: '0.96rem' }}>Play all turns yourself</span>
+                  <span style={{ color: '#0f766e', lineHeight: 1.5 }}>
+                    Take each seat manually while you test rules, movement, and the shared linked-view flow.
+                  </span>
                 </button>
-              );
-            })}
-          </div>
-        </div>
+                <button
+                  type="button"
+                  disabled
+                  onClick={() => setPlayMode('ai')}
+                  style={{
+                    textAlign: 'left',
+                    borderRadius: '22px',
+                    border: '1px solid rgba(15,118,110,0.14)',
+                    background: 'rgba(248,250,252,0.96)',
+                    color: '#94a3b8',
+                    padding: '1rem',
+                    display: 'grid',
+                    gap: '0.35rem',
+                    cursor: 'not-allowed',
+                  }}
+                >
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontWeight: 800, fontSize: '0.96rem' }}>
+                    <Bot size={16} />
+                    AI seats coming soon
+                  </span>
+                  <span style={{ lineHeight: 1.5 }}>
+                    Shared seat automation is being wired into the same legal-move-first preview flow.
+                  </span>
+                </button>
+              </div>
 
-        {previewState && affordances && moveTree ? (
-          <>
-            <div style={{ marginTop: '1rem', display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
-              {project.seats.map((seat) => (
-                <div key={seat.id} style={{ padding: '0.55rem 0.8rem', borderRadius: '999px', background: previewState.turnState.activePlayerId === seat.id ? 'rgba(16,185,129,0.16)' : 'rgba(240,253,244,0.9)', color: '#064e3b' }}>
-                  {seat.name}: {countSeatResources(seat.id)}
-                </div>
-              ))}
-              <div style={{ padding: '0.55rem 0.8rem', borderRadius: '999px', background: 'rgba(14,165,233,0.14)', color: '#075985' }}>
-                Turn {previewState.turnState.turnNumber} · {previewState.turnState.currentPhase}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.7rem', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowStartPopup(false)}
+                  style={{
+                    border: '1px solid rgba(15,118,110,0.14)',
+                    background: 'rgba(255,255,255,0.88)',
+                    borderRadius: '999px',
+                    padding: '0.7rem 1rem',
+                    color: '#064e3b',
+                    fontWeight: 700,
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmStart}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.45rem',
+                    border: 'none',
+                    background: 'linear-gradient(135deg, #064e3b, #10b981)',
+                    borderRadius: '999px',
+                    padding: '0.7rem 1rem',
+                    color: 'white',
+                    fontWeight: 700,
+                  }}
+                >
+                  <UserRound size={16} />
+                  Start Playing
+                </button>
               </div>
             </div>
-
-            <div style={{ marginTop: '1rem', display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
-              {affordances.availableActions.map((action) => (
-                <button
-                  key={action.id}
-                  onClick={() => {
-                    if (action.kind === 'global') {
-                      onExecuteMove(action.id);
-                      return;
-                    }
-
-                    onSetSelection({
-                      ...selection,
-                      selectedActionId: action.id,
-                    });
-                  }}
-                  disabled={!action.enabled}
-                  style={{
-                    borderRadius: '999px',
-                    border: action.selected ? '2px solid #f97316' : '1px solid rgba(15,118,110,0.15)',
-                    background: action.ready ? 'rgba(16,185,129,0.14)' : 'rgba(255,255,255,0.82)',
-                    padding: '0.55rem 0.85rem',
-                    color: '#064e3b',
-                  }}
-                >
-                  {action.label}
-                </button>
-              ))}
-            </div>
-          </>
-        ) : (
-          <p style={{ ...mutedTextStyle, marginTop: '1rem' }}>Build out the structure to unlock the live preview.</p>
-        )}
-      </div>
-
-      <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'minmax(0, 1.7fr) minmax(280px, 0.95fr)' }}>
-        <div style={{ ...panelStyle, display: 'grid', gap: '1rem' }}>
-          <div>
-            <p style={sectionTitleStyle}>{activeView?.kind === 'player' ? project.appLayout.linkedViewLabel : 'Shared View'}</p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              {activeView?.kind === 'player' ? renderIcon(linkedSeat?.identity.iconKey, { size: 18, style: { color: '#064e3b' } }) : <Eye size={18} color="#064e3b" />}
-              <h3 style={{ margin: 0, color: '#064e3b' }}>{activeView?.label ?? 'Main Board'}</h3>
-            </div>
-            <p style={{ ...mutedTextStyle, marginTop: '0.45rem' }}>{activeView?.description ?? 'Live linked view preview.'}</p>
-          </div>
-
-          {activeView?.kind === 'player'
-            ? renderZoneCollection(linkedZoneIds, 'This player does not have a linked personal area yet.')
-            : (
-              <>
-                {renderBoardCollection()}
-                {sharedZoneIds.length > 0 && renderZoneCollection(sharedZoneIds, 'No shared support zones yet.')}
-              </>
-            )}
+          </GameSurfacePopup>
         </div>
-
-        <div style={{ ...panelStyle, display: 'grid', gap: '0.9rem', alignContent: 'start' }}>
-          <div>
-            <p style={sectionTitleStyle}>Shared Shell</p>
-            <div style={{ display: 'grid', gap: '0.55rem' }}>
-              {project.appLayout.sidePanels.map((panel) => (
-                <div key={panel} style={{ padding: '0.7rem 0.8rem', borderRadius: '16px', background: 'rgba(255,255,255,0.82)', color: '#064e3b', border: '1px solid rgba(15,118,110,0.08)' }}>
-                  {panel}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div style={{ padding: '0.9rem', borderRadius: '18px', background: 'rgba(240,253,244,0.9)', color: '#065f46' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontWeight: 700 }}>
-              <Blocks size={16} />
-              Resource Summary
-            </div>
-            <div style={{ marginTop: '0.55rem', display: 'grid', gap: '0.45rem' }}>
-              {project.seats.map((seat) => (
-                <div key={seat.id} style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', fontSize: '0.9rem' }}>
-                  <span>{seat.name}</span>
-                  <strong>{countSeatResources(seat.id)}</strong>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div style={{ padding: '0.9rem', borderRadius: '18px', background: 'rgba(239,246,255,0.92)', color: '#155e75' }}>
-            <div style={{ fontWeight: 700, marginBottom: '0.4rem' }}>Board Context</div>
-            <div style={{ lineHeight: 1.6 }}>
-              Shared boards: {boardInstances.length}
-              <br />
-              Shared support zones: {sharedZoneIds.length}
-              <br />
-              Linked player areas: {project.views.items.filter((view) => view.kind === 'player').length}
-            </div>
-          </div>
-        </div>
-      </div>
+      </GamePreviewWindow>
     </div>
   );
 }

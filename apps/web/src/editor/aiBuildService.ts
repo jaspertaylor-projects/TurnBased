@@ -174,10 +174,12 @@ function coerceBlueprint(value: unknown): AIGameBlueprint | null {
         .filter(isRecord)
         .map((area) => ({
           ownerId: typeof area.ownerId === 'string' ? area.ownerId : undefined,
+          resourceLabel: typeof area.resourceLabel === 'string' ? area.resourceLabel : undefined,
           reserveLabel: typeof area.reserveLabel === 'string' ? area.reserveLabel : undefined,
           startingPieces: typeof area.startingPieces === 'number' ? area.startingPieces : undefined,
           pieceLabelPrefix: typeof area.pieceLabelPrefix === 'string' ? area.pieceLabelPrefix : undefined,
           pieceType: area.pieceType === 'token' ? 'token' : area.pieceType === 'piece' ? 'piece' : undefined,
+          supplyMode: area.supplyMode === 'infinite' ? 'infinite' : area.supplyMode === 'finite' ? 'finite' : undefined,
         }))
       : undefined,
     sharedZones: Array.isArray(value.sharedZones)
@@ -190,6 +192,7 @@ function coerceBlueprint(value: unknown): AIGameBlueprint | null {
           pieceCount: typeof zone.pieceCount === 'number' ? zone.pieceCount : undefined,
           pieceLabelPrefix: typeof zone.pieceLabelPrefix === 'string' ? zone.pieceLabelPrefix : undefined,
           pieceType: zone.pieceType === 'token' ? 'token' : zone.pieceType === 'piece' ? 'piece' : undefined,
+          supplyMode: zone.supplyMode === 'infinite' ? 'infinite' : zone.supplyMode === 'finite' ? 'finite' : undefined,
         }))
       : undefined,
   };

@@ -112,10 +112,23 @@ export interface EditorRuleConfig {
 }
 
 export type EditorTimeControlMode = 'none' | 'per_turn' | 'per_match';
+export type ProjectPaletteColorId =
+  | 'primary'
+  | 'secondary'
+  | 'tertiary'
+  | 'accent_1'
+  | 'accent_2'
+  | 'accent_3'
+  | 'accent_4'
+  | 'accent_5'
+  | 'accent_6';
+
+export type ProjectColorPalette = Record<ProjectPaletteColorId, string>;
 
 export interface EditorSettings {
   timeControlMode: EditorTimeControlMode;
   timeControlSeconds: number;
+  colorPalette: ProjectColorPalette;
 }
 
 export type EditorProjectViewKind = 'shared' | 'player';

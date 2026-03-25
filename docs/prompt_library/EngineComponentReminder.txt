@@ -1,0 +1,38 @@
+As always keep in mind this functionality we want to make as extensible to other games as possible, and put as much of the UI library and game Engine into the packages that will be shipped with user created games.
+
+- Prefer shared board-surface rendering so the board in the component editor corresponds 1:1 with the board in preview.
+- Project settings should include a named color palette that both AI and humans reuse:
+  - `primary`, `secondary`, `tertiary`, and `accent 1` through `accent 6`
+  - these are preferred colors for AI-authored visual decisions
+  - these should also appear as the shared color choices in human-facing pickers
+  - color picking should use one reusable alpha-capable picker, not ad hoc text inputs
+  - that picker should let a creator save the current color back into one of the named project colors
+  - in settings, the palette should live compactly inside the main game setup panel as a small 3x3 swatch grid rather than a large separate area
+- The current appearance-editing focus is the `board` component:
+  - the current board-authored surface primitives are `space`, `track`, `hex-grid`, and `square-grid`
+  - the board tray should present `hex-grid` and `square-grid` together under a shared `Grid` family
+  - those board children should be movable and resizable in the editor
+  - board-item resizing should happen from the component border itself, without a separate visible resize handle box
+  - this editor surface should focus on visual authoring and appearance controls; gameplay logic can be assumed to be handled later by the AI using the shared engine
+  - the right panel should stay compact and focus on fill, border, radius, placement, and board-surface appearance
+  - when the right panel is styling the board surface itself, it should not waste space on a large explanatory message
+  - board items should not repeat title/kind chrome inside each board object in either the editor or the preview; when selected in the editor, that metadata should appear once above the board surface with a delete action
+  - the top of the board editor should act like a shapes tray for adding board items
+  - tray choices should come from shared preset params, not editor-only labels, so AI can reuse the same board item presets directly
+  - `hex-grid` and `square-grid` are authored as single board items whose explicit cell-coordinate lists generate nested `space` components for engine play
+  - creators should be able to add or delete individual hexes/squares so a grid can take on any authored shape instead of being locked to a rectangle
+  - the generated cell coordinates should stay available to the engine and AI, but those coordinates should not be printed on the board surface itself
+  - grid-shape editing should use a small non-blocking speech-bubble style popup anchored to the selected grid component; reclicking the selected cell should deselect it, and the popup can carry lightweight add/delete actions plus a future detail-edit affordance
+  - shared grid rendering should live in the UI library and use layout math so hexes tile edge-to-edge without a canvas renderer
+  - each hex should have a visible per-hex border by default so neighboring cells read as distinct spaces
+  - when no board item is selected, the active controls should edit the board surface itself
+  - board surface appearance should be shared engine-facing params such as `surfaceColor`, `surfaceTexture`, `surfaceBorderColor`, `surfaceBorderWidth`, and `surfaceBorderStyle`
+  - texture selection in that board-surface mode should stay compact, like a dropdown plus preview instead of a large card gallery
+  - in narrow side panels, reusable color-picker popups should be able to open to the left of their trigger instead of always dropping downward
+  - `BoardSurface` should consume those same board-surface params in both editor and preview so the authored board remains 1:1
+- Detailed implementation and rules wiring should still stay in the engine / AI-authored component model rather than surfacing raw complexity in the editor.
+
+Whenever you make edits make sure to update the doscs so that they stay insync.  this is extra important for the API descriptions which will guide our users AI prompts.
+
+
+Also its OK to break exisitng functionality, there are no users, and no need ot keep things backwards compatible.

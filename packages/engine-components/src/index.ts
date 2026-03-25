@@ -5,6 +5,25 @@ export const COMPONENTS_VERSION = '0.2.0';
 
 export { builtInComponentCatalog } from './catalog';
 export {
+  BOARD_BORDER_STYLE_OPTIONS,
+  BOARD_SURFACE_TEXTURE_OPTIONS,
+  createDefaultBoardAppearanceProperties,
+  resolveBoardAppearanceProperties,
+} from './boardAppearance';
+export {
+  getBoardComponentPreset,
+  listBoardComponentPresets,
+} from './boardPresets';
+export {
+  createRectangularGridCellCoordinates,
+  getGridCellLabel,
+  getGridCoordinateKey,
+  listGridNeighborOptions,
+  normalizeGridCellCoordinates,
+  readGridCellCoordinates,
+  readGridCellStyle,
+} from './gridCells';
+export {
   builtInCatalog,
   createComponentCatalog,
   createComponentInstance,
@@ -19,6 +38,7 @@ export {
   componentBindingsSchema,
   componentCategorySchema,
   componentCompositionSchema,
+  componentFrameSchema,
   componentInstanceSchema,
   componentInteractionDefaultsSchema,
   componentLayoutSchema,
@@ -38,12 +58,18 @@ export {
   componentVisibilityDefaultsSchema,
 } from './schemas';
 export type {
+  BoardAppearanceProperties,
+  BoardBorderStyle,
+  BoardComponentPreset,
+  BoardComponentPresetFamily,
+  BoardSurfaceTextureId,
   BuiltInComponentType,
   ComponentBindings,
   ComponentCatalog,
   ComponentCategory,
   ComponentComposition,
   ComponentCompositionStrategy,
+  ComponentFrame,
   ComponentInstanceModel,
   ComponentInteractionDefaults,
   ComponentLayout,
@@ -64,5 +90,7 @@ export type {
   ComponentValidationResult,
   ComponentVisibilityDefaults,
   CreateComponentInstanceOptions,
+  GridCellCoordinate,
+  GridCellStyle,
   OccupancyValidationContext,
 } from './types';

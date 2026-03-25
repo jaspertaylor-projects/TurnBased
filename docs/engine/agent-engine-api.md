@@ -21,6 +21,7 @@ If this document conflicts with ad hoc assumptions, follow this document.
 4. UI affordances must derive from the legal move tree, not custom click logic.
 5. AI/gameplay consumers should use visible projected state, not unrestricted full state.
 6. Do not modify shared engine packages when generating a game project.
+7. Prefer compact authored templates for repeated resources, then let preview/runtime expand them into concrete entities.
 
 ## Package Map
 
@@ -78,12 +79,40 @@ Built-in component system:
 Primary exports:
 
 - `builtInCatalog`
+- `BOARD_BORDER_STYLE_OPTIONS`
+- `BOARD_SURFACE_TEXTURE_OPTIONS`
 - `createComponentInstance`
 - `getBuiltInComponentManifest`
+- `getBoardComponentPreset`
 - `listBuiltInComponents`
+- `listBoardComponentPresets`
+- `resolveBoardAppearanceProperties`
 - `validateComponentPlacement`
 - `validateComponentOccupancy`
 - `validateComponentTree`
+
+Important authoring direction:
+
+- `piece` and `token` may represent repeated authored templates through `quantity`
+- `piece` and `token` may use `colorMode: 'owner' | 'neutral'`
+- `resource-pile` is the preferred permanent nested region for displaying movable resources inside another component
+- repeated cubes, workers, or markers should usually be authored as one template plus quantity, not one component instance per copy
+- editor prompts should assume the post-build `Component Editor` left rail expands into top-level components with type icons
+- movable `piece`/`token` templates stay outline-first resources, not nested layout cards
+- supply-style zones should usually contain a permanent nested `resource-pile` instead of showing movable templates directly in the layout surface
+- permanent nested children should be arranged visually with frame-style metadata and can be promoted into the main editing context when they need more detail
+- board appearance editing should prefer a shared board-surface renderer so preview and authoring stay visually aligned
+- the visual editor should focus on authored appearance and layout; gameplay logic details can be left to the AI's engine-facing build step
+- when no board item is selected, the active controls should edit shared board-surface appearance params instead of a separate editor-only summary state
+- project settings should expose a named color palette with `primary`, `secondary`, `tertiary`, and `accent 1-6` slots that AI should prefer when making visual decisions
+- human-facing color picking should route through one shared alpha-capable picker that can also save a chosen color back into one of those named palette slots
+- board-item preset menus should come from shared preset data so AI can instantiate the same preset params when generating or refining a game
+- the current board-authored surface primitives are `space`, `track`, `hex-grid`, and `square-grid`
+- `hex-grid` and `square-grid` should be authored as single board items whose explicit cell-coordinate lists generate nested `space` components for engine play
+- the board tray should present `hex-grid` and `square-grid` as two options inside a shared `Grid` preset family
+- board surface appearance should be captured through reusable params like `surfaceColor`, `surfaceTexture`, `surfaceBorderColor`, `surfaceBorderWidth`, and `surfaceBorderStyle`
+- grid editing should allow adding or deleting individual cells while keeping those engine-facing coordinates off the visible board surface
+- hex grids should render with a visible per-hex border by default so each generated space reads distinctly
 
 ### `@turnbased/engine-ui`
 
@@ -93,6 +122,7 @@ UI contract derived from legal moves:
 - selected/highlighted/drop-target states
 - popup choosers
 - action menus
+- shared board and grid rendering
 
 Primary exports:
 
@@ -100,6 +130,18 @@ Primary exports:
 - `getItemAffordance`
 - `getDestinationAffordance`
 - `createPopupChoosers`
+- `BoardGrid`
+- `BoardSurface`
+- `BoardGrid`
+- `getBoardSurfaceTextureStyle`
+- `GamePreviewWindow`
+- `GameSurfacePopup`
+- `GameTableHeader`
+- `GameInfoPanel`
+- `ResourceDock`
+- `LinkedSeatSummaryStrip`
+- `LinkedViewStage`
+- `PlayerLinkedViewStage`
 
 ### `@turnbased/engine-ai`
 
@@ -156,6 +198,12 @@ Important fields:
 - `faceUp`
 - `properties`
 - `tags`
+
+Notes:
+
+- an authored component instance and a runtime entity are not the same thing
+- repeated authored templates may expand into multiple runtime `ent_*` ids
+- UI and canonical actions must use runtime entity/zone ids, not raw component instance ids
 
 `Zone`
 
@@ -330,7 +378,15 @@ Use the component catalog rather than inventing unsupported component types.
 
 - create the minimum number of components required for the requested game loop
 - prefer a single board plus spaces/zones for initial builds
+- prefer a single board with one playable starter space unless the brief strongly requires more
 - ensure each player has owned pieces if the game expects direct movement
+- prefer `Player N Resources` zones for player-owned starter resources
+- add a shared `Game Supply` when the starter loop benefits from common neutral resources
+- prefer one authored per-player resource template with `quantity` over many duplicate child pieces
+- prefer a nested `resource-pile` inside each supply-style zone when the resources should appear in the editor surface
+- keep movable `piece` and `token` templates visible as first-class outline items in the component editor
+- use `colorMode: 'owner'` for player-colored starter resources
+- use `supplyMode: 'infinite'` for authored resource sources that should not drain when used
 - keep names readable and theme-aligned
 
 ## Legal Moves
@@ -379,8 +435,22 @@ Use `@turnbased/engine-ui` to derive:
 - highlighted destinations
 - popup choosers
 - menu actions
+- reusable linked-view navigation surfaces
 
 The UI layer should render engine-derived affordances, not invent custom legality rules.
+
+For linked multi-view starter projects, prefer the reusable `@turnbased/engine-ui` surfaces:
+
+- `GameTableHeader`
+- `GamePreviewWindow`
+- `GameSurfacePopup`
+- `LinkedSeatSummaryStrip`
+- `GameInfoPanel`
+- `ResourceDock`
+- `LinkedViewStage`
+- `PlayerLinkedViewStage`
+
+These assets provide the default "single shared board + player strip + resources dock + shared game supply + linked player view" flow and should be reused before inventing a custom starter shell.
 
 ## Visibility and AI Safety
 
@@ -414,12 +484,16 @@ When generating a new game project:
 1. preserve the requested setup brief, especially player range, solo/campaign flags, theme, and art style
 2. create seats, seat identity, and ownership first
 3. create one shared board view plus one linked player view per seat
-4. give each player 6 starting block resources in a personal area unless the brief explicitly asks for a compatible alternative
-5. define concise rules text
-6. prefer a simple declarative turn structure
-7. ensure preview can compile
-8. ensure legal moves exist for the active player
-9. keep app layout language aligned with the game theme and Lucide-first shell defaults
+4. prefer a single board with one playable starter space unless the brief strongly requires a richer map
+5. give each player a `Player N Resources` area with an owned resource template unless the brief explicitly asks for a compatible alternative
+6. use `quantity` for repeated starter cubes/workers when the copies are identical
+7. use `colorMode: 'owner'` when those resources should render in player color
+8. add a shared `Game Supply` or `supplyMode: 'infinite'` resource source when the loop needs renewable neutral pieces
+9. define concise rules text
+10. prefer a simple declarative turn structure
+10. ensure preview can compile
+11. ensure legal moves exist for the active player
+12. keep app layout language aligned with the game theme and Lucide-first shell defaults
 
 ## What Not to Do
 
@@ -450,10 +524,11 @@ For a typical generated project:
 
 If more detail is required, consult these docs in this order:
 
-1. `docs/engine/agent-engine-api.md`
-2. `docs/engine/component-model.md`
-3. `docs/engine/rules-authoring.md`
-4. `docs/engine/legal-move-generation.md`
-5. `docs/engine/ui-interaction-contract.md`
-6. `docs/engine/ai-player-contract.md`
-7. `docs/engine/architecture.md`
+1. `docs/engine/api-index.md`
+2. `docs/engine/agent-engine-api.md`
+3. `docs/engine/component-model.md`
+4. `docs/engine/rules-authoring.md`
+5. `docs/engine/legal-move-generation.md`
+6. `docs/engine/ui-interaction-contract.md`
+7. `docs/engine/ai-player-contract.md`
+8. `docs/engine/architecture.md`

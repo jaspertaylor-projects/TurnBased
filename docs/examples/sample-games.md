@@ -4,6 +4,17 @@
 
 Sample games serve as **reference implementations**, not starting templates. They demonstrate how to use built-in components, declarative rules, and extension hooks to create different game archetypes.
 
+The creator’s default starter scaffold is intentionally much smaller than these examples:
+
+- one shared board
+- one starter playable space
+- one linked player view per seat
+- one `Player N Resources` zone per seat
+- one shared `Game Supply` zone
+- one authored resource template per repeated cube/worker/token, using quantity instead of one component per copy
+
+These sample games remain useful as reference targets after the starter scaffold is generated and expanded.
+
 ## Target Archetypes
 
 ### 1. Tic-Tac-Toe (Track/Placement Game)

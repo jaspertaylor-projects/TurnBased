@@ -11,7 +11,7 @@ The web editor is expected to become one of the largest and most frequently chan
 - project loading and persistence
 - preview runtime state
 - visual editing UI
-- rules editing UI
+- component editing UI
 - settings UI
 - preview UI
 - sidebar and workspace chrome
@@ -30,7 +30,7 @@ The creator should use a staged architecture:
   It owns route parsing, project loading, persistence, preview state, active section state, version-history actions, workspace syncing, and cross-section callbacks.
 
 - `apps/web/src/editor/sections/` owns the top-level editor areas.
-  Each section renders one major post-build workspace surface such as `Visual`, `Preview`, `Versions`, `Component Editor`, or `App Layout`.
+  Each section renders one major post-build workspace surface such as the combined `Editor`, `Preview`, `Versions`, or `App Layout`.
 - `apps/web/src/editor/components/` owns shared editor chrome.
   The sidebar, requirements banners, and future shared editor scaffolding belong here.
 - `apps/web/src/editor/*.ts` owns editor domain logic.
@@ -43,6 +43,17 @@ The project boundary should be explicit:
 - AI builders may read engine docs, API contracts, and other repo context, but generated artifacts should only be written inside the project workspace boundary.
 - version history should track workspace files, not just raw editor state snapshots, with remote backup available when the user is signed in and the Supabase git flow is configured.
 - generated projects should treat linked views as first-class project state: one shared board view plus one linked player view per seat.
+- the post-build editor should prefer one combined edit surface over splitting visual and component editing into separate primary tabs.
+- the combined editor should favor reusable rendered component cards, focused create/edit flows, and compact starter scaffolds over raw internal trees as the primary experience.
+- the left rail should treat `Component Editor` as an expandable outline:
+  - top-level components appear directly beneath that entry
+  - each top-level component carries a tasteful type icon
+  - inline creation starts from the `+` affordance on the `Component Editor` row
+  - movable nested pieces/tokens stay out of the nested layout canvas and remain outline-first resources
+  - supply-style zones should usually show a permanent nested `resource-pile` region instead of raw movable blocks
+  - board appearance editing should be direct: spaces, tracks, and similar board children are arranged visually in-canvas with drag/drop and resize controls
+  - preview should reuse the same board-surface renderer so the authored board corresponds 1:1 with the playable surface
+  - the main workspace stays focused on editing the selected board, styling its placed children, or creating a new board item
 
 The old templates screen is removed from the primary flow:
 
@@ -59,6 +70,7 @@ Positive:
 - Shared chrome can evolve independently from section rendering.
 - It becomes easier to reason about whether logic belongs in the shell, a section, or a domain module.
 - The project-creation flow becomes faster and more guided for users.
+- The combined editor can keep the authored component tree, component details, and rendered component view aligned in one place without a separate generic inspector pane.
 
 Tradeoffs:
 

@@ -8,6 +8,7 @@ import {
   createDefaultSeats,
   syncProjectViews,
 } from './project';
+import { createDefaultProjectColorPalette } from './projectPalette';
 import { deleteProjectWorkspace } from './workspace';
 
 const STORAGE_KEY = 'turnbased.creator.projects';
@@ -67,6 +68,10 @@ function normalizeEditorProject(project: EditorProject): EditorProject {
     settings: {
       ...createDefaultProjectSettings(),
       ...(project.settings ?? {}),
+      colorPalette: {
+        ...createDefaultProjectColorPalette(),
+        ...(project.settings?.colorPalette ?? {}),
+      },
     },
     appLayout: {
       ...createDefaultAppLayout(project.name),

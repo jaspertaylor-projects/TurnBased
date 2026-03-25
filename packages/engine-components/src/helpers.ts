@@ -84,6 +84,7 @@ export function createComponentInstance<TProperties extends Record<string, unkno
     parentId: options.parentId ?? null,
     placement: options.placement ?? null,
     bindings: options.bindings ?? {},
+    frame: options.frame,
     renderOverrides: options.renderOverrides,
     interactionOverrides: options.interactionOverrides,
   };

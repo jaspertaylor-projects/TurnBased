@@ -58,6 +58,8 @@ The TurnBased engine is a **deterministic, event-sourced game state machine** de
 | `shared-types` | Cross-package type definitions |
 | `shared-utils` | Serialization, hashing, ID generation, zod helpers |
 
+For a package-by-package usage guide and doc index, start with [api-index.md](/home/anonymous/TheCode/TurnBased/docs/engine/api-index.md).
+
 ## Data Flow
 
 1. Player or AI submits an **intent action** (e.g., "play card X to zone Y").

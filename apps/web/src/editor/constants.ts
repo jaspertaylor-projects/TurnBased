@@ -1,6 +1,7 @@
 import type { UISelectionState } from '@turnbased/engine-ui';
 
-export type EditorSection = 'visual' | 'preview' | 'versions' | 'components' | 'app_layout';
+export type EditorSection = 'settings' | 'component_editor' | 'preview' | 'versions' | 'app_layout';
+export type ComponentEditorMode = 'edit' | 'create';
 
 export interface EditorSectionOption {
   id: EditorSection;
@@ -19,9 +20,14 @@ export const EMPTY_SELECTION: UISelectionState = {
 
 export const SECTION_OPTIONS: EditorSectionOption[] = [
   {
-    id: 'visual',
-    label: 'Visual',
-    description: 'Arrange the board and main play surface.',
+    id: 'settings',
+    label: 'Settings',
+    description: 'Edit the game setup, player range, theme, and art style.',
+  },
+  {
+    id: 'component_editor',
+    label: 'Component Editor',
+    description: 'Browse top-level components from the left rail and edit or create focused components here.',
   },
   {
     id: 'preview',
@@ -32,11 +38,6 @@ export const SECTION_OPTIONS: EditorSectionOption[] = [
     id: 'versions',
     label: 'Versions',
     description: 'Track workspace history and recover checkpoints.',
-  },
-  {
-    id: 'components',
-    label: 'Component Editor',
-    description: 'Manage components, properties, and ownership.',
   },
   {
     id: 'app_layout',

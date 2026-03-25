@@ -10,6 +10,79 @@ The current package exports:
 - `getDestinationAffordance(moveTree, zoneId, options?)`
 - `createPopupChoosers(moveTree, options?)`
 - `DEFAULT_KEYBOARD_SHORTCUTS`
+- `BoardGrid(props)`
+- `GamePreviewWindow(props)`
+- `GameSurfacePopup(props)`
+- `GameTableHeader(props)`
+- `GameInfoPanel(props)`
+- `ResourceDock(props)`
+- `LinkedSeatSummaryStrip(props)`
+- `LinkedViewStage(props)`
+- `PlayerLinkedViewStage(props)`
+
+## Reusable Linked-View UI Assets
+
+The package now includes reusable linked-view shell pieces for the default startup experience:
+
+- `LinkedSeatSummaryStrip`
+  - renders a row of player icons
+  - each icon can expand on hover to expose a short resource summary
+  - clicking a player icon can switch the active view to that player's linked area
+- `GameInfoPanel`
+  - renders a reusable status/info box for turn ownership and primary turn actions
+- `GameTableHeader`
+  - renders reusable above-the-table chrome for game title and primary session actions
+- `GamePreviewWindow`
+  - renders the reusable felt-table surface and app boundary
+- `GameSurfacePopup`
+  - renders a reusable game-surface popup above the preview/table shell
+  - intended for start-of-match choices, lightweight session gating, and other shared in-surface prompts
+- `ResourceDock`
+  - renders shared player-resource docks for reusable bottom-of-board inventories
+- `LinkedViewStage`
+  - renders the main shared board surface
+  - intended for the default `Main Board` view
+- `PlayerLinkedViewStage`
+  - renders a player-owned view surface
+  - includes a built-in "back to main board" action slot
+
+These are intentionally generic so AI-generated projects and app-level previews can reuse the same linked-view navigation pattern instead of inventing custom one-off shells.
+
+The current starter direction is:
+
+- a single shared board surface by default
+- top-of-table game chrome outside the felt play area
+- turn/info state in the upper banner near the player strip
+- per-player `Player N Resources` inventories plus a shared `Game Supply` rendered through shared dock components
+- editor board authoring should reuse the same shared board-surface renderer so board placement and styling stay 1:1 between editor and preview
+- the editor surface should focus on visual editing; gameplay logic editing can stay in the AI/engine layer
+- shared color selection should come from one reusable alpha-capable picker that can both choose from and write back into a project-level named palette
+- that shared color picker should support left-opening popups in narrow side panels, so editor controls do not crowd the workspace
+- shared board-surface appearance should flow through `BoardSurface` using params such as `surfaceColor`, `surfaceTexture`, `surfaceBorderColor`, `surfaceBorderWidth`, and `surfaceBorderStyle`
+- when no board child is selected, the editor's active controls should style that shared board surface directly without a bulky summary pane, and texture selection should stay compact
+- shared grid rendering should also come from `@turnbased/engine-ui`, with `BoardGrid` owning both square-grid cells and edge-to-edge hex tiling math
+- `BoardGrid` should scale to fit inside the authored component frame instead of overflowing beyond it
+- `BoardGrid` should render authored cell-coordinate sets directly and keep cell coordinates off the visible surface by default
+- hex grids should ship with a visible per-hex border shell so neighboring cells read clearly before any custom styling is applied
+
+## Resource Template Rendering
+
+The UI layer should expect many authored resources to arrive as repeated runtime entities generated from one authored template.
+
+Common example:
+
+- one authored cube template inside a nested `resource-pile` in `Player 1 Resources`
+- `quantity = 6`
+- `colorMode = 'owner'`
+- `supplyMode = 'finite'`
+
+When rendered:
+
+- preview/game surfaces still show six draggable cubes
+- editor surfaces should show the permanent `resource-pile` region and may summarize the resource template with a compact `x6` representation
+- `colorMode = 'owner'` should resolve visual color from the owning seat
+- `colorMode = 'neutral'` should use a shared neutral style
+- `supplyMode = 'infinite'` may keep a shared source available while spawning fresh runtime copies into destinations
 
 ## Affordance State
 

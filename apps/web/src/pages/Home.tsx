@@ -211,7 +211,7 @@ export const Home = () => {
                 <FeatureCard icon="🍃" title="AI-Powered Browser Editor" accent="#10b981">
                   <p style={{ margin: 0 }}>
                     Start with a lightweight setup form, then let AI generate a linked multi-view workspace in the browser. No downloads required.
-                    The editor opens into visual, preview, versions, component editor, and app layout tabs after the first build.
+                    The editor opens into a focused component editor, runtime preview, version history, and app layout tools after the first build.
                   </p>
                 </FeatureCard>
               </RevealSection>
@@ -251,7 +251,7 @@ export const Home = () => {
                 <StepCard num={1} title="Start with Setup" desc="Enter the game name, player range, solo and campaign flags, theme, and art style. AI uses that setup to create the initial linked-view scaffold." />
               </RevealSection>
               <RevealSection delay={0.2}>
-                <StepCard num={2} title="Build with AI" desc="Generate the first workspace from the setup form and engine APIs. The result opens straight into visual editing, version history, component editing, and runtime preview." />
+                <StepCard num={2} title="Build with AI" desc="Generate the first workspace from the setup form and engine APIs. The result opens straight into the component editor, version history, app layout tools, and runtime preview." />
               </RevealSection>
               <RevealSection delay={0.3}>
                 <StepCard num={3} title="Refine and Playtest" desc="Adjust components, app layout, and version checkpoints while preview shows the current playable state and legal move flow." />
