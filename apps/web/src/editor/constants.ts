@@ -1,6 +1,6 @@
 import type { UISelectionState } from '@turnbased/engine-ui';
 
-export type EditorSection = 'settings' | 'component_editor' | 'preview' | 'versions' | 'app_layout';
+export type EditorSection = 'settings' | 'art' | 'component_editor' | 'preview' | 'versions' | 'app_layout';
 export type ComponentEditorMode = 'edit' | 'create';
 
 export interface EditorSectionOption {
@@ -22,7 +22,12 @@ export const SECTION_OPTIONS: EditorSectionOption[] = [
   {
     id: 'settings',
     label: 'Settings',
-    description: 'Edit the game setup, player range, theme, and art style.',
+    description: 'Edit the game setup, player range, and project palette.',
+  },
+  {
+    id: 'art',
+    label: 'Art',
+    description: 'Manage theme, art styles, recurring visual assets, and first-class icon tokens.',
   },
   {
     id: 'component_editor',

@@ -1,5 +1,7 @@
 import type { EditorProject, ProjectColorPalette, ProjectPaletteColorId } from './types';
 
+export const PROJECT_PALETTE_REFERENCE_PREFIX = 'palette:';
+
 export const PROJECT_PALETTE_ORDER: ProjectPaletteColorId[] = [
   'primary',
   'secondary',
@@ -38,10 +40,56 @@ export function createDefaultProjectColorPalette(): ProjectColorPalette {
   };
 }
 
+export function createProjectPaletteReference(id: ProjectPaletteColorId): string {
+  return `${PROJECT_PALETTE_REFERENCE_PREFIX}${id}`;
+}
+
+export function readProjectPaletteReference(value: string | null | undefined): ProjectPaletteColorId | null {
+  if (!value || typeof value !== 'string') {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed.startsWith(PROJECT_PALETTE_REFERENCE_PREFIX)) {
+    return null;
+  }
+
+  const candidate = trimmed.slice(PROJECT_PALETTE_REFERENCE_PREFIX.length) as ProjectPaletteColorId;
+  return PROJECT_PALETTE_ORDER.includes(candidate) ? candidate : null;
+}
+
+export function resolveProjectPaletteColorValue(
+  palette: ProjectColorPalette,
+  value: string | null | undefined,
+  visited = new Set<ProjectPaletteColorId>(),
+): string | null {
+  if (!value || typeof value !== 'string' || value.trim().length === 0) {
+    return null;
+  }
+
+  const reference = readProjectPaletteReference(value);
+  if (!reference) {
+    return value;
+  }
+
+  if (visited.has(reference)) {
+    return createDefaultProjectColorPalette()[reference];
+  }
+
+  visited.add(reference);
+  return resolveProjectPaletteColorValue(
+    palette,
+    palette[reference] ?? createDefaultProjectColorPalette()[reference],
+    visited,
+  );
+}
+
 export function listProjectPaletteOptions(project: Pick<EditorProject, 'settings'>) {
   return PROJECT_PALETTE_ORDER.map((id) => ({
     id,
     label: PROJECT_PALETTE_LABELS[id],
-    value: project.settings.colorPalette[id],
+    value: resolveProjectPaletteColorValue(project.settings.colorPalette, project.settings.colorPalette[id])
+      ?? createDefaultProjectColorPalette()[id],
+    referenceValue: createProjectPaletteReference(id),
   }));
 }

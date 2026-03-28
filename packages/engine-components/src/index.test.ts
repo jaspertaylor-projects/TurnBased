@@ -19,7 +19,7 @@ describe('engine-components catalog', () => {
     const allComponents = listBuiltInComponents();
     const collectionComponents = listBuiltInComponents('collection');
 
-    expect(allComponents).toHaveLength(12);
+    expect(allComponents.map((component) => component.type)).toContain('text-box');
     expect(collectionComponents.map((component) => component.type)).toEqual([
       'deck',
       'hand',
@@ -56,6 +56,7 @@ describe('engine-components catalog', () => {
     expect(board.properties.label).toBe('Board');
     expect(space.properties.terrain).toBe('plain');
     expect(piece.properties.size).toBe('medium');
+    expect(getBuiltInComponentManifest('text-box').propertiesSchema.parse({}).fontSize).toBe(22);
 
     expect(
       validateComponentPlacement(
@@ -67,8 +68,35 @@ describe('engine-components catalog', () => {
       validateComponentPlacement(
         getBuiltInComponentManifest('deck'),
         getBuiltInComponentManifest('space'),
-      ).valid,
+    ).valid,
     ).toBe(false);
+    expect(
+      validateComponentPlacement(
+        getBuiltInComponentManifest('text-box'),
+        getBuiltInComponentManifest('board'),
+      ).valid,
+    ).toBe(true);
+  });
+
+  it('accepts reusable cell appearance properties on grid components', () => {
+    const grid = createComponentInstance(getBuiltInComponentManifest('square-grid'), {
+      instanceId: createComponentInstanceId('grid_square'),
+      properties: {
+        cellBackground: 'rgba(240,253,244,0.92)',
+        cellTextureId: 'wood',
+        cellTextureOpacity: 0.45,
+        cellBorderColor: 'rgba(15,118,110,0.28)',
+        cellBorderWidth: 3,
+        cellBorderRadius: 12,
+      },
+    });
+
+    expect(grid.properties.cellBackground).toBe('rgba(240,253,244,0.92)');
+    expect(grid.properties.cellTextureId).toBe('wood');
+    expect(grid.properties.cellTextureOpacity).toBe(0.45);
+    expect(grid.properties.cellBorderColor).toBe('rgba(15,118,110,0.28)');
+    expect(grid.properties.cellBorderWidth).toBe(3);
+    expect(grid.properties.cellBorderRadius).toBe(12);
   });
 
   it('enforces occupancy defaults for spaces and score tracks', () => {

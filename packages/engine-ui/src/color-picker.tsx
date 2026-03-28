@@ -4,6 +4,7 @@ export interface PaletteColorOption {
   id: string;
   label: string;
   value: string;
+  referenceValue?: string;
 }
 
 export interface ProjectColorPickerProps {
@@ -29,6 +30,9 @@ const FALLBACK_COLOR: ParsedColor = {
   b: 110,
   a: 1,
 };
+const COLOR_PICKER_GAP = 10;
+const COLOR_PICKER_VIEWPORT_PADDING = 12;
+const COLOR_PICKER_DEFAULT_HEIGHT = 420;
 
 function clampChannel(value: number): number {
   return Math.max(0, Math.min(255, Math.round(value)));
@@ -117,6 +121,58 @@ function parseColor(value: string | null | undefined): ParsedColor {
   return FALLBACK_COLOR;
 }
 
+function resolvePaletteColorValue(
+  value: string | null | undefined,
+  palette: readonly PaletteColorOption[],
+): { resolvedValue: string | null; activePaletteOption: PaletteColorOption | null } {
+  if (!value || value.trim().length === 0) {
+    return {
+      resolvedValue: null,
+      activePaletteOption: null,
+    };
+  }
+
+  const activePaletteOption = palette.find((option) => option.referenceValue === value) ?? null;
+  return {
+    resolvedValue: activePaletteOption?.value ?? value,
+    activePaletteOption,
+  };
+}
+
+function getPopupWidth(): number {
+  return Math.min(340, Math.max(260, Math.floor(window.innerWidth * 0.82)));
+}
+
+function getPopupPosition(
+  triggerRect: DOMRect,
+  popupPlacement: ProjectColorPickerProps['popupPlacement'],
+  popupWidth: number,
+  popupHeight: number,
+) {
+  const unclampedLeft = popupPlacement === 'left'
+    ? triggerRect.left - popupWidth - COLOR_PICKER_GAP
+    : triggerRect.left;
+  const unclampedTop = popupPlacement === 'left'
+    ? triggerRect.top
+    : triggerRect.bottom + COLOR_PICKER_GAP;
+  const top = popupPlacement === 'left'
+    ? Math.max(COLOR_PICKER_VIEWPORT_PADDING, triggerRect.top)
+    : Math.max(
+      COLOR_PICKER_VIEWPORT_PADDING,
+      Math.min(unclampedTop, window.innerHeight - popupHeight - COLOR_PICKER_VIEWPORT_PADDING),
+    );
+
+  return {
+    width: popupWidth,
+    left: Math.max(
+      COLOR_PICKER_VIEWPORT_PADDING,
+      Math.min(unclampedLeft, window.innerWidth - popupWidth - COLOR_PICKER_VIEWPORT_PADDING),
+    ),
+    top,
+    maxHeight: Math.max(240, window.innerHeight - top - COLOR_PICKER_VIEWPORT_PADDING),
+  };
+}
+
 export function ProjectColorPicker({
   value,
   onChange,
@@ -124,13 +180,35 @@ export function ProjectColorPicker({
   onAssignPaletteColor,
   label = '',
   compact = false,
-  popupPlacement = 'bottom',
+  popupPlacement = 'left',
 }: ProjectColorPickerProps) {
   const [open, setOpen] = useState(false);
   const [assignTarget, setAssignTarget] = useState<string>(palette[0]?.id ?? '');
   const rootRef = useRef<HTMLDivElement | null>(null);
-  const parsed = useMemo(() => parseColor(value), [value]);
-  const colorText = value && value.trim().length > 0 ? value : formatColor(parsed);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const popupRef = useRef<HTMLDivElement | null>(null);
+  const [popupPosition, setPopupPosition] = useState<{ top: number; left: number; width: number; maxHeight: number } | null>(null);
+  const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
+  const [draftValue, setDraftValue] = useState<string | null>(null);
+  const liveValue = open ? draftValue : value;
+  const { resolvedValue, activePaletteOption } = useMemo(
+    () => resolvePaletteColorValue(liveValue, palette),
+    [liveValue, palette],
+  );
+  const parsed = useMemo(() => parseColor(resolvedValue), [resolvedValue]);
+  const colorText = resolvedValue && resolvedValue.trim().length > 0 ? resolvedValue : formatColor(parsed);
+  const editableValue = open
+    ? (draftValue && draftValue.trim().length > 0 ? draftValue : formatColor(parsed))
+    : colorText;
+
+  function commitDraftAndClose() {
+    const nextValue = draftValue && draftValue.trim().length > 0 ? draftValue : formatColor(parsed);
+    setOpen(false);
+    setDraftValue(null);
+    if ((value ?? '') !== nextValue) {
+      onChange(nextValue);
+    }
+  }
 
   useEffect(() => {
     if (!open) {
@@ -139,14 +217,50 @@ export function ProjectColorPicker({
 
     function handlePointerDown(event: MouseEvent) {
       const target = event.target;
-      if (rootRef.current && target instanceof Node && !rootRef.current.contains(target)) {
-        setOpen(false);
+      if (
+        target instanceof Node
+        && rootRef.current
+        && !rootRef.current.contains(target)
+        && !popupRef.current?.contains(target)
+      ) {
+        commitDraftAndClose();
       }
     }
 
     window.addEventListener('mousedown', handlePointerDown);
     return () => window.removeEventListener('mousedown', handlePointerDown);
-  }, [open]);
+  }, [draftValue, open, parsed, value]);
+
+  useEffect(() => {
+    if (!open) {
+      setPopupPosition(null);
+      setAnchorRect(null);
+      return undefined;
+    }
+
+    function updatePopupPosition() {
+      const triggerRect = anchorRect ?? triggerRef.current?.getBoundingClientRect();
+      if (!triggerRect) {
+        return;
+      }
+
+      setPopupPosition(getPopupPosition(
+        triggerRect,
+        popupPlacement,
+        getPopupWidth(),
+        popupRef.current?.getBoundingClientRect().height ?? COLOR_PICKER_DEFAULT_HEIGHT,
+      ));
+    }
+
+    updatePopupPosition();
+    const animationFrame = window.requestAnimationFrame(updatePopupPosition);
+    window.addEventListener('resize', updatePopupPosition);
+
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+      window.removeEventListener('resize', updatePopupPosition);
+    };
+  }, [anchorRect, open, popupPlacement]);
 
   useEffect(() => {
     if (!assignTarget && palette[0]?.id) {
@@ -157,8 +271,25 @@ export function ProjectColorPicker({
   return (
     <div ref={rootRef} style={{ position: 'relative', width: '100%' }}>
       <button
+        ref={triggerRef}
         type="button"
-        onClick={() => setOpen((current) => !current)}
+        onClick={(event) => {
+          const triggerRect = event.currentTarget.getBoundingClientRect();
+          if (open) {
+            commitDraftAndClose();
+            return;
+          }
+
+          setAnchorRect(triggerRect);
+          setDraftValue(value ?? formatColor(parseColor(resolvedValue)));
+          setPopupPosition(getPopupPosition(
+            triggerRect,
+            popupPlacement,
+            getPopupWidth(),
+            popupRef.current?.getBoundingClientRect().height ?? COLOR_PICKER_DEFAULT_HEIGHT,
+          ));
+          setOpen(true);
+        }}
         style={{
           width: '100%',
           aspectRatio: compact ? '1 / 1' : undefined,
@@ -199,13 +330,14 @@ export function ProjectColorPicker({
 
       {open ? (
         <div
+          ref={popupRef}
           style={{
-            position: 'absolute',
-            zIndex: 40,
-            top: popupPlacement === 'left' ? 0 : 'calc(100% + 0.45rem)',
-            left: popupPlacement === 'bottom' ? 0 : undefined,
-            right: popupPlacement === 'left' ? 'calc(100% + 0.45rem)' : undefined,
-            width: 'min(340px, 82vw)',
+            position: 'fixed',
+            zIndex: 320,
+            top: popupPosition?.top ?? 12,
+            left: popupPosition?.left ?? 12,
+            width: `${popupPosition?.width ?? getPopupWidth()}px`,
+            maxHeight: `${popupPosition?.maxHeight ?? (window.innerHeight - 24)}px`,
             borderRadius: '20px',
             border: '1px solid rgba(15,118,110,0.14)',
             background: 'rgba(255,255,255,0.98)',
@@ -213,6 +345,8 @@ export function ProjectColorPicker({
             padding: '0.9rem',
             display: 'grid',
             gap: '0.75rem',
+            overscrollBehavior: 'contain',
+            overflowY: 'auto',
           }}
         >
           <div style={{ display: 'grid', gridTemplateColumns: '96px minmax(0, 1fr)', gap: '0.75rem', alignItems: 'stretch' }}>
@@ -231,7 +365,7 @@ export function ProjectColorPicker({
                 <input
                   type="color"
                   value={colorToHex(parsed)}
-                  onChange={(event) => onChange(formatColor({
+                  onChange={(event) => setDraftValue(formatColor({
                     ...parsed,
                     ...parseColor(event.target.value),
                     a: parsed.a,
@@ -255,7 +389,7 @@ export function ProjectColorPicker({
                     min={0}
                     max={100}
                     value={Math.round(parsed.a * 100)}
-                    onChange={(event) => onChange(formatColor({
+                    onChange={(event) => setDraftValue(formatColor({
                       ...parsed,
                       a: Number(event.target.value) / 100,
                     }))}
@@ -269,8 +403,8 @@ export function ProjectColorPicker({
           <label style={{ display: 'grid', gap: '0.28rem', color: '#0f766e', fontSize: '0.8rem' }}>
             Value
             <input
-              value={colorText}
-              onChange={(event) => onChange(event.target.value)}
+              value={editableValue}
+              onChange={(event) => setDraftValue(event.target.value)}
               style={{
                 width: '100%',
                 padding: '0.7rem 0.8rem',
@@ -283,6 +417,12 @@ export function ProjectColorPicker({
             />
           </label>
 
+          {activePaletteOption ? (
+            <div style={{ padding: '0.65rem 0.75rem', borderRadius: '14px', background: 'rgba(240,253,244,0.92)', color: '#065f46', fontSize: '0.78rem', fontWeight: 600 }}>
+              Linked to project color: {activePaletteOption.label}
+            </div>
+          ) : null}
+
           {palette.length > 0 ? (
             <div style={{ display: 'grid', gap: '0.5rem' }}>
               <div style={{ color: '#0f766e', fontSize: '0.76rem', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Project Palette</div>
@@ -291,7 +431,7 @@ export function ProjectColorPicker({
                   <button
                     key={option.id}
                     type="button"
-                    onClick={() => onChange(option.value)}
+                    onClick={() => setDraftValue(option.referenceValue ?? option.value)}
                     style={{
                       display: 'grid',
                       gap: '0.28rem',
@@ -338,7 +478,8 @@ export function ProjectColorPicker({
                   type="button"
                   onClick={() => {
                     if (assignTarget) {
-                      onAssignPaletteColor(assignTarget, colorText);
+                      const nextValue = draftValue && draftValue.trim().length > 0 ? draftValue : colorText;
+                      onAssignPaletteColor(assignTarget, nextValue);
                     }
                   }}
                   style={{

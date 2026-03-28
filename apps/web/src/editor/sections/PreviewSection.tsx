@@ -16,19 +16,22 @@ import {
   ResourceDock,
   useEngineUiMotionStyles,
 } from '@turnbased/engine-ui';
-import type { UIAffordanceState, UISelectionState } from '@turnbased/engine-ui';
+import type { LinkedSeatSummaryItem, UIAffordanceState, UISelectionState } from '@turnbased/engine-ui';
 
 import {
   BOARD_SURFACE_HEIGHT,
   BOARD_SURFACE_WIDTH,
   getBoardGridCells,
+  getGridCellAppearance,
   getResolvedBoardItemFrame,
   isBoardGridComponentType,
   isMovableComponentType,
 } from '../boardLayout';
 import { renderComponentIcon } from '../componentMeta';
+import { TextBoxContent } from '../components/TextBoxContent';
 import { getOwnerColor } from '../helpers';
 import { renderIcon } from '../iconography';
+import { resolveProjectPaletteColorValue } from '../projectPalette';
 import { toPreviewZoneId } from '../runtime';
 import type { EditorProject } from '../types';
 
@@ -74,6 +77,9 @@ export function PreviewSection({
   const [hasStarted, setHasStarted] = useState(false);
   const [showStartPopup, setShowStartPopup] = useState(false);
   const [playMode, setPlayMode] = useState<'manual' | 'ai'>('manual');
+  const resolvePaletteColor = (value: string | null | undefined) => (
+    resolveProjectPaletteColorValue(project.settings.colorPalette, value) ?? value ?? null
+  );
 
   const viewMap = useMemo(
     () => new Map(project.views.items.map((view) => [view.id, view])),
@@ -352,12 +358,13 @@ export function PreviewSection({
             label: String(child.properties.label ?? child.displayName ?? 'Board Item'),
             typeLabel: child.componentType.replace('-', ' '),
             icon: renderComponentIcon(child.componentType, { size: 16, style: { color: '#064e3b' } }),
+            showHeader: child.componentType !== 'text-box',
             x: frame.x,
             y: frame.y,
             width: frame.width,
             height: frame.height,
-            background: dropTarget ? 'rgba(250,204,21,0.18)' : frame.background,
-            borderColor: dropTarget ? '#f97316' : frame.borderColor,
+            background: dropTarget ? 'rgba(250,204,21,0.18)' : (resolvePaletteColor(frame.background) ?? frame.background),
+            borderColor: dropTarget ? '#f97316' : (resolvePaletteColor(frame.borderColor) ?? frame.borderColor),
             borderWidth: dropTarget ? 3 : frame.borderWidth,
             borderRadius: frame.borderRadius,
             selected,
@@ -377,7 +384,15 @@ export function PreviewSection({
                 handleZoneDrop(childId);
               }
               : undefined,
-            content: isGrid
+            content: child.componentType === 'text-box'
+              ? (
+                <TextBoxContent
+                  project={project}
+                  properties={child.properties}
+                  emptyPlaceholder="Add text in the component editor."
+                />
+              )
+              : isGrid
               ? (() => {
                 const gridCells = getBoardGridCells(child);
 
@@ -389,6 +404,7 @@ export function PreviewSection({
                       const cellZoneId = toPreviewZoneId(cellId);
                       const cellZone = previewState.zones[cellZoneId];
                       const cellState = affordances?.zoneStates[cellZoneId];
+                      const cellAppearance = getGridCellAppearance(child);
                       const row = typeof cell?.placement?.coordinates?.y === 'number'
                         ? cell.placement.coordinates.y
                         : (gridCells[cellIndex]?.y ?? cellIndex);
@@ -403,11 +419,14 @@ export function PreviewSection({
                         label: String(cell?.properties.label ?? cell?.displayName ?? `Cell ${cellIndex + 1}`),
                         background: cellState?.dropTarget
                           ? 'rgba(250,204,21,0.24)'
-                          : 'rgba(255,255,255,0.92)',
+                          : (resolvePaletteColor(cellAppearance.background) ?? cellAppearance.background),
+                        textureId: cellAppearance.textureId,
+                        textureOpacity: cellAppearance.textureOpacity,
                         borderColor: cellState?.dropTarget
                           ? '#f97316'
-                          : (child.componentType === 'hex-grid' ? undefined : 'rgba(15,118,110,0.18)'),
-                        borderWidth: cellState?.dropTarget ? 2 : 1,
+                          : (resolvePaletteColor(cellAppearance.borderColor) ?? (child.componentType === 'hex-grid' ? undefined : 'rgba(15,118,110,0.18)')),
+                        borderWidth: cellState?.dropTarget ? 2 : cellAppearance.borderWidth,
+                        borderRadius: cellAppearance.borderRadius,
                         selected: Boolean(cellState?.selected),
                         highlighted: Boolean(cellState?.highlighted || cellState?.interactable),
                         dropTarget: Boolean(cellState?.dropTarget),
@@ -450,9 +469,9 @@ export function PreviewSection({
         height={BOARD_SURFACE_HEIGHT}
         minHeight={520}
         surfaceAppearance={{
-          background: boardAppearance.surfaceColor,
+          background: resolvePaletteColor(boardAppearance.surfaceColor) ?? boardAppearance.surfaceColor,
           textureId: boardAppearance.surfaceTexture,
-          borderColor: boardAppearance.surfaceBorderColor,
+          borderColor: resolvePaletteColor(boardAppearance.surfaceBorderColor) ?? boardAppearance.surfaceBorderColor,
           borderWidth: boardAppearance.surfaceBorderWidth,
           borderStyle: boardAppearance.surfaceBorderStyle,
         }}
@@ -584,11 +603,11 @@ export function PreviewSection({
     );
   }
 
-  const seatItems = project.seats.map((seat) => ({
+  const seatItems: LinkedSeatSummaryItem[] = project.seats.map((seat) => ({
     id: seat.id,
     label: seat.name,
     color: seat.color,
-    icon: renderIcon(seat.identity.iconKey, { size: 20, style: { color: '#064e3b' } }),
+    icon: renderIcon(seat.identity.iconKey, { size: 20, style: { color: '#064e3b' } }) as LinkedSeatSummaryItem['icon'],
     summary: `${countSeatResources(seat.id)} cubes`,
     active: activeView?.linkedSeatId === seat.id,
     onSelect: () => setActiveViewId(project.views.items.find((view) => view.linkedSeatId === seat.id)?.id ?? project.views.defaultViewId),

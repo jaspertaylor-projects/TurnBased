@@ -6,6 +6,38 @@ import type { BuiltInComponentType, ComponentManifest } from './types';
 import { createRectangularGridCellCoordinates } from './gridCells';
 
 const countSchema = z.number().int().nonnegative().nullable();
+const boardSurfaceTextureIdSchema = z.enum(['none', 'felt', 'water', 'grass', 'wood', 'marble', 'leather', 'stone', 'sand', 'metal']);
+
+const gridCellAppearancePropertyDefinitions = {
+  cellBackground: { kind: 'string', label: 'Cell Background' },
+  cellTextureId: { kind: 'enum', label: 'Cell Texture', options: boardSurfaceTextureIdSchema.options },
+  cellTextureOpacity: { kind: 'number', label: 'Cell Texture Opacity' },
+  cellBorderColor: { kind: 'string', label: 'Cell Border Color' },
+  cellBorderWidth: { kind: 'number', label: 'Cell Border Width' },
+  cellBorderRadius: { kind: 'number', label: 'Cell Border Radius' },
+} as const;
+
+function createGridCellAppearanceSchema(defaultBorderWidth: number, defaultBorderRadius: number) {
+  return {
+    cellBackground: z.string().trim().min(1).nullable().default(null),
+    cellTextureId: boardSurfaceTextureIdSchema.default('none'),
+    cellTextureOpacity: z.number().min(0).max(1).default(0.3),
+    cellBorderColor: z.string().trim().min(1).nullable().default(null),
+    cellBorderWidth: z.number().nonnegative().default(defaultBorderWidth),
+    cellBorderRadius: z.number().nonnegative().default(defaultBorderRadius),
+  };
+}
+
+function createGridCellAppearanceDefaults(defaultBorderWidth: number, defaultBorderRadius: number) {
+  return {
+    cellBackground: null,
+    cellTextureId: 'none' as const,
+    cellTextureOpacity: 0.3,
+    cellBorderColor: null,
+    cellBorderWidth: defaultBorderWidth,
+    cellBorderRadius: defaultBorderRadius,
+  };
+}
 
 const defaultContainerRenderHints = {
   showLabel: true,
@@ -114,7 +146,7 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
       allowedParentCategories: [],
       allowedParentTypes: [],
       allowedChildCategories: ['container', 'counter'],
-      allowedChildTypes: ['space', 'track', 'hex-grid', 'square-grid', 'checkerboard-grid', 'zone', 'resource-pile', 'counter', 'score-track'],
+      allowedChildTypes: ['space', 'track', 'text-box', 'hex-grid', 'square-grid', 'checkerboard-grid', 'zone', 'resource-pile', 'counter', 'score-track'],
       minChildren: 0,
       maxChildren: null,
     },
@@ -122,7 +154,7 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
       mode: 'multiple',
       capacity: null,
       occupantCategories: ['container', 'counter'],
-      occupantTypes: ['space', 'track', 'hex-grid', 'square-grid', 'checkerboard-grid', 'zone', 'resource-pile', 'counter', 'score-track'],
+      occupantTypes: ['space', 'track', 'text-box', 'hex-grid', 'square-grid', 'checkerboard-grid', 'zone', 'resource-pile', 'counter', 'score-track'],
       allowMixedOccupants: true,
       allowSharedControl: true,
       perPlayerLimit: null,
@@ -140,7 +172,7 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
           id: 'surface',
           label: 'Surface',
           acceptsCategories: ['container', 'counter'],
-          acceptsTypes: ['space', 'track', 'hex-grid', 'square-grid', 'checkerboard-grid', 'zone', 'resource-pile', 'counter', 'score-track'],
+          acceptsTypes: ['space', 'track', 'text-box', 'hex-grid', 'square-grid', 'checkerboard-grid', 'zone', 'resource-pile', 'counter', 'score-track'],
           minChildren: 0,
           maxChildren: null,
         },
@@ -237,6 +269,7 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
       cells: { kind: 'json', label: 'Cells', description: 'Explicit hex coordinates. Each coordinate becomes a generated space.' },
       cellLabelPrefix: { kind: 'string', label: 'Cell Label Prefix' },
       maxCapacity: { kind: 'number', label: 'Cell Capacity' },
+      ...gridCellAppearancePropertyDefinitions,
     },
     propertiesSchema: z.object({
       label: z.string().default('Hex Grid'),
@@ -246,12 +279,14 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
       })).default(createRectangularGridCellCoordinates(4, 5)),
       cellLabelPrefix: z.string().default('Hex'),
       maxCapacity: countSchema.default(null),
+      ...createGridCellAppearanceSchema(2, 0),
     }),
     defaultProperties: {
       label: 'Hex Grid',
       cells: createRectangularGridCellCoordinates(4, 5),
       cellLabelPrefix: 'Hex',
       maxCapacity: null,
+      ...createGridCellAppearanceDefaults(2, 0),
     },
     renderHints: {
       surface: 'board',
@@ -316,6 +351,7 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
       cells: { kind: 'json', label: 'Cells', description: 'Explicit square-grid coordinates. Each coordinate becomes a generated space.' },
       cellLabelPrefix: { kind: 'string', label: 'Cell Label Prefix' },
       maxCapacity: { kind: 'number', label: 'Cell Capacity' },
+      ...gridCellAppearancePropertyDefinitions,
     },
     propertiesSchema: z.object({
       label: z.string().default('Square Grid'),
@@ -325,12 +361,14 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
       })).default(createRectangularGridCellCoordinates(6, 6)),
       cellLabelPrefix: z.string().default('Cell'),
       maxCapacity: countSchema.default(null),
+      ...createGridCellAppearanceSchema(1, 10),
     }),
     defaultProperties: {
       label: 'Square Grid',
       cells: createRectangularGridCellCoordinates(6, 6),
       cellLabelPrefix: 'Cell',
       maxCapacity: null,
+      ...createGridCellAppearanceDefaults(1, 10),
     },
     renderHints: {
       surface: 'board',
@@ -395,6 +433,7 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
       cells: { kind: 'json', label: 'Cells', description: 'Explicit square-grid coordinates. Each coordinate becomes a generated space.' },
       cellLabelPrefix: { kind: 'string', label: 'Cell Label Prefix' },
       maxCapacity: { kind: 'number', label: 'Cell Capacity' },
+      ...gridCellAppearancePropertyDefinitions,
     },
     propertiesSchema: z.object({
       label: z.string().default('Square Grid'),
@@ -404,12 +443,14 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
       })).default(createRectangularGridCellCoordinates(6, 6)),
       cellLabelPrefix: z.string().default('Cell'),
       maxCapacity: countSchema.default(null),
+      ...createGridCellAppearanceSchema(1, 10),
     }),
     defaultProperties: {
       label: 'Square Grid',
       cells: createRectangularGridCellCoordinates(6, 6),
       cellLabelPrefix: 'Cell',
       maxCapacity: null,
+      ...createGridCellAppearanceDefaults(1, 10),
     },
     renderHints: {
       surface: 'board',
@@ -536,6 +577,92 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
       ],
     },
     tags: ['ordered', 'progression'],
+  },
+  'text-box': {
+    type: 'text-box',
+    category: 'container',
+    displayName: 'Text Box',
+    description: 'A rich text annotation box for instructions, flavor, labels, and icon tokens on the board surface.',
+    propertyDefinitions: {
+      label: { kind: 'string', label: 'Label' },
+      contentHtml: { kind: 'string', label: 'Content HTML' },
+      fontFamily: { kind: 'enum', label: 'Font Family', options: ['sans', 'serif', 'display', 'mono'] },
+      fontSize: { kind: 'number', label: 'Font Size' },
+      lineHeight: { kind: 'number', label: 'Line Height' },
+      textColor: { kind: 'string', label: 'Text Color' },
+      textAlign: { kind: 'enum', label: 'Text Align', options: ['left', 'center', 'right', 'justify'] },
+      verticalAlign: { kind: 'enum', label: 'Vertical Align', options: ['start', 'center', 'end'] },
+      padding: { kind: 'number', label: 'Padding' },
+    },
+    propertiesSchema: z.object({
+      label: z.string().default('Text Box'),
+      contentHtml: z.string().default('<p>Text box</p>'),
+      fontFamily: z.enum(['sans', 'serif', 'display', 'mono']).default('sans'),
+      fontSize: z.number().min(10).max(96).default(22),
+      lineHeight: z.number().min(1).max(2.4).default(1.4),
+      textColor: z.string().default('#064e3b'),
+      textAlign: z.enum(['left', 'center', 'right', 'justify']).default('left'),
+      verticalAlign: z.enum(['start', 'center', 'end']).default('center'),
+      padding: z.number().nonnegative().max(64).default(18),
+    }),
+    defaultProperties: {
+      label: 'Text Box',
+      contentHtml: '<p>Text box</p>',
+      fontFamily: 'sans',
+      fontSize: 22,
+      lineHeight: 1.4,
+      textColor: '#064e3b',
+      textAlign: 'left',
+      verticalAlign: 'center',
+      padding: 18,
+    },
+    renderHints: {
+      surface: 'board',
+      layout: 'freeform',
+      orientation: 'none',
+      ...defaultContainerRenderHints,
+      showLabel: false,
+      showOccupancy: false,
+      showCapacity: false,
+      supportsCoordinates: false,
+    },
+    interactionDefaults: {
+      selectionMode: 'single',
+      primaryAction: 'inspect',
+      dragEnabled: false,
+      dropEnabled: false,
+      keyboardNavigable: true,
+      highlightValidDestinations: false,
+    },
+    placementConstraints: {
+      requiresParent: true,
+      allowedParentCategories: ['container'],
+      allowedParentTypes: ['board'],
+      allowedChildCategories: [],
+      allowedChildTypes: [],
+      minChildren: 0,
+      maxChildren: 0,
+    },
+    occupancyRules: {
+      mode: 'none',
+      capacity: 0,
+      occupantCategories: [],
+      occupantTypes: [],
+      allowMixedOccupants: false,
+      allowSharedControl: false,
+      perPlayerLimit: null,
+    },
+    visibilityDefaults: {
+      zoneVisibility: Visibility.Public,
+      contentsVisibility: Visibility.Public,
+      ownerPrivate: false,
+      faceUpByDefault: true,
+    },
+    composition: {
+      strategy: 'leaf',
+      childSlots: [],
+    },
+    tags: ['annotation', 'text', 'board-ui'],
   },
   zone: {
     type: 'zone',

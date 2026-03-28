@@ -1,14 +1,15 @@
-import type { EditorProject, StoredEditorProjects } from './types';
+import type { EditorArtReference, EditorIconAsset, EditorProject, StoredEditorProjects } from './types';
 import { ensureProjectManifest } from './manifest';
 import {
   createDefaultAppLayout,
+  createDefaultProjectArtDirection,
   createDefaultProjectSettings,
   createDefaultProjectViews,
   createDefaultRulesBrief,
   createDefaultSeats,
   syncProjectViews,
 } from './project';
-import { createDefaultProjectColorPalette } from './projectPalette';
+import { createDefaultProjectColorPalette, createProjectPaletteReference } from './projectPalette';
 import { deleteProjectWorkspace } from './workspace';
 
 const STORAGE_KEY = 'turnbased.creator.projects';
@@ -24,6 +25,60 @@ function getStorage(): Storage | null {
 function clampPlayerCount(value: unknown, fallback: number): number {
   const numeric = typeof value === 'number' && Number.isFinite(value) ? Math.trunc(value) : fallback;
   return Math.max(1, Math.min(6, numeric));
+}
+
+function normalizeArtReference(
+  item: Partial<EditorArtReference> | undefined,
+  fallbackId: string,
+): EditorArtReference {
+  return {
+    id: typeof item?.id === 'string' && item.id.trim().length > 0 ? item.id : fallbackId,
+    name: typeof item?.name === 'string' ? item.name : '',
+    category: typeof item?.category === 'string' ? item.category : '',
+    description: typeof item?.description === 'string' ? item.description : '',
+    tags: Array.isArray(item?.tags) ? item.tags.filter((tag): tag is string => typeof tag === 'string') : [],
+  };
+}
+
+function normalizeIconAsset(
+  item: Partial<EditorIconAsset> | undefined,
+  fallbackId: string,
+): EditorIconAsset {
+  return {
+    id: typeof item?.id === 'string' && item.id.trim().length > 0 ? item.id : fallbackId,
+    mode: item?.mode === 'custom' ? 'custom' : 'library',
+    name: typeof item?.name === 'string' ? item.name : '',
+    iconKey: typeof item?.iconKey === 'string' && item.iconKey.trim().length > 0 ? item.iconKey : 'shield',
+    iconColor: typeof item?.iconColor === 'string' && item.iconColor.trim().length > 0
+      ? item.iconColor
+      : createProjectPaletteReference('primary'),
+    iconFillColor: typeof item?.iconFillColor === 'string' && item.iconFillColor.trim().length > 0
+      ? item.iconFillColor
+      : 'rgba(0,0,0,0)',
+    iconStrokeWidth: typeof item?.iconStrokeWidth === 'number' && Number.isFinite(item.iconStrokeWidth)
+      ? Math.max(0.5, item.iconStrokeWidth)
+      : 1,
+    backgroundColor: typeof item?.backgroundColor === 'string' && item.backgroundColor.trim().length > 0
+      ? item.backgroundColor
+      : 'rgba(255,255,255,0.94)',
+    backgroundTextureId: typeof item?.backgroundTextureId === 'string' ? item.backgroundTextureId : 'none',
+    backgroundTextureOpacity: typeof item?.backgroundTextureOpacity === 'number' && Number.isFinite(item.backgroundTextureOpacity)
+      ? Math.max(0, Math.min(1, item.backgroundTextureOpacity))
+      : 0.35,
+    borderColor: typeof item?.borderColor === 'string' && item.borderColor.trim().length > 0
+      ? item.borderColor
+      : createProjectPaletteReference('secondary'),
+    borderWidth: typeof item?.borderWidth === 'number' && Number.isFinite(item.borderWidth)
+      ? Math.max(0, item.borderWidth)
+      : 1,
+    borderRadius: typeof item?.borderRadius === 'number' && Number.isFinite(item.borderRadius)
+      ? Math.max(0, item.borderRadius)
+      : 20,
+    customSvgMarkup: typeof item?.customSvgMarkup === 'string' ? item.customSvgMarkup : '',
+    inlineCode: typeof item?.inlineCode === 'string' ? item.inlineCode : '',
+    description: typeof item?.description === 'string' ? item.description : '',
+    tags: Array.isArray(item?.tags) ? item.tags.filter((tag): tag is string => typeof tag === 'string') : [],
+  };
 }
 
 function normalizeEditorProject(project: EditorProject): EditorProject {
@@ -72,6 +127,20 @@ function normalizeEditorProject(project: EditorProject): EditorProject {
         ...createDefaultProjectColorPalette(),
         ...(project.settings?.colorPalette ?? {}),
       },
+    },
+    art: {
+      ...createDefaultProjectArtDirection(),
+      ...(project.art ?? {}),
+      theme: project.art?.theme ?? project.brief?.theme ?? defaultBrief.theme,
+      definedArtStyles: Array.isArray(project.art?.definedArtStyles)
+        ? project.art.definedArtStyles.map((item, index) => normalizeArtReference(item, `art_style_${index + 1}`))
+        : [],
+      recurringAssets: Array.isArray(project.art?.recurringAssets)
+        ? project.art.recurringAssets.map((item, index) => normalizeArtReference(item, `art_asset_${index + 1}`))
+        : [],
+      icons: Array.isArray(project.art?.icons)
+        ? project.art.icons.map((item, index) => normalizeIconAsset(item, `art_icon_${index + 1}`))
+        : [],
     },
     appLayout: {
       ...createDefaultAppLayout(project.name),

@@ -13,6 +13,7 @@ export interface BoardSurfaceItem {
   label: string;
   typeLabel?: string;
   icon?: ReactNode;
+  showHeader?: boolean;
   x: number;
   y: number;
   width: number;
@@ -60,7 +61,7 @@ function getItemStyle(
   width: number,
   height: number,
   editable: boolean,
-  showItemHeader: boolean,
+  showHeader: boolean,
 ): CSSProperties {
   return {
     position: 'absolute',
@@ -80,8 +81,8 @@ function getItemStyle(
     padding: editable ? '0.8rem 0.8rem 1rem 0.8rem' : '0.7rem',
     textAlign: 'left',
     display: 'grid',
-    gridTemplateRows: showItemHeader ? 'auto minmax(0, 1fr)' : 'minmax(0, 1fr)',
-    gap: showItemHeader ? '0.55rem' : 0,
+    gridTemplateRows: showHeader ? 'auto minmax(0, 1fr)' : 'minmax(0, 1fr)',
+    gap: showHeader ? '0.55rem' : 0,
     overflow: 'hidden',
     cursor: editable ? 'move' : item.onClick ? 'pointer' : 'default',
     transition: 'box-shadow 140ms ease, border-color 140ms ease, background 140ms ease',
@@ -115,14 +116,14 @@ function getItemTextureOverlayStyle(
 
 function BoardSurfaceItemInner({
   item,
-  showItemHeader,
+  showHeader,
 }: {
   item: BoardSurfaceItem;
-  showItemHeader: boolean;
+  showHeader: boolean;
 }) {
   return (
     <>
-      {showItemHeader ? (
+      {showHeader ? (
         <div style={{ display: 'grid', gap: '0.35rem' }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', minWidth: 0 }}>
             {item.icon ? <span style={{ display: 'inline-grid', placeItems: 'center', color: '#064e3b' }}>{item.icon}</span> : null}
@@ -230,15 +231,16 @@ export function BoardSurface({
       ) : null}
 
       {items.map((item) => {
+        const resolvedShowHeader = item.showHeader ?? showItemHeader;
         const interactive = Boolean(item.onClick || item.onMouseDown || item.onDragOver || item.onDrop);
 
         if (!interactive) {
           const itemTextureOverlay = getItemTextureOverlayStyle(item);
 
           return (
-            <div key={item.id} style={getItemStyle(item, width, height, editable, showItemHeader)}>
+            <div key={item.id} style={getItemStyle(item, width, height, editable, resolvedShowHeader)}>
               {itemTextureOverlay ? <div style={itemTextureOverlay} /> : null}
-              <BoardSurfaceItemInner item={item} showItemHeader={showItemHeader} />
+              <BoardSurfaceItemInner item={item} showHeader={resolvedShowHeader} />
             </div>
           );
         }
@@ -261,13 +263,13 @@ export function BoardSurface({
                 }
               }
               : undefined}
-            style={getItemStyle(item, width, height, editable, showItemHeader)}
+            style={getItemStyle(item, width, height, editable, resolvedShowHeader)}
           >
             {(() => {
               const itemTextureOverlay = getItemTextureOverlayStyle(item);
               return itemTextureOverlay ? <div style={itemTextureOverlay} /> : null;
             })()}
-            <BoardSurfaceItemInner item={item} showItemHeader={showItemHeader} />
+            <BoardSurfaceItemInner item={item} showHeader={resolvedShowHeader} />
             {editable && showResizeHandle && item.onResizeMouseDown ? (
               <span
                 onMouseDown={item.onResizeMouseDown}

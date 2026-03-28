@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent } from 'react';
-import { ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react';
+import { ChevronRight, Plus, Trash2 } from 'lucide-react';
 import {
   BOARD_BORDER_STYLE_OPTIONS,
-  BOARD_SURFACE_TEXTURE_OPTIONS,
   getBoardComponentPreset,
   getBuiltInComponentManifest,
   getGridCoordinateKey,
@@ -16,22 +15,26 @@ import {
 import type {
   BoardComponentPreset,
   BoardComponentPresetFamily,
-  BoardSurfaceTextureId,
   BuiltInComponentType,
   ComponentFrame,
   ComponentInstanceModel,
   GridCellCoordinate,
 } from '@turnbased/engine-components';
-import { BoardGrid, BoardSurface, ProjectColorPicker, getBoardSurfaceTextureStyle } from '@turnbased/engine-ui';
+import { BoardGrid, BoardSurface } from '@turnbased/engine-ui';
 
+import { NumericInput } from '../../components/NumericInput';
 import { renderComponentIcon } from '../componentMeta';
-import { listProjectPaletteOptions } from '../projectPalette';
+import { InspectorAccordion, InspectorAppearanceControls } from '../components/InspectorControls';
+import { TextBoxInspector } from '../components/TextBoxInspector';
+import { TextBoxContent } from '../components/TextBoxContent';
+import { listProjectPaletteOptions, resolveProjectPaletteColorValue } from '../projectPalette';
 import {
   BOARD_SURFACE_HEIGHT,
   BOARD_SURFACE_WIDTH,
   clampBoardItemFrame,
   defaultBoardItemFrame,
   getBoardGridCells,
+  getGridCellAppearance,
   getResolvedBoardItemFrame,
   isBoardGridComponentType,
   isMovableComponentType,
@@ -50,88 +53,6 @@ function getComponentLabel(project: EditorProject, instanceId: string): string {
   const manifest = getBuiltInComponentManifest(instance.componentType as BuiltInComponentType);
   return String(instance.properties.label ?? instance.displayName ?? manifest.displayName);
 }
-
-function EditorAccordion({
-  title,
-  defaultOpen = true,
-  children,
-}: {
-  title: string;
-  defaultOpen?: boolean;
-  children: React.ReactNode;
-}) {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
-  const contentRef = useRef<HTMLDivElement>(null);
-  const [contentHeight, setContentHeight] = useState<number | 'auto'>('auto');
-
-  useEffect(() => {
-    if (!contentRef.current) {
-      return;
-    }
-
-    if (isOpen) {
-      const height = contentRef.current.scrollHeight;
-      setContentHeight(height);
-      const timeout = setTimeout(() => setContentHeight('auto'), 220);
-      return () => clearTimeout(timeout);
-    }
-
-    setContentHeight(contentRef.current.scrollHeight);
-    requestAnimationFrame(() => {
-      setContentHeight(0);
-    });
-
-    return undefined;
-  }, [isOpen]);
-
-  return (
-    <div style={{ borderTop: '1px solid rgba(15,118,110,0.08)' }}>
-      <button
-        type="button"
-        onClick={() => setIsOpen((prev) => !prev)}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          width: '100%',
-          padding: '0.55rem 0',
-          border: 'none',
-          background: 'none',
-          cursor: 'pointer',
-          color: '#0f766e',
-          fontSize: '0.76rem',
-          fontWeight: 600,
-          letterSpacing: '0.08em',
-          textTransform: 'uppercase',
-          textAlign: 'left',
-        }}
-      >
-        {title}
-        <ChevronDown
-          size={14}
-          style={{
-            transition: 'transform 180ms ease',
-            transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)',
-            color: '#0d9488',
-          }}
-        />
-      </button>
-      <div
-        ref={contentRef}
-        style={{
-          overflow: 'hidden',
-          height: typeof contentHeight === 'number' ? `${contentHeight}px` : 'auto',
-          transition: 'height 200ms ease',
-        }}
-      >
-        <div style={{ display: 'grid', gap: '0.6rem', paddingBottom: '0.5rem' }}>
-          {children}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 
 function getComponentPath(project: EditorProject, instanceId: string): string[] {
   const path: string[] = [];
@@ -212,7 +133,7 @@ const compactInputStyle = {
   fontSize: '0.86rem',
 };
 
-const BOARD_PRESET_FAMILY_ORDER: BoardComponentPresetFamily[] = ['space', 'track', 'grid'];
+const BOARD_PRESET_FAMILY_ORDER: BoardComponentPresetFamily[] = ['space', 'track', 'text', 'grid'];
 
 export function VisualsSection({
   project,
@@ -302,6 +223,9 @@ export function VisualsSection({
   }, [activeBoardManifest]);
   const selectedPath = activeBoardId ? getComponentPath(project, activeBoardId) : [];
   const paletteOptions = useMemo(() => listProjectPaletteOptions(project), [project]);
+  const resolvePaletteColor = (value: string | null | undefined) => (
+    resolveProjectPaletteColorValue(project.settings.colorPalette, value) ?? value ?? null
+  );
   const boardAppearance = activeBoard
     ? resolveBoardAppearanceProperties(activeBoard.properties)
     : null;
@@ -312,6 +236,10 @@ export function VisualsSection({
   }
 
   function getPresetFamily(componentType: BuiltInComponentType): BoardComponentPresetFamily | null {
+    if (componentType === 'text-box') {
+      return 'text';
+    }
+
     if (componentType === 'hex-grid' || componentType === 'square-grid' || componentType === 'checkerboard-grid') {
       return 'grid';
     }
@@ -380,7 +308,13 @@ export function VisualsSection({
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA' || document.activeElement?.tagName === 'SELECT') {
+      const activeElement = document.activeElement as HTMLElement | null;
+      if (
+        activeElement?.tagName === 'INPUT'
+        || activeElement?.tagName === 'TEXTAREA'
+        || activeElement?.tagName === 'SELECT'
+        || activeElement?.isContentEditable
+      ) {
         return;
       }
 
@@ -581,10 +515,10 @@ export function VisualsSection({
       y: frame.y,
       width: frame.width,
       height: frame.height,
-      background: frame.background,
+      background: resolvePaletteColor(frame.background),
       textureId: frame.textureId ?? null,
       textureOpacity: frame.textureOpacity ?? 0.3,
-      borderColor: frame.borderColor,
+      borderColor: resolvePaletteColor(frame.borderColor),
       borderWidth: frame.borderWidth,
       borderRadius: frame.borderRadius,
       selected: isSelected,
@@ -620,7 +554,16 @@ export function VisualsSection({
       onMouseMove: (event: ReactMouseEvent<HTMLDivElement>) => {
         event.currentTarget.style.cursor = getResizeCursor(getResizeEdgesForPointer(event));
       },
-      content: isBoardGridComponentType(child.componentType)
+      showHeader: child.componentType !== 'text-box',
+      content: child.componentType === 'text-box'
+        ? (
+          <TextBoxContent
+            project={project}
+            properties={child.properties}
+            emptyPlaceholder="Add text, formatting, and :icon_name: tokens in the inspector."
+          />
+        )
+        : isBoardGridComponentType(child.componentType)
         ? (() => {
           const cellIds = child.children.map(String).filter((cellId) => project.instances[cellId]?.componentType === 'space');
 
@@ -637,25 +580,19 @@ export function VisualsSection({
                   ? Math.trunc(cell.placement.coordinates.x)
                   : 0;
                 const cellKey = getGridCoordinateKey({ x: column, y: row });
-                const gridCellBg = typeof child.properties.cellBackground === 'string' && child.properties.cellBackground.trim().length > 0
-                  ? child.properties.cellBackground
-                  : 'rgba(255,255,255,0.92)';
-                const gridCellTextureId = typeof child.properties.cellTextureId === 'string' ? child.properties.cellTextureId : null;
-                const gridCellTextureOpacity = typeof child.properties.cellTextureOpacity === 'number' ? child.properties.cellTextureOpacity : 0.3;
-                const gridCellBorderWidth = typeof child.properties.cellBorderWidth === 'number' ? child.properties.cellBorderWidth : undefined;
-                const gridCellBorderRadius = typeof child.properties.cellBorderRadius === 'number' ? child.properties.cellBorderRadius : undefined;
+                const gridCellAppearance = getGridCellAppearance(child);
 
                 return {
                   id: cellId,
                   row,
                   column,
                   label: String(cell?.properties.label ?? cell?.displayName ?? `Cell ${cellIndex + 1}`),
-                  background: gridCellBg,
-                  textureId: gridCellTextureId,
-                  textureOpacity: gridCellTextureOpacity,
-                  borderColor: child.componentType === 'hex-grid' ? undefined : 'rgba(15,118,110,0.18)',
-                  borderWidth: gridCellBorderWidth,
-                  borderRadius: gridCellBorderRadius,
+                  background: resolvePaletteColor(gridCellAppearance.background) ?? gridCellAppearance.background,
+                  textureId: gridCellAppearance.textureId,
+                  textureOpacity: gridCellAppearance.textureOpacity,
+                  borderColor: resolvePaletteColor(gridCellAppearance.borderColor) ?? (child.componentType === 'hex-grid' ? undefined : 'rgba(15,118,110,0.18)'),
+                  borderWidth: gridCellAppearance.borderWidth,
+                  borderRadius: gridCellAppearance.borderRadius,
                   selected: isSelected && cellKey === (resolvedSelectedGridCell ? getGridCoordinateKey(resolvedSelectedGridCell) : null),
                   onMouseDown: (event) => {
                     event.stopPropagation();
@@ -774,7 +711,7 @@ export function VisualsSection({
                 }}
               >
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', color: '#064e3b', fontWeight: 800 }}>
-                  {renderComponentIcon(groupIconKey, { size: 16, style: { color: '#064e3b' } })}
+                  {renderComponentIcon(group.family === 'text' ? 'text-box' : groupIconKey, { size: 16, style: { color: '#064e3b' } })}
                   {group.familyLabel}
                 </div>
                 <select
@@ -820,7 +757,7 @@ export function VisualsSection({
                     cursor: 'grab',
                   }}
                 >
-                  {renderComponentIcon(groupIconKey, { size: 15, style: { color: '#065f46' } })}
+                  {renderComponentIcon(group.family === 'text' ? 'text-box' : groupIconKey, { size: 15, style: { color: '#065f46' } })}
                   Drag Or Add
                 </button>
               </div>
@@ -914,10 +851,10 @@ export function VisualsSection({
               height={BOARD_SURFACE_HEIGHT}
               minHeight={560}
               surfaceAppearance={boardAppearance ? {
-                background: boardAppearance.surfaceColor,
+                background: resolvePaletteColor(boardAppearance.surfaceColor) ?? boardAppearance.surfaceColor,
                 textureId: boardAppearance.surfaceTexture,
                 textureOpacity: boardAppearance.surfaceTextureOpacity,
-                borderColor: boardAppearance.surfaceBorderColor,
+                borderColor: resolvePaletteColor(boardAppearance.surfaceBorderColor) ?? boardAppearance.surfaceBorderColor,
                 borderWidth: boardAppearance.surfaceBorderWidth,
                 borderStyle: boardAppearance.surfaceBorderStyle,
               } : undefined}
@@ -930,7 +867,7 @@ export function VisualsSection({
               onSurfaceDrop={handleSurfaceDrop}
               emptyState={(
                 <div style={{ maxWidth: '320px', display: 'grid', gap: '0.55rem', color: '#0f766e' }}>
-                  <strong style={{ color: '#064e3b' }}>Drop spaces, tracks, and board grids here</strong>
+                  <strong style={{ color: '#064e3b' }}>Drop spaces, tracks, text boxes, and board grids here</strong>
                   <span>Everything placed on this surface uses the same framing and styling rules as preview.</span>
                 </div>
               )}
@@ -1138,26 +1075,8 @@ export function VisualsSection({
                       <span dir="ltr">{String(activeBoard.displayName || activeBoard.properties.label || 'Board')}</span>
                     </button>
                     {boardChildIds.length > 0 && (
-                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', flexGrow: 1, minWidth: 0 }}>
-                        <span
-                          style={{
-                            flexShrink: 1,
-                            minWidth: 0,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                            direction: 'rtl',
-                            textAlign: 'left',
-                            fontSize: '0.9rem',
-                            fontWeight: 700,
-                            color: '#095c55',
-                          }}
-                          title={String(activeBoard.displayName || activeBoard.properties.label || 'Board')}
-                        >
-                          <span dir="ltr">{String(activeBoard.displayName || activeBoard.properties.label || 'Board')}</span>
-                        </span>
-
-                        <span style={{ fontSize: '0.8rem', color: '#095c55', marginLeft: '0.35rem', flexShrink: 0, pointerEvents: 'none' }}>▼</span>
+                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: '0 0 auto', width: '18px', height: '18px' }}>
+                        <span style={{ fontSize: '0.8rem', color: '#095c55', flexShrink: 0, pointerEvents: 'none' }}>▼</span>
                         <select
                           value=""
                           onChange={(event) => {
@@ -1173,6 +1092,7 @@ export function VisualsSection({
                             opacity: 0,
                             cursor: 'pointer',
                             width: '100%',
+                            height: '100%',
                           }}
                           title="Select Sub Component"
                         >
@@ -1198,10 +1118,7 @@ export function VisualsSection({
           {selectedBoardChild && resolvedSelectedBoardChildId ? (
             <>
               {showGridShapePopup ? (
-                <div style={{ display: 'grid', gap: '0.15rem' }}>
-                  <div style={{ color: '#0f766e', fontSize: '0.76rem', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '0.2rem' }}>
-                    {selectedBoardChild?.componentType === 'hex-grid' ? 'Hex Tools' : 'Grid Tools'}
-                  </div>
+                <InspectorAccordion title={selectedBoardChild.componentType === 'hex-grid' ? 'Hex Tools' : 'Grid Tools'}>
                   {resolvedSelectedGridCell ? (
                     <>
                       {gridAllNeighborOptions.map((option) => (
@@ -1334,486 +1251,308 @@ export function VisualsSection({
                       </button>
                     </div>
                   )}
-                </div>
+                </InspectorAccordion>
               ) : null}
-              {!resolvedSelectedGridCell ? (
-              <>
-              {(() => {
+              {!resolvedSelectedGridCell ? (() => {
                 const componentType = selectedBoardChild.componentType as BuiltInComponentType;
+                const isTextBox = componentType === 'text-box';
                 const presetFamily = getPresetFamily(componentType);
                 const presets = presetFamily
                   ? boardPresetGroups.find((group) => group.family === presetFamily)?.presets ?? []
                   : [];
-
-                if (presets.length === 0) {
-                  return null;
-                }
-
                 const activePresetId = presetFamily ? selectedPresetIds[presetFamily] : undefined;
                 const selectedPreset = activePresetId
                   ? presets.find((preset) => preset.id === activePresetId)
                   : null;
-
-                return (
-                  <label style={labelStyle}>
-                    Preset
-                    <select
-                      value={selectedPreset?.id ?? presets[0]?.id ?? ''}
-                      onChange={(event) => {
-                        const preset = getBoardComponentPreset(event.target.value);
-                        if (!preset) {
-                          return;
-                        }
-
-                        setSelectedPresetIds((current) => ({
-                          ...current,
-                          ...(presetFamily ? { [presetFamily]: preset.id } : {}),
-                        }));
-                        onUpdateComponent(resolvedSelectedBoardChildId, (instance) => applyPresetToInstance(
-                          instance,
-                          preset,
-                          boardChildIds.indexOf(resolvedSelectedBoardChildId),
-                        ));
-                      }}
-                      style={compactInputStyle}
-                    >
-                      {presets.map((preset) => (
-                        <option key={preset.id} value={preset.id}>
-                          {preset.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                );
-              })()}
-
-              <label style={labelStyle}>
-                Label
-                <input
-                  value={String(selectedBoardChild.properties.label ?? selectedBoardChild.displayName ?? '')}
-                  onChange={(event) => onUpdateComponent(resolvedSelectedBoardChildId, (instance) => ({
-                    ...instance,
-                    displayName: event.target.value,
-                    properties: {
-                      ...instance.properties,
-                      label: event.target.value,
-                    },
-                  }))}
-                  style={compactInputStyle}
-                />
-              </label>
-
-              {(() => {
                 const childIndex = boardChildIds.indexOf(resolvedSelectedBoardChildId);
                 const frame = getResolvedBoardItemFrame(selectedBoardChild, Math.max(childIndex, 0));
+                const manifest = getBuiltInComponentManifest(selectedBoardChild.componentType as BuiltInComponentType);
+                const hiddenParameterKeys = isBoardGridComponentType(selectedBoardChild.componentType)
+                  ? ['label', 'x', 'y', 'rows', 'columns', 'cells', 'cellLabelPrefix', 'maxCapacity', 'cellStyles', 'cellBackground', 'cellTextureId', 'cellTextureOpacity', 'cellBorderColor', 'cellBorderWidth', 'cellBorderRadius']
+                  : isTextBox
+                    ? ['label', 'contentHtml', 'fontFamily', 'fontSize', 'lineHeight', 'textColor', 'textAlign', 'verticalAlign', 'padding']
+                  : ['label', 'x', 'y'];
+                const parameterEntries = Object.entries(manifest.propertyDefinitions)
+                  .filter(([key]) => !hiddenParameterKeys.includes(key));
+                const cellAppearance = isBoardGridComponentType(selectedBoardChild.componentType)
+                  ? getGridCellAppearance(selectedBoardChild)
+                  : null;
+                const cellBorderWidth = cellAppearance?.borderWidth
+                  ?? (selectedBoardChild.componentType === 'hex-grid' ? 2 : 1);
+                const cellBorderRadius = cellAppearance?.borderRadius
+                  ?? (selectedBoardChild.componentType === 'hex-grid' ? 0 : 10);
+                const cellBorderColor = cellAppearance?.borderColor
+                  ?? (selectedBoardChild.componentType === 'hex-grid' ? 'rgba(15,118,110,0.52)' : 'rgba(15,118,110,0.18)');
 
                 return (
                   <>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.6rem' }}>
-                      <label style={labelStyle}>
-                        X
-                        <input
-                          type="number"
-                          value={Math.round(frame.x)}
-                          onChange={(event) => updateBoardChildFrame(resolvedSelectedBoardChildId, (current) => ({
-                            ...current,
-                            x: Number(event.target.value),
-                          }))}
-                          style={compactInputStyle}
-                        />
-                      </label>
-                      <label style={labelStyle}>
-                        Y
-                        <input
-                          type="number"
-                          value={Math.round(frame.y)}
-                          onChange={(event) => updateBoardChildFrame(resolvedSelectedBoardChildId, (current) => ({
-                            ...current,
-                            y: Number(event.target.value),
-                          }))}
-                          style={compactInputStyle}
-                        />
-                      </label>
-                      <label style={labelStyle}>
-                        Width
-                        <input
-                          type="number"
-                          value={Math.round(frame.width)}
-                          onChange={(event) => updateBoardChildFrame(resolvedSelectedBoardChildId, (current) => ({
-                            ...current,
-                            width: Number(event.target.value),
-                          }))}
-                          style={compactInputStyle}
-                        />
-                      </label>
-                      <label style={labelStyle}>
-                        Height
-                        <input
-                          type="number"
-                          value={Math.round(frame.height)}
-                          onChange={(event) => updateBoardChildFrame(resolvedSelectedBoardChildId, (current) => ({
-                            ...current,
-                            height: Number(event.target.value),
-                          }))}
-                          style={compactInputStyle}
-                        />
-                      </label>
-                    </div>
+                    <InspectorAccordion title="General">
+                      {presets.length > 0 ? (
+                        <label style={labelStyle}>
+                          Preset
+                          <select
+                            value={selectedPreset?.id ?? presets[0]?.id ?? ''}
+                            onChange={(event) => {
+                              const preset = getBoardComponentPreset(event.target.value);
+                              if (!preset) {
+                                return;
+                              }
 
-                    <label style={labelStyle}>
-                      Fill
-                      <ProjectColorPicker
-                        value={frame.background ?? 'rgba(255,255,255,0.94)'}
-                        palette={paletteOptions}
-                        onChange={(value) => updateBoardChildFrame(resolvedSelectedBoardChildId, (current) => ({
-                          ...current,
-                          background: value || null,
+                              setSelectedPresetIds((current) => ({
+                                ...current,
+                                ...(presetFamily ? { [presetFamily]: preset.id } : {}),
+                              }));
+                              onUpdateComponent(resolvedSelectedBoardChildId, (instance) => applyPresetToInstance(
+                                instance,
+                                preset,
+                                boardChildIds.indexOf(resolvedSelectedBoardChildId),
+                              ));
+                            }}
+                            style={compactInputStyle}
+                          >
+                            {presets.map((preset) => (
+                              <option key={preset.id} value={preset.id}>
+                                {preset.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      ) : null}
+
+                      <label style={labelStyle}>
+                        Label
+                        <input
+                          value={String(selectedBoardChild.properties.label ?? selectedBoardChild.displayName ?? '')}
+                          onChange={(event) => onUpdateComponent(resolvedSelectedBoardChildId, (instance) => ({
+                            ...instance,
+                            displayName: event.target.value,
+                            properties: {
+                              ...instance.properties,
+                              label: event.target.value,
+                            },
+                          }))}
+                          style={compactInputStyle}
+                        />
+                      </label>
+                    </InspectorAccordion>
+
+                    <InspectorAccordion title="Layout">
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.6rem' }}>
+                        <label style={labelStyle}>
+                          X
+                          <NumericInput
+                            value={Math.round(frame.x)}
+                            onValueChange={(value) => updateBoardChildFrame(resolvedSelectedBoardChildId, (current) => ({
+                              ...current,
+                              x: value,
+                            }))}
+                            style={compactInputStyle}
+                          />
+                        </label>
+                        <label style={labelStyle}>
+                          Y
+                          <NumericInput
+                            value={Math.round(frame.y)}
+                            onValueChange={(value) => updateBoardChildFrame(resolvedSelectedBoardChildId, (current) => ({
+                              ...current,
+                              y: value,
+                            }))}
+                            style={compactInputStyle}
+                          />
+                        </label>
+                        <label style={labelStyle}>
+                          Width
+                          <NumericInput
+                            value={Math.round(frame.width)}
+                            onValueChange={(value) => updateBoardChildFrame(resolvedSelectedBoardChildId, (current) => ({
+                              ...current,
+                              width: value,
+                            }))}
+                            style={compactInputStyle}
+                          />
+                        </label>
+                        <label style={labelStyle}>
+                          Height
+                          <NumericInput
+                            value={Math.round(frame.height)}
+                            onValueChange={(value) => updateBoardChildFrame(resolvedSelectedBoardChildId, (current) => ({
+                              ...current,
+                              height: value,
+                            }))}
+                            style={compactInputStyle}
+                          />
+                        </label>
+                      </div>
+                    </InspectorAccordion>
+
+                    {isTextBox ? (
+                      <TextBoxInspector
+                        project={project}
+                        properties={selectedBoardChild.properties}
+                        paletteOptions={paletteOptions}
+                        onAssignProjectPaletteColor={onAssignProjectPaletteColor}
+                        onUpdateProperties={(updater) => onUpdateComponent(resolvedSelectedBoardChildId, (instance) => ({
+                          ...instance,
+                          properties: updater(instance.properties),
                         }))}
-                        onAssignPaletteColor={onAssignProjectPaletteColor}
                       />
-                    </label>
+                    ) : null}
 
-                    <div style={{ display: 'grid', gap: '0.55rem' }}>
-                      <label style={labelStyle}>
-                        Texture
-                        <select
-                          value={frame.textureId ?? 'none'}
-                          onChange={(event) => updateBoardChildFrame(resolvedSelectedBoardChildId, (current) => ({
-                            ...current,
-                            textureId: event.target.value as BoardSurfaceTextureId,
-                          }))}
-                          style={compactInputStyle}
-                        >
-                          {BOARD_SURFACE_TEXTURE_OPTIONS.map((texture) => (
-                            <option key={texture.id} value={texture.id}>
-                              {texture.label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      {frame.textureId && frame.textureId !== 'none' ? (() => {
-                        const textureOpacity = frame.textureOpacity ?? 0.3;
-                        const textureStyle = getBoardSurfaceTextureStyle(frame.textureId as BoardSurfaceTextureId, textureOpacity);
-
-                        return (
-                          <div style={{ display: 'grid', gap: '0.9rem' }}>
-                            <label style={{ ...labelStyle, display: 'grid', gap: '0.45rem' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem' }}>
-                                <span>Texture Opacity</span>
-                                <span style={{ color: '#0f766e', fontWeight: 700 }}>{Math.round(textureOpacity * 100)}%</span>
-                              </div>
-                              <input
-                                type="range"
-                                min="0"
-                                max="1"
-                                step="0.05"
-                                value={textureOpacity}
-                                onChange={(event) => updateBoardChildFrame(resolvedSelectedBoardChildId, (current) => ({
-                                  ...current,
-                                  textureOpacity: parseFloat(event.target.value),
-                                }))}
-                                style={{ width: '100%', accentColor: '#0f766e' }}
-                              />
-                            </label>
-                            <div
-                              style={{
-                                borderRadius: '14px',
-                                border: '1px solid rgba(15,118,110,0.12)',
-                                background: 'rgba(255,255,255,0.96)',
-                                padding: '0.55rem',
-                              }}
-                            >
-                              <div
-                                style={{
-                                  position: 'relative',
-                                  minHeight: '42px',
-                                  borderRadius: '10px',
-                                  border: '1px solid rgba(15,118,110,0.12)',
-                                  background: frame.background ?? 'rgba(255,255,255,0.94)',
-                                  overflow: 'hidden',
-                                }}
-                              >
-                                <div
-                                  style={{
-                                    position: 'absolute',
-                                    inset: 0,
-                                    pointerEvents: 'none',
-                                    ...textureStyle,
-                                  }}
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })() : null}
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 92px', gap: '0.6rem' }}>
-                      <label style={labelStyle}>
-                        Border
-                        <ProjectColorPicker
-                          value={frame.borderColor ?? 'rgba(15,118,110,0.18)'}
-                          palette={paletteOptions}
-                          onChange={(value) => updateBoardChildFrame(resolvedSelectedBoardChildId, (current) => ({
-                            ...current,
-                            borderColor: value || null,
-                          }))}
-                          onAssignPaletteColor={onAssignProjectPaletteColor}
-                        />
-                      </label>
-                      <label style={labelStyle}>
-                        Width
-                        <input
-                          type="number"
-                          value={frame.borderWidth}
-                          onChange={(event) => updateBoardChildFrame(resolvedSelectedBoardChildId, (current) => ({
-                            ...current,
-                            borderWidth: Number(event.target.value),
-                          }))}
-                          style={compactInputStyle}
-                        />
-                      </label>
-                    </div>
-
-                    <label style={labelStyle}>
-                      Radius
-                      <input
-                        type="number"
-                        value={frame.borderRadius}
-                        onChange={(event) => updateBoardChildFrame(resolvedSelectedBoardChildId, (current) => ({
+                    <InspectorAppearanceControls
+                      backgroundLabel="Fill"
+                      backgroundValue={frame.background ?? 'rgba(255,255,255,0.94)'}
+                      onBackgroundChange={(value) => updateBoardChildFrame(resolvedSelectedBoardChildId, (current) => ({
+                        ...current,
+                        background: value || null,
+                      }))}
+                      palette={paletteOptions}
+                      onAssignPaletteColor={onAssignProjectPaletteColor}
+                      texture={{
+                        value: frame.textureId ?? 'none',
+                        onChange: (value) => updateBoardChildFrame(resolvedSelectedBoardChildId, (current) => ({
                           ...current,
-                          borderRadius: Number(event.target.value),
-                        }))}
-                        style={compactInputStyle}
-                      />
-                    </label>
-
-                    {isBoardGridComponentType(selectedBoardChild.componentType) ? (() => {
-                      const cellBg = typeof selectedBoardChild.properties.cellBackground === 'string' && (selectedBoardChild.properties.cellBackground as string).trim().length > 0
-                        ? selectedBoardChild.properties.cellBackground as string
-                        : 'rgba(255,255,255,0.92)';
-                      const cellTextureId = (typeof selectedBoardChild.properties.cellTextureId === 'string' ? selectedBoardChild.properties.cellTextureId : 'none') as BoardSurfaceTextureId;
-                      const cellTextureOpacity = typeof selectedBoardChild.properties.cellTextureOpacity === 'number' ? selectedBoardChild.properties.cellTextureOpacity : 0.3;
-                      const cellBorderWidth = typeof selectedBoardChild.properties.cellBorderWidth === 'number'
-                        ? selectedBoardChild.properties.cellBorderWidth
-                        : (selectedBoardChild.componentType === 'hex-grid' ? 2 : 1);
-                      const cellBorderRadius = typeof selectedBoardChild.properties.cellBorderRadius === 'number'
-                        ? selectedBoardChild.properties.cellBorderRadius
-                        : (selectedBoardChild.componentType === 'hex-grid' ? 0 : 10);
-
-                      return (
-                        <>
-                          <div style={{ color: '#0f766e', fontSize: '0.76rem', letterSpacing: '0.08em', textTransform: 'uppercase', marginTop: '0.5rem' }}>
-                            Cell Appearance
-                          </div>
-
-                          <label style={labelStyle}>
-                            Cell Fill
-                            <ProjectColorPicker
-                              value={cellBg}
-                              palette={paletteOptions}
-                              onChange={(value) => onUpdateComponent(resolvedSelectedBoardChildId, (instance) => ({
-                                ...instance,
-                                properties: {
-                                  ...instance.properties,
-                                  cellBackground: value || null,
-                                },
-                              }))}
-                              onAssignPaletteColor={onAssignProjectPaletteColor}
-                            />
-                          </label>
-
-                          <div style={{ display: 'grid', gap: '0.55rem' }}>
-                            <label style={labelStyle}>
-                              Cell Texture
-                              <select
-                                value={cellTextureId}
-                                onChange={(event) => onUpdateComponent(resolvedSelectedBoardChildId, (instance) => ({
-                                  ...instance,
-                                  properties: {
-                                    ...instance.properties,
-                                    cellTextureId: event.target.value,
-                                  },
-                                }))}
-                                style={compactInputStyle}
-                              >
-                                {BOARD_SURFACE_TEXTURE_OPTIONS.map((texture) => (
-                                  <option key={texture.id} value={texture.id}>
-                                    {texture.label}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
-                            {cellTextureId !== 'none' ? (() => {
-                              const textureStyle = getBoardSurfaceTextureStyle(cellTextureId, cellTextureOpacity);
-
-                              return (
-                                <div style={{ display: 'grid', gap: '0.9rem' }}>
-                                  <label style={{ ...labelStyle, display: 'grid', gap: '0.45rem' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem' }}>
-                                      <span>Texture Opacity</span>
-                                      <span style={{ color: '#0f766e', fontWeight: 700 }}>{Math.round(cellTextureOpacity * 100)}%</span>
-                                    </div>
-                                    <input
-                                      type="range"
-                                      min="0"
-                                      max="1"
-                                      step="0.05"
-                                      value={cellTextureOpacity}
-                                      onChange={(event) => onUpdateComponent(resolvedSelectedBoardChildId, (instance) => ({
-                                        ...instance,
-                                        properties: {
-                                          ...instance.properties,
-                                          cellTextureOpacity: parseFloat(event.target.value),
-                                        },
-                                      }))}
-                                      style={{ width: '100%', accentColor: '#0f766e' }}
-                                    />
-                                  </label>
-                                  <div
-                                    style={{
-                                      borderRadius: '14px',
-                                      border: '1px solid rgba(15,118,110,0.12)',
-                                      background: 'rgba(255,255,255,0.96)',
-                                      padding: '0.55rem',
-                                    }}
-                                  >
-                                    <div
-                                      style={{
-                                        position: 'relative',
-                                        minHeight: '42px',
-                                        borderRadius: '10px',
-                                        border: '1px solid rgba(15,118,110,0.12)',
-                                        background: cellBg,
-                                        overflow: 'hidden',
-                                      }}
-                                    >
-                                      <div
-                                        style={{
-                                          position: 'absolute',
-                                          inset: 0,
-                                          pointerEvents: 'none',
-                                          ...textureStyle,
-                                        }}
-                                      />
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })() : null}
-                          </div>
-
+                          textureId: value,
+                        })),
+                        opacity: frame.textureOpacity ?? 0.3,
+                        onOpacityChange: (value) => updateBoardChildFrame(resolvedSelectedBoardChildId, (current) => ({
+                          ...current,
+                          textureOpacity: value,
+                        })),
+                        previewBackground: frame.background ?? 'rgba(255,255,255,0.94)',
+                      }}
+                      border={{
+                        colorLabel: 'Border Color',
+                        colorValue: frame.borderColor ?? 'rgba(15,118,110,0.18)',
+                        onColorChange: (value) => updateBoardChildFrame(resolvedSelectedBoardChildId, (current) => ({
+                          ...current,
+                          borderColor: value || null,
+                        })),
+                        controls: (
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.6rem' }}>
                             <label style={labelStyle}>
-                              Cell Border
-                              <input
-                                type="number"
-                                value={cellBorderWidth}
-                                onChange={(event) => onUpdateComponent(resolvedSelectedBoardChildId, (instance) => ({
-                                  ...instance,
-                                  properties: {
-                                    ...instance.properties,
-                                    cellBorderWidth: Number(event.target.value),
-                                  },
+                              Width
+                              <NumericInput
+                                value={frame.borderWidth}
+                                onValueChange={(value) => updateBoardChildFrame(resolvedSelectedBoardChildId, (current) => ({
+                                  ...current,
+                                  borderWidth: value,
                                 }))}
                                 min={0}
+                                step={1}
                                 style={compactInputStyle}
                               />
                             </label>
                             <label style={labelStyle}>
-                              Cell Radius
-                              <input
-                                type="number"
-                                value={cellBorderRadius}
-                                onChange={(event) => onUpdateComponent(resolvedSelectedBoardChildId, (instance) => ({
-                                  ...instance,
-                                  properties: {
-                                    ...instance.properties,
-                                    cellBorderRadius: Number(event.target.value),
-                                  },
+                              Radius
+                              <NumericInput
+                                value={frame.borderRadius}
+                                onValueChange={(value) => updateBoardChildFrame(resolvedSelectedBoardChildId, (current) => ({
+                                  ...current,
+                                  borderRadius: value,
                                 }))}
                                 min={0}
+                                step={1}
                                 style={compactInputStyle}
                               />
                             </label>
                           </div>
-                        </>
-                      );
-                    })() : null}
+                        ),
+                      }}
+                    />
 
-                    {(() => {
-                      const manifest = getBuiltInComponentManifest(selectedBoardChild.componentType as BuiltInComponentType);
-                      const hiddenParameterKeys = isBoardGridComponentType(selectedBoardChild.componentType)
-                        ? ['label', 'x', 'y', 'rows', 'columns', 'cells', 'cellLabelPrefix', 'maxCapacity', 'cellStyles', 'cellBackground', 'cellTextureId', 'cellTextureOpacity', 'cellBorderWidth', 'cellBorderRadius']
-                        : ['label', 'x', 'y'];
-                      const parameterEntries = Object.entries(manifest.propertyDefinitions)
-                        .filter(([key]) => !hiddenParameterKeys.includes(key));
+                    {cellAppearance ? (
+                      <InspectorAppearanceControls
+                        scopeLabel="Cell"
+                        backgroundLabel="Fill"
+                        backgroundValue={cellAppearance.background}
+                        onBackgroundChange={(value) => onUpdateComponent(resolvedSelectedBoardChildId, (instance) => ({
+                          ...instance,
+                          properties: {
+                            ...instance.properties,
+                            cellBackground: value || null,
+                          },
+                        }))}
+                        palette={paletteOptions}
+                        onAssignPaletteColor={onAssignProjectPaletteColor}
+                        texture={{
+                          value: cellAppearance.textureId ?? 'none',
+                          onChange: (value) => onUpdateComponent(resolvedSelectedBoardChildId, (instance) => ({
+                            ...instance,
+                            properties: {
+                              ...instance.properties,
+                              cellTextureId: value,
+                            },
+                          })),
+                          opacity: cellAppearance.textureOpacity,
+                          onOpacityChange: (value) => onUpdateComponent(resolvedSelectedBoardChildId, (instance) => ({
+                            ...instance,
+                            properties: {
+                              ...instance.properties,
+                              cellTextureOpacity: value,
+                            },
+                          })),
+                          previewBackground: cellAppearance.background,
+                        }}
+                        border={{
+                          colorValue: cellBorderColor,
+                          onColorChange: (value) => onUpdateComponent(resolvedSelectedBoardChildId, (instance) => ({
+                            ...instance,
+                            properties: {
+                              ...instance.properties,
+                              cellBorderColor: value || null,
+                            },
+                          })),
+                          controls: (
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.6rem' }}>
+                              <label style={labelStyle}>
+                                Width
+                                <NumericInput
+                                  value={cellBorderWidth}
+                                  onValueChange={(value) => onUpdateComponent(resolvedSelectedBoardChildId, (instance) => ({
+                                    ...instance,
+                                    properties: {
+                                      ...instance.properties,
+                                      cellBorderWidth: value,
+                                    },
+                                  }))}
+                                  min={0}
+                                  step={1}
+                                  style={compactInputStyle}
+                                />
+                              </label>
+                              <label style={labelStyle}>
+                                Radius
+                                <NumericInput
+                                  value={cellBorderRadius}
+                                  onValueChange={(value) => onUpdateComponent(resolvedSelectedBoardChildId, (instance) => ({
+                                    ...instance,
+                                    properties: {
+                                      ...instance.properties,
+                                      cellBorderRadius: value,
+                                    },
+                                  }))}
+                                  min={0}
+                                  step={1}
+                                  style={compactInputStyle}
+                                />
+                              </label>
+                            </div>
+                          ),
+                        }}
+                      />
+                    ) : null}
 
-                      if (parameterEntries.length === 0) {
-                        return null;
-                      }
+                    {parameterEntries.length > 0 ? (
+                      <InspectorAccordion title="Parameters">
+                        {parameterEntries.map(([key, definition]) => {
+                          const value = selectedBoardChild.properties[key];
 
-                      return (
-                        <div style={{ display: 'grid', gap: '0.6rem' }}>
-                          <div style={{ color: '#0f766e', fontSize: '0.76rem', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                            Parameters
-                          </div>
-                          {parameterEntries.map(([key, definition]) => {
-                            const value = selectedBoardChild.properties[key];
-
-                            if (definition.kind === 'boolean') {
-                              return (
-                                <label key={key} style={labelStyle}>
-                                  {definition.label}
-                                  <select
-                                    value={String(Boolean(value))}
-                                    onChange={(event) => onUpdateComponent(resolvedSelectedBoardChildId, (instance) => ({
-                                      ...instance,
-                                      properties: {
-                                        ...instance.properties,
-                                        [key]: parsePropertyValue(definition, event.target.value),
-                                      },
-                                    }))}
-                                    style={compactInputStyle}
-                                  >
-                                    <option value="true">True</option>
-                                    <option value="false">False</option>
-                                  </select>
-                                </label>
-                              );
-                            }
-
-                            if (definition.kind === 'enum') {
-                              return (
-                                <label key={key} style={labelStyle}>
-                                  {definition.label}
-                                  <select
-                                    value={String(value ?? '')}
-                                    onChange={(event) => onUpdateComponent(resolvedSelectedBoardChildId, (instance) => ({
-                                      ...instance,
-                                      properties: {
-                                        ...instance.properties,
-                                        [key]: event.target.value,
-                                      },
-                                    }))}
-                                    style={compactInputStyle}
-                                  >
-                                    {(definition.options ?? []).map((option) => (
-                                      <option key={option} value={option}>
-                                        {option}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </label>
-                              );
-                            }
-
+                          if (definition.kind === 'boolean') {
                             return (
                               <label key={key} style={labelStyle}>
                                 {definition.label}
-                                <input
-                                  type={definition.kind === 'number' ? 'number' : 'text'}
-                                  value={String(value ?? '')}
+                                <select
+                                  value={String(Boolean(value))}
                                   onChange={(event) => onUpdateComponent(resolvedSelectedBoardChildId, (instance) => ({
                                     ...instance,
                                     properties: {
@@ -1822,161 +1561,118 @@ export function VisualsSection({
                                     },
                                   }))}
                                   style={compactInputStyle}
-                                />
+                                >
+                                  <option value="true">True</option>
+                                  <option value="false">False</option>
+                                </select>
                               </label>
                             );
-                          })}
-                        </div>
-                      );
-                    })()}
+                          }
+
+                          if (definition.kind === 'enum') {
+                            return (
+                              <label key={key} style={labelStyle}>
+                                {definition.label}
+                                <select
+                                  value={String(value ?? '')}
+                                  onChange={(event) => onUpdateComponent(resolvedSelectedBoardChildId, (instance) => ({
+                                    ...instance,
+                                    properties: {
+                                      ...instance.properties,
+                                      [key]: event.target.value,
+                                    },
+                                  }))}
+                                  style={compactInputStyle}
+                                >
+                                  {(definition.options ?? []).map((option) => (
+                                    <option key={option} value={option}>
+                                      {option}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                            );
+                          }
+
+                          return (
+                            <label key={key} style={labelStyle}>
+                              {definition.label}
+                              <input
+                                type={definition.kind === 'number' ? 'number' : 'text'}
+                                value={String(value ?? '')}
+                                onChange={(event) => onUpdateComponent(resolvedSelectedBoardChildId, (instance) => ({
+                                  ...instance,
+                                  properties: {
+                                    ...instance.properties,
+                                    [key]: parsePropertyValue(definition, event.target.value),
+                                  },
+                                }))}
+                                style={compactInputStyle}
+                              />
+                            </label>
+                          );
+                        })}
+                      </InspectorAccordion>
+                    ) : null}
                   </>
                 );
-              })()}
-            </>
-            ) : null}
+              })() : null}
             </>
           ) : (
             boardAppearance && activeBoardId ? (
-              <>
-                <label style={labelStyle}>
-                  Background
-                  <ProjectColorPicker
-                    value={boardAppearance.surfaceColor}
-                    palette={paletteOptions}
-                    onChange={(value) => updateBoardAppearanceProperty('surfaceColor', value)}
-                    onAssignPaletteColor={onAssignProjectPaletteColor}
-                    popupPlacement="left"
-                  />
-                </label>
-
-                <div style={{ display: 'grid', gap: '0.55rem' }}>
-                  <label style={labelStyle}>
-                    Texture
-                    <select
-                      value={boardAppearance.surfaceTexture}
-                      onChange={(event) => updateBoardAppearanceProperty('surfaceTexture', event.target.value)}
-                      style={compactInputStyle}
-                    >
-                      {BOARD_SURFACE_TEXTURE_OPTIONS.map((texture) => (
-                        <option key={texture.id} value={texture.id}>
-                          {texture.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  {(() => {
-                    const selectedTexture = BOARD_SURFACE_TEXTURE_OPTIONS.find((texture) => texture.id === boardAppearance.surfaceTexture)
-                      ?? BOARD_SURFACE_TEXTURE_OPTIONS[0];
-                    const textureStyle = getBoardSurfaceTextureStyle(selectedTexture.id, boardAppearance.surfaceTextureOpacity);
-
-                    return (
-                      <div
-                        style={{
-                          display: 'grid',
-                          gap: '0.9rem',
-                        }}
-                      >
-                        <label style={{ ...labelStyle, display: 'grid', gap: '0.45rem' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem' }}>
-                            <span>Texture Opacity</span>
-                            <span style={{ color: '#0f766e', fontWeight: 700 }}>{Math.round(boardAppearance.surfaceTextureOpacity * 100)}%</span>
-                          </div>
-                          <input
-                            type="range"
-                            min="0"
-                            max="1"
-                            step="0.05"
-                            value={boardAppearance.surfaceTextureOpacity}
-                            onChange={(event) => updateBoardAppearanceProperty('surfaceTextureOpacity', parseFloat(event.target.value))}
-                            style={{ width: '100%', accentColor: '#0f766e' }}
-                          />
-                        </label>
-                        <div
-                          style={{
-                            borderRadius: '14px',
-                            border: '1px solid rgba(15,118,110,0.12)',
-                            background: 'rgba(255,255,255,0.96)',
-                            padding: '0.55rem',
-                            display: 'grid',
-                            gap: '0.45rem',
-                          }}
-                        >
-                          <div
-                            style={{
-                              position: 'relative',
-                              display: 'block',
-                              minHeight: '52px',
-                              borderRadius: '10px',
-                              border: '1px solid rgba(15,118,110,0.12)',
-                              background: boardAppearance.surfaceColor,
-                              overflow: 'hidden',
-                            }}
+              <InspectorAppearanceControls
+                scopeLabel="Surface"
+                backgroundValue={boardAppearance.surfaceColor}
+                onBackgroundChange={(value) => updateBoardAppearanceProperty('surfaceColor', value)}
+                palette={paletteOptions}
+                onAssignPaletteColor={onAssignProjectPaletteColor}
+                texture={{
+                  value: boardAppearance.surfaceTexture,
+                  onChange: (value) => updateBoardAppearanceProperty('surfaceTexture', value),
+                  opacity: boardAppearance.surfaceTextureOpacity,
+                  onOpacityChange: (value) => updateBoardAppearanceProperty('surfaceTextureOpacity', value),
+                  previewBackground: boardAppearance.surfaceColor,
+                }}
+                border={{
+                  colorLabel: 'Border Color',
+                  colorValue: boardAppearance.surfaceBorderColor,
+                  onColorChange: (value) => updateBoardAppearanceProperty('surfaceBorderColor', value),
+                  controls: (
+                    <div style={{ display: 'grid', gap: '0.6rem' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 112px', gap: '0.6rem' }}>
+                        <label style={labelStyle}>
+                          Border Style
+                          <select
+                            value={boardAppearance.surfaceBorderStyle}
+                            onChange={(event) => updateBoardAppearanceProperty('surfaceBorderStyle', event.target.value)}
+                            style={compactInputStyle}
                           >
-                            <div
-                              style={{
-                                position: 'absolute',
-                                inset: 0,
-                                pointerEvents: 'none',
-                                backgroundImage: textureStyle.backgroundImage,
-                                backgroundSize: textureStyle.backgroundSize,
-                                backgroundPosition: textureStyle.backgroundPosition,
-                                backgroundRepeat: textureStyle.backgroundRepeat,
-                                filter: textureStyle.filter,
-                              }}
-                            />
-                          </div>
-                        <div style={{ display: 'grid', gap: '0.12rem' }}>
-                          <span style={{ color: '#064e3b', fontSize: '0.8rem', fontWeight: 700 }}>{selectedTexture.label}</span>
-                          <span style={{ color: '#0f766e', fontSize: '0.72rem', lineHeight: 1.35 }}>{selectedTexture.description}</span>
-                        </div>
+                            {BOARD_BORDER_STYLE_OPTIONS.map((option) => (
+                              <option key={option} value={option}>
+                                {option[0].toUpperCase() + option.slice(1)}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label style={labelStyle}>
+                          Thickness
+                          <select
+                            value={String(boardAppearance.surfaceBorderWidth)}
+                            onChange={(event) => updateBoardAppearanceProperty('surfaceBorderWidth', Number(event.target.value))}
+                            style={compactInputStyle}
+                          >
+                            {boardBorderWidthOptions.map((option) => (
+                              <option key={option} value={option}>
+                                {option}px
+                              </option>
+                            ))}
+                          </select>
+                        </label>
                       </div>
                     </div>
-                    );
-                  })()}
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 112px', gap: '0.6rem' }}>
-                  <label style={labelStyle}>
-                    Border Color
-                    <ProjectColorPicker
-                      value={boardAppearance.surfaceBorderColor}
-                      palette={paletteOptions}
-                      onChange={(value) => updateBoardAppearanceProperty('surfaceBorderColor', value)}
-                      onAssignPaletteColor={onAssignProjectPaletteColor}
-                      popupPlacement="left"
-                    />
-                  </label>
-                  <label style={labelStyle}>
-                    Thickness
-                    <select
-                      value={String(boardAppearance.surfaceBorderWidth)}
-                      onChange={(event) => updateBoardAppearanceProperty('surfaceBorderWidth', Number(event.target.value))}
-                      style={compactInputStyle}
-                    >
-                      {boardBorderWidthOptions.map((option) => (
-                        <option key={option} value={option}>
-                          {option}px
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-
-                <label style={labelStyle}>
-                  Border Style
-                  <select
-                    value={boardAppearance.surfaceBorderStyle}
-                    onChange={(event) => updateBoardAppearanceProperty('surfaceBorderStyle', event.target.value)}
-                    style={compactInputStyle}
-                  >
-                    {BOARD_BORDER_STYLE_OPTIONS.map((option) => (
-                      <option key={option} value={option}>
-                        {option[0].toUpperCase() + option.slice(1)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </>
+                  ),
+                }}
+              />
             ) : (
               <p style={mutedTextStyle}>Select a board item to adjust its placement, fill, and border. Preview uses the same board layout and styling.</p>
             )

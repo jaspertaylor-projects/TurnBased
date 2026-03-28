@@ -131,6 +131,45 @@ export interface EditorSettings {
   colorPalette: ProjectColorPalette;
 }
 
+import type { BoardSurfaceTextureId } from '@turnbased/engine-components';
+
+export interface EditorArtReference {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  tags: string[];
+}
+
+export type EditorIconAssetMode = 'library' | 'custom';
+
+export interface EditorIconAsset {
+  id: string;
+  mode: EditorIconAssetMode;
+  name: string;
+  iconKey: string;
+  iconColor: string;
+  iconFillColor: string;
+  iconStrokeWidth: number;
+  backgroundColor: string;
+  backgroundTextureId: BoardSurfaceTextureId;
+  backgroundTextureOpacity: number;
+  borderColor: string;
+  borderWidth: number;
+  borderRadius: number;
+  customSvgMarkup: string;
+  inlineCode: string;
+  description: string;
+  tags: string[];
+}
+
+export interface EditorArtDirection {
+  theme: string;
+  definedArtStyles: EditorArtReference[];
+  recurringAssets: EditorArtReference[];
+  icons: EditorIconAsset[];
+}
+
 export type EditorProjectViewKind = 'shared' | 'player';
 
 export interface EditorProjectView {
@@ -176,6 +215,7 @@ export interface EditorProject {
   instances: Record<string, ComponentInstanceModel>;
   rules: EditorRuleConfig;
   settings: EditorSettings;
+  art: EditorArtDirection;
   appLayout: EditorAppLayout;
 }
 

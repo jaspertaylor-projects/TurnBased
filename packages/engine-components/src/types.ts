@@ -11,6 +11,7 @@ export type BuiltInComponentType =
   | 'board'
   | 'space'
   | 'track'
+  | 'text-box'
   | 'hex-grid'
   | 'square-grid'
   | 'checkerboard-grid'
@@ -202,6 +203,7 @@ export interface GridCellStyle {
   background?: string | null;
   textureId?: BoardSurfaceTextureId | null;
   textureOpacity?: number;
+  borderColor?: string | null;
   borderWidth?: number;
   borderRadius?: number;
 }
@@ -225,7 +227,7 @@ export interface ComponentCatalog {
   manifests: Record<string, ComponentManifest>;
 }
 
-export type BoardComponentPresetFamily = 'space' | 'track' | 'grid';
+export type BoardComponentPresetFamily = 'space' | 'track' | 'grid' | 'text';
 
 export interface BoardComponentPreset {
   id: string;

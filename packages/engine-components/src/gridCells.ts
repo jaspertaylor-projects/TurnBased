@@ -146,6 +146,10 @@ export function readGridCellStyle(value: unknown): GridCellStyle {
     style.textureOpacity = Math.max(0, Math.min(1, source.textureOpacity));
   }
 
+  if (typeof source.borderColor === 'string' && source.borderColor.trim().length > 0) {
+    style.borderColor = source.borderColor;
+  }
+
   if (typeof source.borderWidth === 'number' && Number.isFinite(source.borderWidth)) {
     style.borderWidth = Math.max(0, source.borderWidth);
   }

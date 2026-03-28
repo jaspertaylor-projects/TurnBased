@@ -5,6 +5,7 @@ export const builtInComponentTypeSchema = z.enum([
   'board',
   'space',
   'track',
+  'text-box',
   'hex-grid',
   'square-grid',
   'checkerboard-grid',

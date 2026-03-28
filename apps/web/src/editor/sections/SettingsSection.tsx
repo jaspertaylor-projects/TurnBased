@@ -1,5 +1,6 @@
 import { ProjectColorPicker } from '@turnbased/engine-ui';
 
+import { NumericInput } from '../../components/NumericInput';
 import { listProjectPaletteOptions, PROJECT_PALETTE_LABELS, PROJECT_PALETTE_ORDER } from '../projectPalette';
 import { inputStyle, labelStyle, panelStyle, sectionTitleStyle } from '../styles';
 import type { EditorProject } from '../types';
@@ -40,13 +41,12 @@ export function SettingsSection({
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
             <label style={labelStyle}>
               Min players
-              <input
-                type="number"
+              <NumericInput
                 min={1}
                 max={6}
                 value={project.brief.minPlayers}
-                onChange={(event) => onUpdateBrief((brief) => {
-                  const nextMin = clampPlayerCount(Number(event.target.value) || 1);
+                onValueChange={(value) => onUpdateBrief((brief) => {
+                  const nextMin = clampPlayerCount(value);
                   return {
                     ...brief,
                     minPlayers: Math.min(nextMin, brief.maxPlayers),
@@ -59,13 +59,12 @@ export function SettingsSection({
 
             <label style={labelStyle}>
               Max players
-              <input
-                type="number"
+              <NumericInput
                 min={1}
                 max={6}
                 value={project.brief.maxPlayers}
-                onChange={(event) => onUpdateBrief((brief) => {
-                  const nextMax = clampPlayerCount(Number(event.target.value) || 1);
+                onValueChange={(value) => onUpdateBrief((brief) => {
+                  const nextMax = clampPlayerCount(value);
                   return {
                     ...brief,
                     minPlayers: Math.min(brief.minPlayers, nextMax),
@@ -76,30 +75,6 @@ export function SettingsSection({
               />
             </label>
           </div>
-
-          <label style={{ ...labelStyle, marginBottom: '0.75rem' }}>
-            Theme
-            <input
-              value={project.brief.theme}
-              onChange={(event) => onUpdateBrief((brief) => ({
-                ...brief,
-                theme: event.target.value,
-              }))}
-              style={inputStyle}
-            />
-          </label>
-
-          <label style={{ ...labelStyle, marginBottom: '0.75rem' }}>
-            Art style
-            <input
-              value={project.brief.artStyle}
-              onChange={(event) => onUpdateBrief((brief) => ({
-                ...brief,
-                artStyle: event.target.value,
-              }))}
-              style={inputStyle}
-            />
-          </label>
 
           <div style={{ display: 'grid', gap: '0.65rem' }}>
             <label style={{ display: 'flex', gap: '0.65rem', alignItems: 'flex-start', color: '#065f46' }}>

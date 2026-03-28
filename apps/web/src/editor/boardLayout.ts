@@ -1,5 +1,6 @@
 import {
   readGridCellCoordinates,
+  type BoardSurfaceTextureId,
   type ComponentFrame,
   type ComponentInstanceModel,
   type GridCellCoordinate,
@@ -22,8 +23,18 @@ export function isBoardGridComponentType(componentType: string): componentType i
 export function isBoardAuthorableComponentType(componentType: string): boolean {
   return componentType === 'space'
     || componentType === 'track'
+    || componentType === 'text-box'
     || componentType === 'hex-grid'
     || componentType === 'square-grid';
+}
+
+export interface GridCellAppearance {
+  background: string;
+  textureId: BoardSurfaceTextureId | null;
+  textureOpacity: number;
+  borderColor: string | null;
+  borderWidth?: number;
+  borderRadius?: number;
 }
 
 export function getBoardGridCells(instance: ComponentInstanceModel): GridCellCoordinate[] {
@@ -35,6 +46,29 @@ export function getBoardGridCells(instance: ComponentInstanceModel): GridCellCoo
     : 1;
 
   return readGridCellCoordinates(instance.properties.cells, fallbackRows, fallbackColumns);
+}
+
+export function getGridCellAppearance(instance: ComponentInstanceModel): GridCellAppearance {
+  return {
+    background: typeof instance.properties.cellBackground === 'string' && instance.properties.cellBackground.trim().length > 0
+      ? instance.properties.cellBackground
+      : 'rgba(255,255,255,0.92)',
+    textureId: typeof instance.properties.cellTextureId === 'string' && instance.properties.cellTextureId !== 'none'
+      ? instance.properties.cellTextureId as BoardSurfaceTextureId
+      : null,
+    textureOpacity: typeof instance.properties.cellTextureOpacity === 'number'
+      ? instance.properties.cellTextureOpacity
+      : 0.3,
+    borderColor: typeof instance.properties.cellBorderColor === 'string' && instance.properties.cellBorderColor.trim().length > 0
+      ? instance.properties.cellBorderColor
+      : null,
+    borderWidth: typeof instance.properties.cellBorderWidth === 'number'
+      ? instance.properties.cellBorderWidth
+      : undefined,
+    borderRadius: typeof instance.properties.cellBorderRadius === 'number'
+      ? instance.properties.cellBorderRadius
+      : undefined,
+  };
 }
 
 export function defaultBoardItemFrame(componentType: string, index: number): ComponentFrame {
@@ -63,6 +97,17 @@ export function defaultBoardItemFrame(componentType: string, index: number): Com
         borderColor: 'rgba(14,165,233,0.18)',
         borderWidth: 1,
         borderRadius: 22,
+      };
+    case 'text-box':
+      return {
+        x: baseX,
+        y: baseY,
+        width: 260,
+        height: 148,
+        background: 'rgba(255,255,255,0.92)',
+        borderColor: 'rgba(15,118,110,0.18)',
+        borderWidth: 1,
+        borderRadius: 18,
       };
     case 'hex-grid':
       return {

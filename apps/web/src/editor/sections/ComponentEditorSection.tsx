@@ -5,6 +5,7 @@ import type {
 } from '@turnbased/engine-components';
 import { createPlayerId } from '@turnbased/shared-types';
 
+import { NumericInput } from '../../components/NumericInput';
 import { TreeItem } from '../TreeItem';
 import { parsePropertyValue } from '../helpers';
 import { inputStyle, labelStyle, mutedTextStyle, panelStyle, sectionTitleStyle } from '../styles';
@@ -183,18 +184,32 @@ export function ComponentEditorSection({
                 return (
                   <label key={key} style={labelStyle}>
                     {definition.label}
-                    <input
-                      type={definition.kind === 'number' ? 'number' : 'text'}
-                      value={Array.isArray(value) ? value.join(', ') : String(value ?? '')}
-                      onChange={(event) => onUpdateSelectedComponent((instance) => ({
-                        ...instance,
-                        properties: {
-                          ...instance.properties,
-                          [key]: parsePropertyValue(definition, event.target.value),
-                        },
-                      }))}
-                      style={inputStyle}
-                    />
+                    {definition.kind === 'number' ? (
+                      <NumericInput
+                        value={typeof value === 'number' ? value : Number(value ?? 0)}
+                        onValueChange={(nextValue) => onUpdateSelectedComponent((instance) => ({
+                          ...instance,
+                          properties: {
+                            ...instance.properties,
+                            [key]: parsePropertyValue(definition, String(nextValue)),
+                          },
+                        }))}
+                        style={inputStyle}
+                      />
+                    ) : (
+                      <input
+                        type="text"
+                        value={Array.isArray(value) ? value.join(', ') : String(value ?? '')}
+                        onChange={(event) => onUpdateSelectedComponent((instance) => ({
+                          ...instance,
+                          properties: {
+                            ...instance.properties,
+                            [key]: parsePropertyValue(definition, event.target.value),
+                          },
+                        }))}
+                        style={inputStyle}
+                      />
+                    )}
                   </label>
                 );
               })}
@@ -202,14 +217,13 @@ export function ComponentEditorSection({
 
             <label style={{ ...labelStyle, marginTop: '0.8rem' }}>
               Placement index
-              <input
-                type="number"
+              <NumericInput
                 value={selectedComponent.placement?.index ?? 0}
-                onChange={(event) => onUpdateSelectedComponent((instance) => ({
+                onValueChange={(value) => onUpdateSelectedComponent((instance) => ({
                   ...instance,
                   placement: {
                     ...instance.placement,
-                    index: Number(event.target.value),
+                    index: value,
                   },
                 }))}
                 style={inputStyle}

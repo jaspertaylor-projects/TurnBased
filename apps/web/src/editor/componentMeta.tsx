@@ -13,6 +13,7 @@ import {
   Layers3,
   Package,
   Rows3,
+  Type,
   Trophy,
 } from 'lucide-react';
 
@@ -30,6 +31,7 @@ const COMPONENT_ICONS: Record<string, LucideIcon> = {
   space: Box,
   zone: Rows3,
   track: Rows3,
+  'text-box': Type,
   'hex-grid': Hexagon,
   'square-grid': Grid2x2,
   'checkerboard-grid': Grid2x2,

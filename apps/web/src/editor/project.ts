@@ -21,6 +21,7 @@ import { createDefaultProjectManifest } from './manifest';
 import { createDefaultProjectColorPalette } from './projectPalette';
 import type {
   EditorAppLayout,
+  EditorArtDirection,
   EditorProject,
   EditorProjectView,
   EditorProjectViews,
@@ -56,6 +57,15 @@ export function createDefaultProjectSettings(): EditorSettings {
     timeControlMode: 'none',
     timeControlSeconds: 300,
     colorPalette: createDefaultProjectColorPalette(),
+  };
+}
+
+export function createDefaultProjectArtDirection(): EditorArtDirection {
+  return {
+    theme: '',
+    definedArtStyles: [],
+    recurringAssets: [],
+    icons: [],
   };
 }
 
@@ -287,6 +297,7 @@ export function createBlankProject(name = 'Untitled Prototype'): EditorProject {
       designerNotes: 'This workspace can be generated from a lightweight setup form, then refined across the component editor, preview, versions, and app layout sections.',
     },
     settings: createDefaultProjectSettings(),
+    art: createDefaultProjectArtDirection(),
     appLayout: createDefaultAppLayout(name),
   };
 }
@@ -341,6 +352,16 @@ export function updateProjectSettings(
   return touchProject({
     ...project,
     settings: updater(project.settings),
+  });
+}
+
+export function updateProjectArt(
+  project: EditorProject,
+  updater: (art: EditorProject['art']) => EditorProject['art'],
+): EditorProject {
+  return touchProject({
+    ...project,
+    art: updater(project.art),
   });
 }
 

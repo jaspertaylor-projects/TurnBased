@@ -10,6 +10,7 @@ import {
   syncGeneratedBoardChildren,
   updateComponentInstance,
   updateProjectAppLayout,
+  updateProjectArt,
   updateProjectBrief,
   updateProjectDescription,
   updateProjectSettings,
@@ -33,6 +34,7 @@ import { VisualsSection } from '../editor/sections/VisualsSection';
 import { PreviewSection } from '../editor/sections/PreviewSection';
 import { VersionsSection } from '../editor/sections/VersionsSection';
 import { AppLayoutSection } from '../editor/sections/AppLayoutSection';
+import { ArtSection } from '../editor/sections/ArtSection';
 import { SettingsSection } from '../editor/sections/SettingsSection';
 import type { BuiltInComponentType, ComponentInstanceModel } from '@turnbased/engine-components';
 import { commitProjectVersion, getProjectGitStatus, listProjectGitCommits, restoreProjectFromCommit } from '../editor/git';
@@ -366,6 +368,32 @@ export const Editor = () => {
             onSetSelection={setSelection}
             onEntityClick={handleEntityClick}
             onZoneClick={handleZoneClick}
+          />
+        );
+      case 'art':
+        return (
+          <ArtSection
+            project={currentProject}
+            onUpdateArt={(updater) => commitProject(updateProjectArt(currentProject, updater))}
+            onUpdateTheme={(value) => commitProject(
+              updateProjectBrief(
+                updateProjectArt(currentProject, (art) => ({
+                  ...art,
+                  theme: value,
+                })),
+                (brief) => ({
+                  ...brief,
+                  theme: value,
+                }),
+              ),
+            )}
+            onAssignPaletteColor={(paletteId, value) => commitProject(updateProjectSettings(currentProject, (settings) => ({
+              ...settings,
+              colorPalette: {
+                ...settings.colorPalette,
+                [paletteId]: value,
+              },
+            })))}
           />
         );
       case 'versions':

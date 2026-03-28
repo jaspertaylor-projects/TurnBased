@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Brush, Flag, Users } from 'lucide-react';
 
+import { NumericInput } from '../components/NumericInput';
 import { buildProjectWithAI, getCreatorEnvironmentStatus } from '../editor/aiBuildService';
 import { commitProjectVersion } from '../editor/git';
 import { buildPreviewRuntime } from '../editor/runtime';
@@ -124,24 +125,22 @@ export const CreateBlankProject = () => {
 
           <label style={{ display: 'grid', gap: '0.35rem', color: '#0f766e', fontSize: '0.85rem' }}>
             Min players
-            <input
-              type="number"
+            <NumericInput
               min={1}
               max={6}
               value={brief.minPlayers}
-              onChange={(event) => setBrief((current) => updatePlayerRange(current, { minPlayers: Number(event.target.value) || 1 }))}
+              onValueChange={(value) => setBrief((current) => updatePlayerRange(current, { minPlayers: value }))}
               style={{ padding: '0.75rem 0.85rem', borderRadius: '12px', border: '1px solid rgba(15,118,110,0.12)' }}
             />
           </label>
 
           <label style={{ display: 'grid', gap: '0.35rem', color: '#0f766e', fontSize: '0.85rem' }}>
             Max players
-            <input
-              type="number"
+            <NumericInput
               min={1}
               max={6}
               value={brief.maxPlayers}
-              onChange={(event) => setBrief((current) => updatePlayerRange(current, { maxPlayers: Number(event.target.value) || 1 }))}
+              onValueChange={(value) => setBrief((current) => updatePlayerRange(current, { maxPlayers: value }))}
               style={{ padding: '0.75rem 0.85rem', borderRadius: '12px', border: '1px solid rgba(15,118,110,0.12)' }}
             />
           </label>
