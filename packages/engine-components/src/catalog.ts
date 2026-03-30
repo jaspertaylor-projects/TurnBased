@@ -5,8 +5,23 @@ import { createDefaultBoardAppearanceProperties } from './boardAppearance';
 import type { BuiltInComponentType, ComponentManifest } from './types';
 import { createRectangularGridCellCoordinates } from './gridCells';
 
+type ComponentManifestDefinition = Omit<ComponentManifest, 'authoring'>;
+
 const countSchema = z.number().int().nonnegative().nullable();
 const boardSurfaceTextureIdSchema = z.enum(['none', 'felt', 'water', 'grass', 'wood', 'marble', 'leather', 'stone', 'sand', 'metal']);
+const primaryComponentTypes = new Set<BuiltInComponentType>([
+  'board',
+  'deck',
+  'piece',
+  'space',
+  'track',
+  'hex-grid',
+  'square-grid',
+  'network',
+  'card',
+  'text-box',
+  'image-area',
+]);
 
 const gridCellAppearancePropertyDefinitions = {
   cellBackground: { kind: 'string', label: 'Cell Background' },
@@ -77,10 +92,11 @@ const defaultCounterRenderHints = {
 
 const defaultBoardAppearance = createDefaultBoardAppearanceProperties();
 
-const manifests: Record<BuiltInComponentType, ComponentManifest> = {
+const manifests: Record<BuiltInComponentType, ComponentManifestDefinition> = {
   board: {
     type: 'board',
     category: 'container',
+    role: 'top-level',
     displayName: 'Board',
     description: 'A spatial root component that arranges spaces, tracks, and authored grid regions.',
     propertyDefinitions: {
@@ -143,18 +159,18 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
     },
     placementConstraints: {
       requiresParent: false,
-      allowedParentCategories: [],
+      allowedParentRoles: [],
       allowedParentTypes: [],
-      allowedChildCategories: ['container', 'counter'],
-      allowedChildTypes: ['space', 'track', 'text-box', 'hex-grid', 'square-grid', 'checkerboard-grid', 'zone', 'resource-pile', 'counter', 'score-track'],
+      allowedChildRoles: ['top-level', 'sub-component', 'leaf'],
+      allowedChildTypes: ['card', 'space', 'track', 'text-box', 'image-area', 'network', 'hex-grid', 'square-grid', 'checkerboard-grid', 'zone', 'resource-pile', 'counter', 'score-track'],
       minChildren: 0,
       maxChildren: null,
     },
     occupancyRules: {
       mode: 'multiple',
       capacity: null,
-      occupantCategories: ['container', 'counter'],
-      occupantTypes: ['space', 'track', 'text-box', 'hex-grid', 'square-grid', 'checkerboard-grid', 'zone', 'resource-pile', 'counter', 'score-track'],
+      occupantRoles: ['top-level', 'sub-component', 'leaf'],
+      occupantTypes: ['card', 'space', 'track', 'text-box', 'image-area', 'network', 'hex-grid', 'square-grid', 'checkerboard-grid', 'zone', 'resource-pile', 'counter', 'score-track'],
       allowMixedOccupants: true,
       allowSharedControl: true,
       perPlayerLimit: null,
@@ -171,8 +187,8 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
         {
           id: 'surface',
           label: 'Surface',
-          acceptsCategories: ['container', 'counter'],
-          acceptsTypes: ['space', 'track', 'text-box', 'hex-grid', 'square-grid', 'checkerboard-grid', 'zone', 'resource-pile', 'counter', 'score-track'],
+          acceptsRoles: ['top-level', 'sub-component', 'leaf'],
+          acceptsTypes: ['card', 'space', 'track', 'text-box', 'image-area', 'network', 'hex-grid', 'square-grid', 'checkerboard-grid', 'zone', 'resource-pile', 'counter', 'score-track'],
           minChildren: 0,
           maxChildren: null,
         },
@@ -180,9 +196,85 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
     },
     tags: ['spatial', 'surface', 'root'],
   },
+  card: {
+    type: 'card',
+    category: 'entity',
+    role: 'sub-component',
+    displayName: 'Card',
+    description: 'A composable card face that can live in a deck, on a board, or inside another authored surface.',
+    propertyDefinitions: {
+      label: { kind: 'string', label: 'Label' },
+      title: { kind: 'string', label: 'Title' },
+      subtitle: { kind: 'string', label: 'Subtitle' },
+      faceUp: { kind: 'boolean', label: 'Face Up' },
+    },
+    propertiesSchema: z.object({
+      label: z.string().default('Card'),
+      title: z.string().default('Card Title'),
+      subtitle: z.string().default('Card text'),
+      faceUp: z.boolean().default(true),
+    }),
+    defaultProperties: {
+      label: 'Card',
+      title: 'Card Title',
+      subtitle: 'Card text',
+      faceUp: true,
+    },
+    renderHints: {
+      surface: 'entity',
+      layout: 'freeform',
+      orientation: 'vertical',
+      ...defaultEntityRenderHints,
+    },
+    interactionDefaults: {
+      selectionMode: 'single',
+      primaryAction: 'inspect',
+      dragEnabled: true,
+      dropEnabled: true,
+      keyboardNavigable: true,
+      highlightValidDestinations: false,
+    },
+    placementConstraints: {
+      requiresParent: true,
+      allowedParentRoles: ['top-level', 'sub-component'],
+      allowedParentTypes: [],
+      allowedChildRoles: ['top-level', 'sub-component', 'leaf'],
+      allowedChildTypes: [],
+      minChildren: 0,
+      maxChildren: null,
+    },
+    occupancyRules: {
+      mode: 'multiple',
+      capacity: null,
+      occupantRoles: ['top-level', 'sub-component', 'leaf'],
+      occupantTypes: [],
+      allowMixedOccupants: true,
+      allowSharedControl: true,
+      perPlayerLimit: null,
+    },
+    visibilityDefaults: {
+      ownerPrivate: false,
+      faceUpByDefault: true,
+    },
+    composition: {
+      strategy: 'children',
+      childSlots: [
+        {
+          id: 'face',
+          label: 'Face',
+          acceptsRoles: ['top-level', 'sub-component', 'leaf'],
+          acceptsTypes: [],
+          minChildren: 0,
+          maxChildren: null,
+        },
+      ],
+    },
+    tags: ['card', 'face', 'composable'],
+  },
   space: {
     type: 'space',
     category: 'container',
+    role: 'sub-component',
     displayName: 'Space',
     description: 'A single placeable location on a board or track.',
     propertyDefinitions: {
@@ -222,18 +314,18 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
     },
     placementConstraints: {
       requiresParent: true,
-      allowedParentCategories: ['container'],
-      allowedParentTypes: ['board', 'track', 'zone', 'hex-grid', 'square-grid', 'checkerboard-grid'],
-      allowedChildCategories: ['entity', 'container'],
-      allowedChildTypes: ['piece', 'token', 'resource-pile'],
+      allowedParentRoles: ['top-level', 'sub-component'],
+      allowedParentTypes: [],
+      allowedChildRoles: ['top-level', 'sub-component', 'leaf'],
+      allowedChildTypes: [],
       minChildren: 0,
       maxChildren: null,
     },
     occupancyRules: {
       mode: 'multiple',
       capacity: null,
-      occupantCategories: ['entity', 'container'],
-      occupantTypes: ['piece', 'token', 'resource-pile'],
+      occupantRoles: ['top-level', 'sub-component', 'leaf'],
+      occupantTypes: [],
       allowMixedOccupants: true,
       allowSharedControl: true,
       perPlayerLimit: null,
@@ -250,8 +342,8 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
         {
           id: 'occupant',
           label: 'Occupant',
-          acceptsCategories: ['entity', 'container'],
-          acceptsTypes: ['piece', 'token', 'resource-pile'],
+          acceptsRoles: ['top-level', 'sub-component', 'leaf'],
+          acceptsTypes: [],
           minChildren: 0,
           maxChildren: null,
         },
@@ -262,6 +354,7 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
   'hex-grid': {
     type: 'hex-grid',
     category: 'container',
+    role: 'sub-component',
     displayName: 'Hex Grid',
     description: 'A board-authored hex map region whose generated cells are individual spaces for engine play.',
     propertyDefinitions: {
@@ -304,18 +397,18 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
     },
     placementConstraints: {
       requiresParent: true,
-      allowedParentCategories: ['container'],
-      allowedParentTypes: ['board'],
-      allowedChildCategories: ['container'],
-      allowedChildTypes: ['space'],
+      allowedParentRoles: ['top-level', 'sub-component'],
+      allowedParentTypes: [],
+      allowedChildRoles: ['top-level', 'sub-component', 'leaf'],
+      allowedChildTypes: [],
       minChildren: 0,
       maxChildren: null,
     },
     occupancyRules: {
       mode: 'multiple',
       capacity: null,
-      occupantCategories: ['container'],
-      occupantTypes: ['space'],
+      occupantRoles: ['top-level', 'sub-component', 'leaf'],
+      occupantTypes: [],
       allowMixedOccupants: true,
       allowSharedControl: true,
       perPlayerLimit: null,
@@ -332,8 +425,8 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
         {
           id: 'cells',
           label: 'Cells',
-          acceptsCategories: ['container'],
-          acceptsTypes: ['space'],
+          acceptsRoles: ['top-level', 'sub-component', 'leaf'],
+          acceptsTypes: [],
           minChildren: 0,
           maxChildren: null,
         },
@@ -344,6 +437,7 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
   'square-grid': {
     type: 'square-grid',
     category: 'container',
+    role: 'sub-component',
     displayName: 'Square Grid',
     description: 'A board-authored square grid region whose generated cells are individual spaces for engine play.',
     propertyDefinitions: {
@@ -386,18 +480,18 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
     },
     placementConstraints: {
       requiresParent: true,
-      allowedParentCategories: ['container'],
-      allowedParentTypes: ['board'],
-      allowedChildCategories: ['container'],
-      allowedChildTypes: ['space'],
+      allowedParentRoles: ['top-level', 'sub-component'],
+      allowedParentTypes: [],
+      allowedChildRoles: ['top-level', 'sub-component', 'leaf'],
+      allowedChildTypes: [],
       minChildren: 0,
       maxChildren: null,
     },
     occupancyRules: {
       mode: 'multiple',
       capacity: null,
-      occupantCategories: ['container'],
-      occupantTypes: ['space'],
+      occupantRoles: ['top-level', 'sub-component', 'leaf'],
+      occupantTypes: [],
       allowMixedOccupants: true,
       allowSharedControl: true,
       perPlayerLimit: null,
@@ -414,8 +508,8 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
         {
           id: 'cells',
           label: 'Cells',
-          acceptsCategories: ['container'],
-          acceptsTypes: ['space'],
+          acceptsRoles: ['top-level', 'sub-component', 'leaf'],
+          acceptsTypes: [],
           minChildren: 0,
           maxChildren: null,
         },
@@ -426,6 +520,7 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
   'checkerboard-grid': {
     type: 'checkerboard-grid',
     category: 'container',
+    role: 'sub-component',
     displayName: 'Square Grid',
     description: 'A legacy square grid region whose generated cells are individual spaces for engine play.',
     propertyDefinitions: {
@@ -468,18 +563,18 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
     },
     placementConstraints: {
       requiresParent: true,
-      allowedParentCategories: ['container'],
-      allowedParentTypes: ['board'],
-      allowedChildCategories: ['container'],
-      allowedChildTypes: ['space'],
+      allowedParentRoles: ['top-level', 'sub-component'],
+      allowedParentTypes: [],
+      allowedChildRoles: ['top-level', 'sub-component', 'leaf'],
+      allowedChildTypes: [],
       minChildren: 0,
       maxChildren: null,
     },
     occupancyRules: {
       mode: 'multiple',
       capacity: null,
-      occupantCategories: ['container'],
-      occupantTypes: ['space'],
+      occupantRoles: ['top-level', 'sub-component', 'leaf'],
+      occupantTypes: [],
       allowMixedOccupants: true,
       allowSharedControl: true,
       perPlayerLimit: null,
@@ -496,8 +591,8 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
         {
           id: 'cells',
           label: 'Cells',
-          acceptsCategories: ['container'],
-          acceptsTypes: ['space'],
+          acceptsRoles: ['top-level', 'sub-component', 'leaf'],
+          acceptsTypes: [],
           minChildren: 0,
           maxChildren: null,
         },
@@ -508,6 +603,7 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
   track: {
     type: 'track',
     category: 'container',
+    role: 'sub-component',
     displayName: 'Track',
     description: 'An ordered path of positions, suitable for movement and score progress.',
     propertyDefinitions: {
@@ -541,18 +637,18 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
     },
     placementConstraints: {
       requiresParent: false,
-      allowedParentCategories: ['container'],
-      allowedParentTypes: ['board', 'zone'],
-      allowedChildCategories: ['container', 'entity'],
-      allowedChildTypes: ['space', 'resource-pile', 'piece', 'token'],
+      allowedParentRoles: ['top-level', 'sub-component'],
+      allowedParentTypes: [],
+      allowedChildRoles: ['top-level', 'sub-component', 'leaf'],
+      allowedChildTypes: [],
       minChildren: 0,
       maxChildren: null,
     },
     occupancyRules: {
       mode: 'track',
       capacity: null,
-      occupantCategories: ['container', 'entity'],
-      occupantTypes: ['space', 'resource-pile', 'piece', 'token'],
+      occupantRoles: ['top-level', 'sub-component', 'leaf'],
+      occupantTypes: [],
       allowMixedOccupants: true,
       allowSharedControl: true,
       perPlayerLimit: null,
@@ -569,8 +665,8 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
         {
           id: 'positions',
           label: 'Positions',
-          acceptsCategories: ['container', 'entity'],
-          acceptsTypes: ['space', 'resource-pile', 'piece', 'token'],
+          acceptsRoles: ['top-level', 'sub-component', 'leaf'],
+          acceptsTypes: [],
           minChildren: 0,
           maxChildren: null,
         },
@@ -581,6 +677,7 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
   'text-box': {
     type: 'text-box',
     category: 'container',
+    role: 'leaf',
     displayName: 'Text Box',
     description: 'A rich text annotation box for instructions, flavor, labels, and icon tokens on the board surface.',
     propertyDefinitions: {
@@ -636,9 +733,9 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
     },
     placementConstraints: {
       requiresParent: true,
-      allowedParentCategories: ['container'],
-      allowedParentTypes: ['board'],
-      allowedChildCategories: [],
+      allowedParentRoles: ['top-level', 'sub-component', 'leaf'],
+      allowedParentTypes: [],
+      allowedChildRoles: [],
       allowedChildTypes: [],
       minChildren: 0,
       maxChildren: 0,
@@ -646,7 +743,7 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
     occupancyRules: {
       mode: 'none',
       capacity: 0,
-      occupantCategories: [],
+      occupantRoles: [],
       occupantTypes: [],
       allowMixedOccupants: false,
       allowSharedControl: false,
@@ -667,6 +764,7 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
   zone: {
     type: 'zone',
     category: 'container',
+    role: 'sub-component',
     displayName: 'Zone',
     description: 'A logical container for entities, collections, and local counters.',
     propertyDefinitions: {
@@ -700,9 +798,9 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
     },
     placementConstraints: {
       requiresParent: false,
-      allowedParentCategories: ['container'],
+      allowedParentRoles: ['top-level', 'sub-component'],
       allowedParentTypes: ['board'],
-      allowedChildCategories: ['collection', 'entity', 'counter', 'container'],
+      allowedChildRoles: ['top-level', 'sub-component', 'leaf'],
       allowedChildTypes: ['deck', 'hand', 'discard', 'bag', 'piece', 'token', 'counter', 'track', 'resource-pile'],
       minChildren: 0,
       maxChildren: null,
@@ -710,7 +808,7 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
     occupancyRules: {
       mode: 'multiple',
       capacity: null,
-      occupantCategories: ['collection', 'entity', 'counter', 'container'],
+      occupantRoles: ['top-level', 'sub-component', 'leaf'],
       occupantTypes: ['deck', 'hand', 'discard', 'bag', 'piece', 'token', 'counter', 'track', 'resource-pile'],
       allowMixedOccupants: true,
       allowSharedControl: true,
@@ -728,7 +826,7 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
         {
           id: 'contents',
           label: 'Contents',
-          acceptsCategories: ['collection', 'entity', 'counter', 'container'],
+          acceptsRoles: ['top-level', 'sub-component', 'leaf'],
           acceptsTypes: ['deck', 'hand', 'discard', 'bag', 'piece', 'token', 'counter', 'track', 'resource-pile'],
           minChildren: 0,
           maxChildren: null,
@@ -740,6 +838,7 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
   'resource-pile': {
     type: 'resource-pile',
     category: 'container',
+    role: 'sub-component',
     displayName: 'Resource Pile',
     description: 'A permanent nested region that visually groups movable resources without making each resource part of the layout.',
     propertyDefinitions: {
@@ -770,9 +869,9 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
     },
     placementConstraints: {
       requiresParent: true,
-      allowedParentCategories: ['container'],
+      allowedParentRoles: ['top-level', 'sub-component'],
       allowedParentTypes: ['board', 'space', 'track', 'zone'],
-      allowedChildCategories: ['entity'],
+      allowedChildRoles: ['top-level', 'sub-component', 'leaf'],
       allowedChildTypes: ['piece', 'token'],
       minChildren: 0,
       maxChildren: null,
@@ -780,7 +879,7 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
     occupancyRules: {
       mode: 'multiple',
       capacity: null,
-      occupantCategories: ['entity'],
+      occupantRoles: ['top-level', 'sub-component', 'leaf'],
       occupantTypes: ['piece', 'token'],
       allowMixedOccupants: true,
       allowSharedControl: true,
@@ -798,7 +897,7 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
         {
           id: 'resources',
           label: 'Resources',
-          acceptsCategories: ['entity'],
+          acceptsRoles: ['top-level', 'sub-component', 'leaf'],
           acceptsTypes: ['piece', 'token'],
           minChildren: 0,
           maxChildren: null,
@@ -810,8 +909,9 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
   deck: {
     type: 'deck',
     category: 'collection',
-    displayName: 'Deck',
-    description: 'An ordered, usually face-down collection that supports draw and shuffle actions.',
+    role: 'top-level',
+    displayName: 'Deck of Cards',
+    description: 'An ordered, usually face-down card collection that supports draw and shuffle actions.',
     propertyDefinitions: {
       label: { kind: 'string', label: 'Label' },
       ordered: { kind: 'boolean', label: 'Ordered' },
@@ -819,13 +919,13 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
       maxCards: { kind: 'number', label: 'Capacity' },
     },
     propertiesSchema: z.object({
-      label: z.string().default('Deck'),
+      label: z.string().default('Deck of Cards'),
       ordered: z.boolean().default(true),
       faceDown: z.boolean().default(true),
       maxCards: countSchema,
     }),
     defaultProperties: {
-      label: 'Deck',
+      label: 'Deck of Cards',
       ordered: true,
       faceDown: true,
       maxCards: null,
@@ -846,18 +946,18 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
     },
     placementConstraints: {
       requiresParent: false,
-      allowedParentCategories: ['container'],
-      allowedParentTypes: ['zone', 'board'],
-      allowedChildCategories: ['entity'],
-      allowedChildTypes: ['piece', 'token'],
+      allowedParentRoles: [],
+      allowedParentTypes: [],
+      allowedChildRoles: ['top-level', 'sub-component', 'leaf'],
+      allowedChildTypes: ['piece', 'token', 'card'],
       minChildren: 0,
       maxChildren: null,
     },
     occupancyRules: {
       mode: 'stack',
       capacity: null,
-      occupantCategories: ['entity'],
-      occupantTypes: ['piece', 'token'],
+      occupantRoles: ['top-level', 'sub-component', 'leaf'],
+      occupantTypes: ['piece', 'token', 'card'],
       allowMixedOccupants: true,
       allowSharedControl: true,
       perPlayerLimit: null,
@@ -874,8 +974,8 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
         {
           id: 'cards',
           label: 'Cards',
-          acceptsCategories: ['entity'],
-          acceptsTypes: ['piece', 'token'],
+          acceptsRoles: ['top-level', 'sub-component', 'leaf'],
+          acceptsTypes: ['piece', 'token', 'card'],
           minChildren: 0,
           maxChildren: null,
         },
@@ -886,6 +986,7 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
   hand: {
     type: 'hand',
     category: 'collection',
+    role: 'top-level',
     displayName: 'Hand',
     description: 'A player-owned private collection that presents items in a fan or row.',
     propertyDefinitions: {
@@ -919,18 +1020,18 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
     },
     placementConstraints: {
       requiresParent: false,
-      allowedParentCategories: ['container'],
-      allowedParentTypes: ['zone', 'board'],
-      allowedChildCategories: ['entity'],
-      allowedChildTypes: ['piece', 'token'],
+      allowedParentRoles: [],
+      allowedParentTypes: [],
+      allowedChildRoles: ['top-level', 'sub-component', 'leaf'],
+      allowedChildTypes: ['piece', 'token', 'card'],
       minChildren: 0,
       maxChildren: null,
     },
     occupancyRules: {
       mode: 'multiple',
       capacity: null,
-      occupantCategories: ['entity'],
-      occupantTypes: ['piece', 'token'],
+      occupantRoles: ['top-level', 'sub-component', 'leaf'],
+      occupantTypes: ['piece', 'token', 'card'],
       allowMixedOccupants: true,
       allowSharedControl: false,
       perPlayerLimit: null,
@@ -947,8 +1048,8 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
         {
           id: 'held-items',
           label: 'Held Items',
-          acceptsCategories: ['entity'],
-          acceptsTypes: ['piece', 'token'],
+          acceptsRoles: ['top-level', 'sub-component', 'leaf'],
+          acceptsTypes: ['piece', 'token', 'card'],
           minChildren: 0,
           maxChildren: null,
         },
@@ -959,6 +1060,7 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
   discard: {
     type: 'discard',
     category: 'collection',
+    role: 'top-level',
     displayName: 'Discard',
     description: 'A public pile of spent or resolved entities.',
     propertyDefinitions: {
@@ -989,18 +1091,18 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
     },
     placementConstraints: {
       requiresParent: false,
-      allowedParentCategories: ['container'],
-      allowedParentTypes: ['zone', 'board'],
-      allowedChildCategories: ['entity'],
-      allowedChildTypes: ['piece', 'token'],
+      allowedParentRoles: [],
+      allowedParentTypes: [],
+      allowedChildRoles: ['top-level', 'sub-component', 'leaf'],
+      allowedChildTypes: ['piece', 'token', 'card'],
       minChildren: 0,
       maxChildren: null,
     },
     occupancyRules: {
       mode: 'stack',
       capacity: null,
-      occupantCategories: ['entity'],
-      occupantTypes: ['piece', 'token'],
+      occupantRoles: ['top-level', 'sub-component', 'leaf'],
+      occupantTypes: ['piece', 'token', 'card'],
       allowMixedOccupants: true,
       allowSharedControl: true,
       perPlayerLimit: null,
@@ -1017,8 +1119,8 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
         {
           id: 'discarded-items',
           label: 'Discarded Items',
-          acceptsCategories: ['entity'],
-          acceptsTypes: ['piece', 'token'],
+          acceptsRoles: ['top-level', 'sub-component', 'leaf'],
+          acceptsTypes: ['piece', 'token', 'card'],
           minChildren: 0,
           maxChildren: null,
         },
@@ -1029,6 +1131,7 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
   bag: {
     type: 'bag',
     category: 'collection',
+    role: 'top-level',
     displayName: 'Bag',
     description: 'A concealed random-access collection used for draws and pulls.',
     propertyDefinitions: {
@@ -1062,18 +1165,18 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
     },
     placementConstraints: {
       requiresParent: false,
-      allowedParentCategories: ['container'],
-      allowedParentTypes: ['zone', 'board'],
-      allowedChildCategories: ['entity'],
-      allowedChildTypes: ['piece', 'token'],
+      allowedParentRoles: [],
+      allowedParentTypes: [],
+      allowedChildRoles: ['top-level', 'sub-component', 'leaf'],
+      allowedChildTypes: ['piece', 'token', 'card'],
       minChildren: 0,
       maxChildren: null,
     },
     occupancyRules: {
       mode: 'stack',
       capacity: null,
-      occupantCategories: ['entity'],
-      occupantTypes: ['piece', 'token'],
+      occupantRoles: ['top-level', 'sub-component', 'leaf'],
+      occupantTypes: ['piece', 'token', 'card'],
       allowMixedOccupants: true,
       allowSharedControl: true,
       perPlayerLimit: null,
@@ -1090,8 +1193,8 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
         {
           id: 'contained-items',
           label: 'Contained Items',
-          acceptsCategories: ['entity'],
-          acceptsTypes: ['piece', 'token'],
+          acceptsRoles: ['top-level', 'sub-component', 'leaf'],
+          acceptsTypes: ['piece', 'token', 'card'],
           minChildren: 0,
           maxChildren: null,
         },
@@ -1102,8 +1205,9 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
   piece: {
     type: 'piece',
     category: 'entity',
+    role: 'top-level',
     displayName: 'Piece',
-    description: 'A movable actor or pawn that usually occupies spaces or tracks.',
+    description: 'A movable actor or pawn that functions as a structural root on the table.',
     propertyDefinitions: {
       label: { kind: 'string', label: 'Label' },
       moveStyle: { kind: 'string', label: 'Move Style' },
@@ -1140,13 +1244,13 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
       dragEnabled: true,
       dropEnabled: false,
       keyboardNavigable: true,
-      highlightValidDestinations: true,
+      highlightValidDestinations: false,
     },
     placementConstraints: {
-      requiresParent: true,
-      allowedParentCategories: ['container', 'collection', 'counter'],
-      allowedParentTypes: ['space', 'zone', 'resource-pile', 'track', 'deck', 'hand', 'discard', 'bag', 'score-track'],
-      allowedChildCategories: [],
+      requiresParent: false,
+      allowedParentRoles: [],
+      allowedParentTypes: [],
+      allowedChildRoles: ['sub-component', 'leaf'],
       allowedChildTypes: [],
       minChildren: 0,
       maxChildren: 0,
@@ -1154,7 +1258,7 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
     occupancyRules: {
       mode: 'none',
       capacity: 0,
-      occupantCategories: [],
+      occupantRoles: ['sub-component', 'leaf'],
       occupantTypes: [],
       allowMixedOccupants: false,
       allowSharedControl: false,
@@ -1173,6 +1277,7 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
   token: {
     type: 'token',
     category: 'entity',
+    role: 'leaf',
     displayName: 'Token',
     description: 'A lightweight marker for status, ownership, or track position.',
     propertyDefinitions: {
@@ -1215,9 +1320,9 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
     },
     placementConstraints: {
       requiresParent: true,
-      allowedParentCategories: ['container', 'collection', 'counter'],
-      allowedParentTypes: ['space', 'zone', 'resource-pile', 'track', 'deck', 'hand', 'discard', 'bag', 'score-track'],
-      allowedChildCategories: [],
+      allowedParentRoles: ['top-level', 'sub-component', 'leaf'],
+      allowedParentTypes: [],
+      allowedChildRoles: [],
       allowedChildTypes: [],
       minChildren: 0,
       maxChildren: 0,
@@ -1225,7 +1330,7 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
     occupancyRules: {
       mode: 'none',
       capacity: 0,
-      occupantCategories: [],
+      occupantRoles: [],
       occupantTypes: [],
       allowMixedOccupants: false,
       allowSharedControl: false,
@@ -1244,6 +1349,7 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
   counter: {
     type: 'counter',
     category: 'counter',
+    role: 'leaf',
     displayName: 'Counter',
     description: 'A numeric tracker for score, health, resources, or charges.',
     propertyDefinitions: {
@@ -1283,9 +1389,9 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
     },
     placementConstraints: {
       requiresParent: false,
-      allowedParentCategories: ['container'],
-      allowedParentTypes: ['board', 'zone'],
-      allowedChildCategories: [],
+      allowedParentRoles: ['top-level', 'sub-component'],
+      allowedParentTypes: [],
+      allowedChildRoles: [],
       allowedChildTypes: [],
       minChildren: 0,
       maxChildren: 0,
@@ -1293,7 +1399,7 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
     occupancyRules: {
       mode: 'none',
       capacity: 0,
-      occupantCategories: [],
+      occupantRoles: [],
       occupantTypes: [],
       allowMixedOccupants: false,
       allowSharedControl: false,
@@ -1312,6 +1418,7 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
   'score-track': {
     type: 'score-track',
     category: 'counter',
+    role: 'leaf',
     displayName: 'Score Track',
     description: 'A scoring component with ordered positions and marker occupancy.',
     propertyDefinitions: {
@@ -1345,17 +1452,17 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
     },
     placementConstraints: {
       requiresParent: false,
-      allowedParentCategories: ['container'],
-      allowedParentTypes: ['board', 'zone'],
-      allowedChildCategories: ['entity'],
-      allowedChildTypes: ['token', 'piece'],
+      allowedParentRoles: ['top-level', 'sub-component'],
+      allowedParentTypes: [],
+      allowedChildRoles: [],
+      allowedChildTypes: [],
       minChildren: 0,
       maxChildren: null,
     },
     occupancyRules: {
       mode: 'track',
       capacity: null,
-      occupantCategories: ['entity'],
+      occupantRoles: [],
       occupantTypes: ['token', 'piece'],
       allowMixedOccupants: true,
       allowSharedControl: true,
@@ -1371,7 +1478,7 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
         {
           id: 'markers',
           label: 'Score Markers',
-          acceptsCategories: ['entity'],
+          acceptsRoles: [],
           acceptsTypes: ['token', 'piece'],
           minChildren: 0,
           maxChildren: null,
@@ -1380,6 +1487,149 @@ const manifests: Record<BuiltInComponentType, ComponentManifest> = {
     },
     tags: ['score', 'progression'],
   },
+  'image-area': {
+    type: 'image-area',
+    category: 'entity',
+    role: 'leaf',
+    displayName: 'Image Area',
+    description: 'An image annotation meant for decorating the board surface.',
+    propertyDefinitions: {
+      label: { kind: 'string', label: 'Label' },
+      imageUrl: { kind: 'string', label: 'Image URL', required: true },
+      opacity: { kind: 'number', label: 'Opacity' },
+      objectFit: { kind: 'enum', label: 'Object Fit', options: ['cover', 'contain', 'fill'] },
+    },
+    propertiesSchema: z.object({
+      label: z.string().default('Image'),
+      imageUrl: z.string().default(''),
+      opacity: z.number().min(0).max(1).default(1),
+      objectFit: z.enum(['cover', 'contain', 'fill']).default('contain'),
+    }),
+    defaultProperties: {
+      label: 'Image',
+      imageUrl: '',
+      opacity: 1,
+      objectFit: 'contain',
+    },
+    renderHints: {
+      surface: 'entity',
+      layout: 'freeform',
+      orientation: 'none',
+      showLabel: false,
+      showCount: false,
+      showOccupancy: false,
+      showOwnership: false,
+      showCapacity: false,
+      supportsCoordinates: false,
+    },
+    interactionDefaults: {
+      selectionMode: 'single',
+      primaryAction: 'inspect',
+      dragEnabled: false,
+      dropEnabled: false,
+      keyboardNavigable: true,
+      highlightValidDestinations: false,
+    },
+    placementConstraints: {
+      requiresParent: true,
+      allowedParentRoles: ['top-level', 'sub-component'],
+      allowedParentTypes: [],
+      allowedChildRoles: [],
+      allowedChildTypes: [],
+      minChildren: 0,
+      maxChildren: 0,
+    },
+    occupancyRules: {
+      mode: 'none',
+      capacity: 0,
+      occupantRoles: [],
+      occupantTypes: [],
+      allowMixedOccupants: false,
+      allowSharedControl: false,
+      perPlayerLimit: null,
+    },
+    visibilityDefaults: {},
+    composition: {
+      strategy: 'leaf',
+      childSlots: [],
+    },
+    tags: ['annotation', 'visual'],
+  },
+  network: {
+    type: 'network',
+    category: 'container',
+    role: 'sub-component',
+    displayName: 'Network',
+    description: 'A custom graph of connected nodes to construct arbitrary movement networks.',
+    propertyDefinitions: {
+      label: { kind: 'string', label: 'Label' },
+      nodes: { kind: 'json', label: 'Nodes Data' },
+      edges: { kind: 'json', label: 'Edges Data' },
+    },
+    propertiesSchema: z.object({
+      label: z.string().default('Network'),
+      nodes: z.any().default([]),
+      edges: z.any().default([]),
+    }),
+    defaultProperties: {
+      label: 'Network',
+      nodes: [],
+      edges: [],
+    },
+    renderHints: {
+      surface: 'board',
+      layout: 'graph',
+      orientation: 'none',
+      showLabel: true,
+      showCount: false,
+      showOccupancy: true,
+      showOwnership: false,
+      showCapacity: false,
+      supportsCoordinates: true,
+    },
+    interactionDefaults: {
+      selectionMode: 'single',
+      primaryAction: 'select',
+      dragEnabled: false,
+      dropEnabled: false,
+      keyboardNavigable: true,
+      highlightValidDestinations: false,
+    },
+    placementConstraints: {
+      requiresParent: true,
+      allowedParentRoles: ['top-level', 'sub-component'],
+      allowedParentTypes: [],
+      allowedChildRoles: ['top-level', 'sub-component', 'leaf'],
+      allowedChildTypes: [],
+      minChildren: 0,
+      maxChildren: null,
+    },
+    occupancyRules: {
+      mode: 'multiple',
+      capacity: null,
+      occupantRoles: ['top-level', 'sub-component', 'leaf'],
+      occupantTypes: [],
+      allowMixedOccupants: true,
+      allowSharedControl: true,
+      perPlayerLimit: null,
+    },
+    visibilityDefaults: {},
+    composition: {
+      strategy: 'children',
+      childSlots: [],
+    },
+    tags: ['container', 'network'],
+  },
 };
 
-export const builtInComponentCatalog = manifests;
+export const builtInComponentCatalog = Object.fromEntries(
+  Object.entries(manifests).map(([type, manifest]) => [
+    type,
+    {
+      ...manifest,
+      authoring: {
+        discoverability: primaryComponentTypes.has(type as BuiltInComponentType) ? 'primary' : 'hidden',
+      },
+    },
+  ]),
+) as Record<BuiltInComponentType, ComponentManifest>;

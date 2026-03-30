@@ -9,9 +9,12 @@ import type { z } from 'zod';
 
 export type BuiltInComponentType =
   | 'board'
+  | 'card'
   | 'space'
   | 'track'
   | 'text-box'
+  | 'image-area'
+  | 'network'
   | 'hex-grid'
   | 'square-grid'
   | 'checkerboard-grid'
@@ -25,6 +28,9 @@ export type BuiltInComponentType =
   | 'token'
   | 'counter'
   | 'score-track';
+
+export type StructuralRole = 'top-level' | 'sub-component' | 'leaf';
+export type ComponentAuthoringDiscoverability = 'primary' | 'hidden';
 
 export type ComponentCategory = 'container' | 'collection' | 'entity' | 'counter';
 export type ComponentSurface =
@@ -105,10 +111,14 @@ export interface ComponentVisibilityDefaults {
   faceUpByDefault?: boolean;
 }
 
+export interface ComponentAuthoringMetadata {
+  discoverability: ComponentAuthoringDiscoverability;
+}
+
 export interface ComponentSlotDefinition {
   id: string;
   label: string;
-  acceptsCategories: ComponentCategory[];
+  acceptsRoles: StructuralRole[];
   acceptsTypes: string[];
   minChildren: number;
   maxChildren: number | null;
@@ -121,9 +131,9 @@ export interface ComponentComposition {
 
 export interface ComponentPlacementConstraints {
   requiresParent: boolean;
-  allowedParentCategories: ComponentCategory[];
+  allowedParentRoles: StructuralRole[];
   allowedParentTypes: string[];
-  allowedChildCategories: ComponentCategory[];
+  allowedChildRoles: StructuralRole[];
   allowedChildTypes: string[];
   minChildren: number;
   maxChildren: number | null;
@@ -132,7 +142,7 @@ export interface ComponentPlacementConstraints {
 export interface ComponentOccupancyRules {
   mode: ComponentOccupancyMode;
   capacity: number | null;
-  occupantCategories: ComponentCategory[];
+  occupantRoles: StructuralRole[];
   occupantTypes: string[];
   allowMixedOccupants: boolean;
   allowSharedControl: boolean;
@@ -142,6 +152,8 @@ export interface ComponentOccupancyRules {
 export interface ComponentManifest<TProperties extends Record<string, unknown> = Record<string, unknown>> {
   type: string;
   category: ComponentCategory;
+  role: StructuralRole;
+  authoring: ComponentAuthoringMetadata;
   displayName: string;
   description: string;
   propertyDefinitions: Record<string, ComponentPropertyDefinition>;
@@ -212,7 +224,9 @@ export interface ComponentInstanceModel<TProperties extends Record<string, unkno
   instanceId: ComponentInstanceId;
   componentType: string;
   category: ComponentCategory;
+  role: StructuralRole;
   displayName?: string;
+  notes?: string;
   properties: TProperties;
   children: ComponentInstanceId[];
   parentId: ComponentInstanceId | null;
@@ -227,7 +241,7 @@ export interface ComponentCatalog {
   manifests: Record<string, ComponentManifest>;
 }
 
-export type BoardComponentPresetFamily = 'space' | 'track' | 'grid' | 'text';
+export type BoardComponentPresetFamily = 'space' | 'track' | 'grid' | 'card' | 'network' | 'text' | 'image';
 
 export interface BoardComponentPreset {
   id: string;
@@ -243,6 +257,7 @@ export interface BoardComponentPreset {
 export interface CreateComponentInstanceOptions<TProperties extends Record<string, unknown>> {
   instanceId: ComponentInstanceId;
   displayName?: string;
+  notes?: string;
   properties?: Partial<TProperties>;
   children?: ComponentInstanceId[];
   parentId?: ComponentInstanceId | null;
@@ -259,14 +274,14 @@ export interface ComponentValidationIssue {
     | 'duplicate_component_type'
     | 'parent_required'
     | 'parent_forbidden'
-    | 'parent_category_not_allowed'
+    | 'parent_role_not_allowed'
     | 'parent_type_not_allowed'
-    | 'child_category_not_allowed'
+    | 'child_role_not_allowed'
     | 'child_type_not_allowed'
     | 'max_children_exceeded'
     | 'min_children_not_met'
     | 'occupancy_capacity_exceeded'
-    | 'occupancy_category_not_allowed'
+    | 'occupancy_role_not_allowed'
     | 'occupancy_type_not_allowed'
     | 'occupancy_shared_control_not_allowed'
     | 'occupancy_mixed_types_not_allowed'
@@ -286,6 +301,6 @@ export interface ComponentValidationResult {
 
 export interface OccupancyValidationContext {
   occupantTypes: string[];
-  occupantCategories: ComponentCategory[];
+  occupantRoles: StructuralRole[];
   occupantOwnerIds?: Array<PlayerId | null | undefined>;
 }

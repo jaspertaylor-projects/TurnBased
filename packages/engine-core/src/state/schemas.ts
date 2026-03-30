@@ -189,6 +189,7 @@ export const componentInstanceSchema = z.object({
   properties: z.record(z.string(), z.unknown()),
   children: z.array(componentInstanceIdSchema),
   parentId: componentInstanceIdSchema.nullable(),
+  notes: z.string().optional(),
 });
 
 // ─── Game State ─────────────────────────────────────────────────────

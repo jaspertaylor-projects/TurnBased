@@ -28,6 +28,7 @@ export {
   createComponentCatalog,
   createComponentInstance,
   getBuiltInComponentManifest,
+  listAuthorableBuiltInComponents,
   listBuiltInComponents,
   validateComponentOccupancy,
   validateComponentPlacement,
@@ -35,6 +36,8 @@ export {
 } from './helpers';
 export {
   builtInComponentTypeSchema,
+  componentAuthoringDiscoverabilitySchema,
+  componentAuthoringMetadataSchema,
   componentBindingsSchema,
   componentCategorySchema,
   componentCompositionSchema,
@@ -56,6 +59,7 @@ export {
   componentSlotDefinitionSchema,
   componentSurfaceSchema,
   componentVisibilityDefaultsSchema,
+  structuralRoleSchema,
 } from './schemas';
 export type {
   BoardAppearanceProperties,
@@ -69,6 +73,8 @@ export type {
   ComponentCategory,
   ComponentComposition,
   ComponentCompositionStrategy,
+  ComponentAuthoringDiscoverability,
+  ComponentAuthoringMetadata,
   ComponentFrame,
   ComponentInstanceModel,
   ComponentInteractionDefaults,
@@ -93,4 +99,5 @@ export type {
   GridCellCoordinate,
   GridCellStyle,
   OccupancyValidationContext,
+  StructuralRole,
 } from './types';

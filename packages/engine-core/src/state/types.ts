@@ -295,6 +295,7 @@ export interface ComponentInstance {
   properties: Record<string, unknown>;
   children: ComponentInstanceId[];
   parentId: ComponentInstanceId | null;
+  notes?: string;
 }
 
 // ─── Trigger Subscription ───────────────────────────────────────────

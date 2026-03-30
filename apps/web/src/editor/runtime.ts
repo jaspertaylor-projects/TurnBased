@@ -43,8 +43,12 @@ export function toPreviewEntityId(instanceId: string, copyIndex?: number) {
 }
 
 function getEntityQuantity(instance: EditorProject['instances'][string]): number {
-  if (instance.componentType !== 'piece' && instance.componentType !== 'token') {
+  if (instance.componentType !== 'piece' && instance.componentType !== 'token' && instance.componentType !== 'card') {
     return 0;
+  }
+
+  if (instance.componentType === 'card') {
+    return 1;
   }
 
   const quantity = instance.properties.quantity;
@@ -146,7 +150,7 @@ function buildZones(project: EditorProject): Record<string, Zone> {
       entityIds: instance.children
         .filter((childId) => {
           const child = project.instances[childId];
-          return child && (child.componentType === 'piece' || child.componentType === 'token');
+          return child && (child.componentType === 'piece' || child.componentType === 'token' || child.componentType === 'card');
         })
         .flatMap((childId) => {
           const child = project.instances[childId];
@@ -172,7 +176,7 @@ function buildZones(project: EditorProject): Record<string, Zone> {
 
 function buildEntities(project: EditorProject): GameState['entities'] {
   return Object.values(project.instances).reduce<GameState['entities']>((entities, instance) => {
-    if (instance.componentType !== 'piece' && instance.componentType !== 'token') {
+    if (instance.componentType !== 'piece' && instance.componentType !== 'token' && instance.componentType !== 'card') {
       return entities;
     }
 
@@ -567,6 +571,7 @@ export function buildPreviewRuntime(project: EditorProject): PreviewRuntime {
         properties: instance.properties,
         children: instance.children,
         parentId: instance.parentId,
+        notes: instance.notes,
       }]),
     ),
   };
@@ -594,6 +599,21 @@ export function buildPreviewRuntime(project: EditorProject): PreviewRuntime {
         category: manifest.category,
         tags: manifest.tags,
       })),
+    componentInstanceNotes: Object.values(project.instances)
+      .map((instance) => {
+        const notes = instance.notes?.trim() ?? '';
+        if (!notes) {
+          return null;
+        }
+
+        return {
+          instanceId: String(instance.instanceId),
+          componentType: instance.componentType,
+          displayName: getZoneName(instance),
+          notes,
+        };
+      })
+      .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry)),
     additionalNotes: [
       project.rules.designerNotes,
       `Target score: ${project.rules.targetScore}.`,

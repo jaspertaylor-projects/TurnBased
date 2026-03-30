@@ -302,6 +302,9 @@ The current editor workflow should reinforce that compact authoring model:
 - shared color picking should route through one alpha-capable reusable picker that can both choose palette colors and save new values back into those named slots
 - the settings UI for that palette should stay compact and live inside the main game setup panel as a 3x3 swatch grid instead of a separate oversized region
 - the left `Component Editor` rail expands into top-level authored components, not a fully exposed raw tree by default
+- the default authoring palette should stay intentionally small: top-level `board`, `deck`, and `piece`; subcomponents such as `space`, `track`, `square-grid`, `hex-grid`, `network`, and `card`; and leaf components such as `text-box` and `image-area`
+- palette exposure should be catalog-driven metadata, so additional built-ins can be promoted or hidden without rewriting editor grouping logic
+- leaf components should never accept draggable children, while authored subcomponents remain the main nesting surface for future composition growth
 - movable `piece` and `token` templates should remain directly visible in that outline even when they live inside a nested `resource-pile`, so creators can treat them as first-class authored resources
 - movable nested pieces/tokens should not appear inside the permanent nested-layout canvas
 - use a permanent nested `resource-pile` when a component needs a visible region where movable resources gather

@@ -3,9 +3,12 @@ import { z } from 'zod';
 
 export const builtInComponentTypeSchema = z.enum([
   'board',
+  'card',
   'space',
   'track',
   'text-box',
+  'image-area',
+  'network',
   'hex-grid',
   'square-grid',
   'checkerboard-grid',
@@ -21,6 +24,8 @@ export const builtInComponentTypeSchema = z.enum([
   'score-track',
 ]);
 
+export const structuralRoleSchema = z.enum(['top-level', 'sub-component', 'leaf']);
+export const componentAuthoringDiscoverabilitySchema = z.enum(['primary', 'hidden']);
 export const componentCategorySchema = z.enum(['container', 'collection', 'entity', 'counter']);
 export const componentSurfaceSchema = z.enum([
   'board',
@@ -81,6 +86,10 @@ export const componentPropertyDefinitionSchema = z.object({
   options: z.array(z.string().trim().min(1)).optional(),
 });
 
+export const componentAuthoringMetadataSchema = z.object({
+  discoverability: componentAuthoringDiscoverabilitySchema,
+});
+
 export const componentRenderHintsSchema = z.object({
   surface: componentSurfaceSchema,
   layout: componentLayoutSchema,
@@ -112,7 +121,7 @@ export const componentVisibilityDefaultsSchema = z.object({
 export const componentSlotDefinitionSchema = z.object({
   id: z.string().trim().min(1),
   label: z.string().trim().min(1),
-  acceptsCategories: z.array(componentCategorySchema),
+  acceptsRoles: z.array(structuralRoleSchema),
   acceptsTypes: z.array(z.string().trim().min(1)),
   minChildren: z.number().int().nonnegative(),
   maxChildren: z.number().int().positive().nullable(),
@@ -125,9 +134,9 @@ export const componentCompositionSchema = z.object({
 
 export const componentPlacementConstraintsSchema = z.object({
   requiresParent: z.boolean(),
-  allowedParentCategories: z.array(componentCategorySchema),
+  allowedParentRoles: z.array(structuralRoleSchema),
   allowedParentTypes: z.array(z.string().trim().min(1)),
-  allowedChildCategories: z.array(componentCategorySchema),
+  allowedChildRoles: z.array(structuralRoleSchema),
   allowedChildTypes: z.array(z.string().trim().min(1)),
   minChildren: z.number().int().nonnegative(),
   maxChildren: z.number().int().nonnegative().nullable(),
@@ -136,7 +145,7 @@ export const componentPlacementConstraintsSchema = z.object({
 export const componentOccupancyRulesSchema = z.object({
   mode: componentOccupancyModeSchema,
   capacity: z.number().int().nonnegative().nullable(),
-  occupantCategories: z.array(componentCategorySchema),
+  occupantRoles: z.array(structuralRoleSchema),
   occupantTypes: z.array(z.string().trim().min(1)),
   allowMixedOccupants: z.boolean(),
   allowSharedControl: z.boolean(),
@@ -151,6 +160,8 @@ export const zodSchemaSchema = z.custom<z.ZodTypeAny>(
 export const componentManifestSchema = z.object({
   type: z.string().trim().min(1),
   category: componentCategorySchema,
+  role: structuralRoleSchema,
+  authoring: componentAuthoringMetadataSchema,
   displayName: z.string().trim().min(1),
   description: z.string().trim().min(1),
   propertyDefinitions: z.record(z.string(), componentPropertyDefinitionSchema),
@@ -189,6 +200,8 @@ export const componentFrameSchema = z.object({
   width: z.number().positive(),
   height: z.number().positive(),
   background: z.string().trim().min(1).nullable(),
+  textureId: z.enum(['none', 'felt', 'wood', 'marble', 'leather', 'stone', 'sand', 'metal', 'water', 'grass']).nullable().optional(),
+  textureOpacity: z.number().min(0).max(1).optional(),
   borderColor: z.string().trim().min(1).nullable(),
   borderWidth: z.number().nonnegative(),
   borderRadius: z.number().nonnegative(),
@@ -198,7 +211,9 @@ export const componentInstanceSchema = z.object({
   instanceId: z.string().trim().min(1),
   componentType: z.string().trim().min(1),
   category: componentCategorySchema,
+  role: structuralRoleSchema,
   displayName: z.string().trim().min(1).optional(),
+  notes: z.string().optional(),
   properties: z.record(z.string(), z.unknown()),
   children: z.array(z.string().trim().min(1)),
   parentId: z.string().trim().min(1).nullable(),

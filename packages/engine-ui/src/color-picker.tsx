@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 export interface PaletteColorOption {
   id: string;
@@ -328,7 +329,7 @@ export function ProjectColorPicker({
         )}
       </button>
 
-      {open ? (
+      {open ? createPortal(
         <div
           ref={popupRef}
           style={{
@@ -497,7 +498,8 @@ export function ProjectColorPicker({
               </div>
             </div>
           ) : null}
-        </div>
+        </div>,
+        document.body,
       ) : null}
     </div>
   );

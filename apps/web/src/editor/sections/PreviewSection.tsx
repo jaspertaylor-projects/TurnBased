@@ -44,6 +44,31 @@ const EMPTY_SELECTION: UISelectionState = {
   subChoiceSelections: {},
 };
 
+function renderImageAreaContent(properties: Record<string, unknown>) {
+  const imageUrl = typeof properties.imageUrl === 'string' ? properties.imageUrl.trim() : '';
+  const opacity = typeof properties.opacity === 'number' ? properties.opacity : 1;
+  const objectFit = properties.objectFit === 'cover' || properties.objectFit === 'fill' ? properties.objectFit : 'contain';
+
+  if (!imageUrl) {
+    return <span style={{ color: '#94a3b8', fontSize: '0.82rem' }}>No image</span>;
+  }
+
+  return (
+    <img
+      src={imageUrl}
+      alt=""
+      draggable={false}
+      style={{
+        width: '100%',
+        height: '100%',
+        objectFit,
+        opacity,
+        pointerEvents: 'none',
+      }}
+    />
+  );
+}
+
 export function PreviewSection({
   project,
   boardInstances,
@@ -392,6 +417,17 @@ export function PreviewSection({
                   emptyPlaceholder="Add text in the component editor."
                 />
               )
+              : child.componentType === 'image-area'
+              ? renderImageAreaContent(child.properties)
+              : child.componentType === 'card'
+              ? (
+                <div style={{ display: 'grid', gap: '0.45rem', color: '#064e3b' }}>
+                  <strong style={{ fontSize: '0.92rem' }}>{String(child.properties.title ?? child.properties.label ?? 'Card')}</strong>
+                  <span style={{ fontSize: '0.8rem', color: '#0f766e', lineHeight: 1.5 }}>
+                    {String(child.properties.subtitle ?? 'Card text')}
+                  </span>
+                </div>
+              )
               : isGrid
               ? (() => {
                 const gridCells = getBoardGridCells(child);
@@ -478,7 +514,7 @@ export function PreviewSection({
         showItemHeader={false}
         emptyState={(
           <div style={{ maxWidth: '320px', display: 'grid', gap: '0.55rem', color: '#0f766e' }}>
-            <strong style={{ color: '#064e3b' }}>Add spaces, tracks, or board grids to the editor</strong>
+            <strong style={{ color: '#064e3b' }}>Add board subcomponents like spaces, cards, tracks, networks, or grids</strong>
             <span>The preview board mirrors that authored board surface directly.</span>
           </div>
         )}

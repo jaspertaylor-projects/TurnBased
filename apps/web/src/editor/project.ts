@@ -428,7 +428,8 @@ export function addProjectComponent(
   ownerId: string | null,
 ): { project: EditorProject; issue?: string; instanceId?: string } {
   const manifest = getBuiltInComponentManifest(type);
-  const parentManifest = parentId ? getBuiltInComponentManifest(project.instances[parentId].componentType as BuiltInComponentType) : null;
+  const resolvedParentId = manifest.role === 'top-level' ? null : parentId;
+  const parentManifest = resolvedParentId ? getBuiltInComponentManifest(project.instances[resolvedParentId].componentType as BuiltInComponentType) : null;
   const placementValidation = validateComponentPlacement(manifest, parentManifest);
 
   if (!placementValidation.valid) {
@@ -441,9 +442,9 @@ export function addProjectComponent(
   const instanceId = generateId(`component_${type}`);
   const instance = createComponentInstance(manifest, {
     instanceId: createComponentInstanceId(instanceId),
-    displayName: inferDisplayName(type, countSiblings(project, parentId, type)),
-    parentId: parentId ? createComponentInstanceId(parentId) : null,
-    placement: inferPlacement(project, type, parentId),
+    displayName: inferDisplayName(type, countSiblings(project, resolvedParentId, type)),
+    parentId: resolvedParentId ? createComponentInstanceId(resolvedParentId) : null,
+    placement: inferPlacement(project, type, resolvedParentId),
     bindings: ownerId ? { ownerId: createPlayerId(ownerId) } : {},
   });
 
@@ -452,11 +453,11 @@ export function addProjectComponent(
     [instanceId]: instance,
   };
 
-  if (parentId) {
-    nextInstances[parentId] = addChildReference(project.instances[parentId], instanceId);
+  if (resolvedParentId) {
+    nextInstances[resolvedParentId] = addChildReference(project.instances[resolvedParentId], instanceId);
   }
 
-  const nextRootInstanceIds = parentId
+  const nextRootInstanceIds = resolvedParentId
     ? project.rootInstanceIds
     : [...project.rootInstanceIds, instanceId];
 
@@ -499,6 +500,9 @@ export function syncGeneratedBoardChildren(project: EditorProject, instanceId: s
   const existingCellIds = instance.children
     .map(String)
     .filter((childId) => project.instances[childId]?.componentType === 'space');
+  const preservedChildIds = instance.children
+    .map(String)
+    .filter((childId) => project.instances[childId]?.componentType !== 'space');
   const existingCellsByCoordinate = new Map(
     existingCellIds.map((childId) => {
       const child = project.instances[childId];
@@ -575,7 +579,7 @@ export function syncGeneratedBoardChildren(project: EditorProject, instanceId: s
       ...nextInstances,
       [instanceId]: {
         ...instance,
-        children: nextChildIds.map((childId) => createComponentInstanceId(childId)),
+        children: [...nextChildIds, ...preservedChildIds].map((childId) => createComponentInstanceId(childId)),
       },
     },
   });
@@ -627,6 +631,10 @@ export function removeComponentInstance(project: EditorProject, instanceId: stri
 
 export function listValidParents(project: EditorProject, type: BuiltInComponentType): ComponentInstanceModel[] {
   const manifest = getBuiltInComponentManifest(type);
+
+  if (manifest.role === 'top-level') {
+    return [];
+  }
 
   return Object.values(project.instances).filter((instance) => {
     const parentManifest = getBuiltInComponentManifest(instance.componentType as BuiltInComponentType);

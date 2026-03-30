@@ -8,6 +8,7 @@ import {
   builtInCatalog,
   createComponentInstance,
   getBuiltInComponentManifest,
+  listAuthorableBuiltInComponents,
   listBuiltInComponents,
   validateComponentOccupancy,
   validateComponentPlacement,
@@ -18,13 +19,28 @@ describe('engine-components catalog', () => {
   it('exposes the full built-in catalog grouped across categories', () => {
     const allComponents = listBuiltInComponents();
     const collectionComponents = listBuiltInComponents('collection');
+    const authorableComponents = listAuthorableBuiltInComponents();
 
     expect(allComponents.map((component) => component.type)).toContain('text-box');
+    expect(allComponents.map((component) => component.type)).toContain('card');
     expect(collectionComponents.map((component) => component.type)).toEqual([
       'deck',
       'hand',
       'discard',
       'bag',
+    ]);
+    expect(authorableComponents.map((component) => component.type)).toEqual([
+      'board',
+      'card',
+      'space',
+      'hex-grid',
+      'square-grid',
+      'track',
+      'text-box',
+      'deck',
+      'piece',
+      'image-area',
+      'network',
     ]);
   });
 
@@ -54,6 +70,7 @@ describe('engine-components catalog', () => {
     });
 
     expect(board.properties.label).toBe('Board');
+    expect(board.notes).toBe('');
     expect(space.properties.terrain).toBe('plain');
     expect(piece.properties.size).toBe('medium');
     expect(getBuiltInComponentManifest('text-box').propertiesSchema.parse({}).fontSize).toBe(22);
@@ -66,14 +83,26 @@ describe('engine-components catalog', () => {
     ).toBe(true);
     expect(
       validateComponentPlacement(
-        getBuiltInComponentManifest('deck'),
-        getBuiltInComponentManifest('space'),
+        getBuiltInComponentManifest('card'),
+        null,
     ).valid,
     ).toBe(false);
     expect(
       validateComponentPlacement(
         getBuiltInComponentManifest('text-box'),
         getBuiltInComponentManifest('board'),
+      ).valid,
+    ).toBe(true);
+    expect(
+      validateComponentPlacement(
+        getBuiltInComponentManifest('card'),
+        getBuiltInComponentManifest('deck'),
+      ).valid,
+    ).toBe(true);
+    expect(
+      validateComponentPlacement(
+        getBuiltInComponentManifest('image-area'),
+        getBuiltInComponentManifest('card'),
       ).valid,
     ).toBe(true);
   });
@@ -99,23 +128,21 @@ describe('engine-components catalog', () => {
     expect(grid.properties.cellBorderRadius).toBe(12);
   });
 
-  it('enforces occupancy defaults for spaces and score tracks', () => {
+  it('allows leaf decorations in spaces while still enforcing score-track limits', () => {
     const ownerA = createPlayerId('player_a');
     const ownerB = createPlayerId('player_b');
     const spaceRules = validateComponentOccupancy(getBuiltInComponentManifest('space'), {
-      occupantTypes: ['piece', 'token'],
-      occupantCategories: ['entity', 'entity'],
+      occupantTypes: ['text-box', 'image-area'],
+      occupantRoles: ['leaf', 'leaf'],
       occupantOwnerIds: [ownerA, ownerB],
     });
     const scoreTrackRules = validateComponentOccupancy(getBuiltInComponentManifest('score-track'), {
       occupantTypes: ['token', 'token'],
-      occupantCategories: ['entity', 'entity'],
+      occupantRoles: ['leaf', 'leaf'],
       occupantOwnerIds: [ownerA, ownerA],
     });
 
-    expect(spaceRules.valid).toBe(false);
-    expect(spaceRules.issues.map((issue) => issue.code)).toContain('occupancy_capacity_exceeded');
-    expect(spaceRules.issues.map((issue) => issue.code)).toContain('occupancy_mixed_types_not_allowed');
+    expect(spaceRules.valid).toBe(true);
     expect(scoreTrackRules.valid).toBe(false);
     expect(scoreTrackRules.issues.map((issue) => issue.code)).toContain(
       'occupancy_per_player_limit_exceeded',

@@ -21,6 +21,7 @@ export {
   validateAISelection,
 } from './runner';
 export {
+  aiRulesComponentInstanceNoteSummarySchema,
   aiOutputEnvelopeSchema,
   aiOutputParametersSchema,
   aiRulesComponentManifestSummarySchema,
@@ -36,6 +37,7 @@ export type {
   AIInputEnvelopeOptions,
   AIOutputEnvelope,
   AIOutputParameters,
+  AIRulesComponentInstanceNoteSummary,
   AIPlayerInfo,
   AIRulesComponentManifestSummary,
   AIRulesDocument,

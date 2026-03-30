@@ -46,6 +46,13 @@ export const aiRulesComponentManifestSummarySchema = z.object({
   tags: z.array(z.string().trim().min(1)).optional(),
 });
 
+export const aiRulesComponentInstanceNoteSummarySchema = z.object({
+  instanceId: z.string().trim().min(1),
+  componentType: z.string().trim().min(1),
+  displayName: z.string().trim().min(1),
+  notes: z.string().trim().min(1),
+});
+
 export const aiSeatBudgetConfigSchema = z.object({
   maxPromptTokens: z.number().int().nonnegative(),
   maxCompletionTokens: z.number().int().nonnegative(),

@@ -63,6 +63,18 @@ export function listBuiltInComponents(category?: ComponentManifest['category']):
   return manifests.filter((manifest) => manifest.category === category);
 }
 
+export function listAuthorableBuiltInComponents(role?: ComponentManifest['role']): ComponentManifest[] {
+  const manifests = Object.values(builtInComponentCatalog).filter((manifest) => (
+    manifest.authoring.discoverability === 'primary'
+  ));
+
+  if (!role) {
+    return manifests;
+  }
+
+  return manifests.filter((manifest) => manifest.role === role);
+}
+
 export function createComponentInstance<TProperties extends Record<string, unknown>>(
   manifest: ComponentManifest<TProperties>,
   options: CreateComponentInstanceOptions<TProperties>,
@@ -78,7 +90,9 @@ export function createComponentInstance<TProperties extends Record<string, unkno
     instanceId: options.instanceId,
     componentType: manifest.type,
     category: manifest.category,
+    role: manifest.role,
     displayName: options.displayName,
+    notes: options.notes ?? '',
     properties: mergedProperties,
     children: options.children ?? [],
     parentId: options.parentId ?? null,
@@ -115,12 +129,12 @@ export function validateComponentPlacement(
   }
 
   if (
-    hasRestrictions(childManifest.placementConstraints.allowedParentCategories) &&
-    !childManifest.placementConstraints.allowedParentCategories.includes(parentManifest.category)
+    hasRestrictions(childManifest.placementConstraints.allowedParentRoles) &&
+    !childManifest.placementConstraints.allowedParentRoles.includes(parentManifest.role)
   ) {
     pushIssue(issues, {
-      code: 'parent_category_not_allowed',
-      message: `${childManifest.type} cannot be placed inside category ${parentManifest.category}.`,
+      code: 'parent_role_not_allowed',
+      message: `${childManifest.type} cannot be placed inside role ${parentManifest.role}.`,
     });
   }
 
@@ -135,12 +149,12 @@ export function validateComponentPlacement(
   }
 
   if (
-    hasRestrictions(parentManifest.placementConstraints.allowedChildCategories) &&
-    !parentManifest.placementConstraints.allowedChildCategories.includes(childManifest.category)
+    hasRestrictions(parentManifest.placementConstraints.allowedChildRoles) &&
+    !parentManifest.placementConstraints.allowedChildRoles.includes(childManifest.role)
   ) {
     pushIssue(issues, {
-      code: 'child_category_not_allowed',
-      message: `${parentManifest.type} cannot contain category ${childManifest.category}.`,
+      code: 'child_role_not_allowed',
+      message: `${parentManifest.type} cannot contain role ${childManifest.role}.`,
     });
   }
 
@@ -165,7 +179,7 @@ export function validateComponentOccupancy(
   context: OccupancyValidationContext,
 ): ComponentValidationResult & { remainingCapacity: number | null } {
   const issues: ComponentValidationIssue[] = [];
-  const { occupantTypes, occupantCategories, occupantOwnerIds = [] } = context;
+  const { occupantTypes, occupantRoles, occupantOwnerIds = [] } = context;
   const rules = containerManifest.occupancyRules;
 
   if (rules.mode === 'none' && occupantTypes.length > 0) {
@@ -182,14 +196,14 @@ export function validateComponentOccupancy(
     });
   }
 
-  for (const category of occupantCategories) {
+  for (const role of occupantRoles) {
     if (
-      hasRestrictions(rules.occupantCategories) &&
-      !rules.occupantCategories.includes(category)
+      hasRestrictions(rules.occupantRoles) &&
+      !rules.occupantRoles.includes(role)
     ) {
       pushIssue(issues, {
-        code: 'occupancy_category_not_allowed',
-        message: `${containerManifest.type} cannot contain occupant category ${category}.`,
+        code: 'occupancy_role_not_allowed',
+        message: `${containerManifest.type} cannot contain occupant role ${role}.`,
       });
     }
   }
@@ -348,7 +362,7 @@ export function validateComponentTree(
 
     const occupancyResult = validateComponentOccupancy(manifest, {
       occupantTypes: childInstances.map((child) => child.componentType),
-      occupantCategories: childInstances.map((child) => child.category),
+      occupantRoles: childInstances.map((child) => child.role),
       occupantOwnerIds: childInstances.map((child) => child.bindings.ownerId),
     });
 

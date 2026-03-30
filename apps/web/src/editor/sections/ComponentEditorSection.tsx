@@ -1,14 +1,19 @@
-import { getBuiltInComponentManifest, listBuiltInComponents } from '@turnbased/engine-components';
+import {
+  getBuiltInComponentManifest,
+  listAuthorableBuiltInComponents,
+  validateComponentPlacement,
+} from '@turnbased/engine-components';
 import type {
   BuiltInComponentType,
   ComponentInstanceModel,
+  StructuralRole,
 } from '@turnbased/engine-components';
 import { createPlayerId } from '@turnbased/shared-types';
 
 import { NumericInput } from '../../components/NumericInput';
 import { TreeItem } from '../TreeItem';
 import { parsePropertyValue } from '../helpers';
-import { inputStyle, labelStyle, mutedTextStyle, panelStyle, sectionTitleStyle } from '../styles';
+import { inputStyle, labelStyle, mutedTextStyle, panelStyle, sectionTitleStyle, textareaStyle } from '../styles';
 import type { EditorProject } from '../types';
 
 export function ComponentEditorSection({
@@ -32,7 +37,12 @@ export function ComponentEditorSection({
   onUpdateSelectedComponent: (updater: (instance: ComponentInstanceModel) => ComponentInstanceModel) => void;
   onRemoveSelectedComponent: () => void;
 }) {
-  const availablePalette = listBuiltInComponents();
+  const availablePalette = listAuthorableBuiltInComponents();
+  const paletteGroups: Array<{ role: StructuralRole; label: string; description: string }> = [
+    { role: 'top-level', label: 'Top-Level', description: 'Root assets that only live at the workspace surface.' },
+    { role: 'sub-component', label: 'Subcomponents', description: 'Reusable building blocks that can nest inside authored structures.' },
+    { role: 'leaf', label: 'Leaf Components', description: 'Decoration and content blocks with no draggable children.' },
+  ];
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 360px) minmax(0, 1fr)', gap: '1rem' }}>
@@ -51,23 +61,64 @@ export function ComponentEditorSection({
             </select>
           </label>
 
-          <div style={{ display: 'grid', gap: '0.55rem' }}>
-            {availablePalette.map((manifest) => (
-              <button
-                key={manifest.type}
-                onClick={() => onAddComponent(manifest.type as BuiltInComponentType)}
-                style={{
-                  textAlign: 'left',
-                  padding: '0.75rem 0.8rem',
-                  borderRadius: '14px',
-                  border: '1px solid rgba(15,118,110,0.12)',
-                  background: 'rgba(255,255,255,0.82)',
-                }}
-              >
-                <div style={{ fontWeight: 700, color: '#064e3b' }}>{manifest.displayName}</div>
-                <div style={{ fontSize: '0.8rem', color: '#0f766e' }}>{manifest.description}</div>
-              </button>
-            ))}
+          <div style={{ display: 'grid', gap: '0.75rem' }}>
+            {paletteGroups.map((group) => {
+              const groupManifests = availablePalette.filter((manifest) => manifest.role === group.role);
+              if (groupManifests.length === 0) {
+                return null;
+              }
+
+              return (
+                <div key={group.role} style={{ display: 'grid', gap: '0.45rem' }}>
+                  <div style={{ display: 'grid', gap: '0.1rem' }}>
+                    <div style={{ fontSize: '0.74rem', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#0f766e' }}>
+                      {group.label}
+                    </div>
+                    <div style={{ fontSize: '0.76rem', color: '#0f766e' }}>{group.description}</div>
+                  </div>
+
+                  <div style={{ display: 'grid', gap: '0.55rem' }}>
+                    {groupManifests.map((manifest) => {
+                      const validParentCount = Object.values(project.instances).filter((instance) => {
+                        const parentManifest = getBuiltInComponentManifest(instance.componentType as BuiltInComponentType);
+                        return validateComponentPlacement(manifest, parentManifest).valid;
+                      }).length;
+                      const isBlocked = manifest.placementConstraints.requiresParent && validParentCount === 0;
+
+                      return (
+                        <button
+                          key={manifest.type}
+                          onClick={() => onAddComponent(manifest.type as BuiltInComponentType)}
+                          disabled={isBlocked}
+                          style={{
+                            textAlign: 'left',
+                            padding: '0.75rem 0.8rem',
+                            borderRadius: '14px',
+                            border: '1px solid rgba(15,118,110,0.12)',
+                            background: isBlocked ? 'rgba(241,245,249,0.9)' : 'rgba(255,255,255,0.82)',
+                            opacity: isBlocked ? 0.72 : 1,
+                            cursor: isBlocked ? 'not-allowed' : 'pointer',
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.6rem', alignItems: 'baseline' }}>
+                            <div style={{ fontWeight: 700, color: '#064e3b' }}>{manifest.displayName}</div>
+                            <div style={{ fontSize: '0.72rem', color: '#0f766e', whiteSpace: 'nowrap' }}>
+                              {manifest.role}
+                            </div>
+                          </div>
+                          <div style={{ fontSize: '0.8rem', color: '#0f766e' }}>{manifest.description}</div>
+                          {isBlocked ? (
+                            <div style={{ fontSize: '0.76rem', color: '#b45309', marginTop: '0.35rem' }}>
+                              Add a compatible parent first.
+                            </div>
+                          ) : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
@@ -107,6 +158,19 @@ export function ComponentEditorSection({
                   displayName: event.target.value,
                 }))}
                 style={inputStyle}
+              />
+            </label>
+
+            <label style={{ ...labelStyle, marginBottom: '0.75rem' }}>
+              Notes
+              <textarea
+                value={selectedComponent.notes ?? ''}
+                onChange={(event) => onUpdateSelectedComponent((instance) => ({
+                  ...instance,
+                  notes: event.target.value,
+                }))}
+                placeholder="Design intent, rule reminders, AI context, or implementation notes for this component."
+                style={textareaStyle}
               />
             </label>
 

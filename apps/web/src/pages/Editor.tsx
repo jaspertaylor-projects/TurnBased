@@ -42,6 +42,17 @@ import { createWorkspaceFiles } from '../editor/shipping';
 import { saveProjectWorkspace } from '../editor/workspace';
 
 const PENDING_EDITOR_NOTICE_KEY = 'turnbased.creator.pendingEditorNotice';
+const PREVIEW_ZONE_COMPONENT_TYPES = new Set([
+  'space',
+  'zone',
+  'resource-pile',
+  'track',
+  'deck',
+  'hand',
+  'discard',
+  'bag',
+  'score-track',
+]);
 
 function isMovableTemplateType(componentType: string): boolean {
   return componentType === 'piece' || componentType === 'token';
@@ -167,7 +178,10 @@ export const Editor = () => {
   const currentRuntime = runtime;
   const currentSectionMeta = SECTION_OPTIONS.find((section) => section.id === activeSection) ?? SECTION_OPTIONS[0];
   const boardInstances = currentProject.rootInstanceIds.filter((instanceId) => currentProject.instances[instanceId]?.componentType === 'board');
-  const topLevelSupportZones = currentProject.rootInstanceIds.filter((instanceId) => currentProject.instances[instanceId]?.componentType !== 'board');
+  const topLevelSupportZones = currentProject.rootInstanceIds.filter((instanceId) => {
+    const componentType = currentProject.instances[instanceId]?.componentType;
+    return componentType ? PREVIEW_ZONE_COMPONENT_TYPES.has(componentType) : false;
+  });
   const componentOutlineIds = listComponentOutlineIds(currentProject);
   const selectedOutlineComponentId = findComponentOutlineId(currentProject, resolvedSelectedComponentId);
   const gitStatus = getProjectGitStatus(currentProject, currentRuntime);

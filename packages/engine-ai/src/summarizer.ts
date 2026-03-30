@@ -2,6 +2,7 @@ import type { PhaseDefinition } from '@turnbased/engine-core';
 
 import type {
   AIInputEnvelope,
+  AIRulesComponentInstanceNoteSummary,
   AIInputEnvelopeOptions,
   AIRulesComponentManifestSummary,
   AIRulesDocument,
@@ -46,6 +47,19 @@ function summarizeComponents(
 
       return fragments.join(' ');
     })
+    .join('; ');
+}
+
+function summarizeComponentNotes(
+  componentNotes: readonly AIRulesComponentInstanceNoteSummary[],
+): string | null {
+  if (componentNotes.length === 0) {
+    return null;
+  }
+
+  return componentNotes
+    .slice(0, 8)
+    .map((componentNote) => `${componentNote.displayName} (${componentNote.componentType}): ${componentNote.notes}`)
     .join('; ');
 }
 
@@ -137,6 +151,13 @@ export function summarizeRulesForAI(
     const componentSummary = summarizeComponents(source.componentManifests);
     if (componentSummary) {
       sections.push(`Components: ${componentSummary}`);
+    }
+  }
+
+  if (source.componentInstanceNotes?.length) {
+    const componentNotesSummary = summarizeComponentNotes(source.componentInstanceNotes);
+    if (componentNotesSummary) {
+      sections.push(`Component notes: ${componentNotesSummary}`);
     }
   }
 

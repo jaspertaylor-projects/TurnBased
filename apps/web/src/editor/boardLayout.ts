@@ -21,54 +21,14 @@ export function isBoardGridComponentType(componentType: string): componentType i
 }
 
 export function isBoardAuthorableComponentType(componentType: string): boolean {
-  return componentType === 'space'
+  return componentType === 'card'
+    || componentType === 'image-area'
+    || componentType === 'network'
+    || componentType === 'space'
     || componentType === 'track'
     || componentType === 'text-box'
     || componentType === 'hex-grid'
     || componentType === 'square-grid';
-}
-
-export interface GridCellAppearance {
-  background: string;
-  textureId: BoardSurfaceTextureId | null;
-  textureOpacity: number;
-  borderColor: string | null;
-  borderWidth?: number;
-  borderRadius?: number;
-}
-
-export function getBoardGridCells(instance: ComponentInstanceModel): GridCellCoordinate[] {
-  const fallbackRows = typeof instance.properties.rows === 'number' && Number.isFinite(instance.properties.rows)
-    ? Math.max(1, Math.trunc(instance.properties.rows))
-    : 1;
-  const fallbackColumns = typeof instance.properties.columns === 'number' && Number.isFinite(instance.properties.columns)
-    ? Math.max(1, Math.trunc(instance.properties.columns))
-    : 1;
-
-  return readGridCellCoordinates(instance.properties.cells, fallbackRows, fallbackColumns);
-}
-
-export function getGridCellAppearance(instance: ComponentInstanceModel): GridCellAppearance {
-  return {
-    background: typeof instance.properties.cellBackground === 'string' && instance.properties.cellBackground.trim().length > 0
-      ? instance.properties.cellBackground
-      : 'rgba(255,255,255,0.92)',
-    textureId: typeof instance.properties.cellTextureId === 'string' && instance.properties.cellTextureId !== 'none'
-      ? instance.properties.cellTextureId as BoardSurfaceTextureId
-      : null,
-    textureOpacity: typeof instance.properties.cellTextureOpacity === 'number'
-      ? instance.properties.cellTextureOpacity
-      : 0.3,
-    borderColor: typeof instance.properties.cellBorderColor === 'string' && instance.properties.cellBorderColor.trim().length > 0
-      ? instance.properties.cellBorderColor
-      : null,
-    borderWidth: typeof instance.properties.cellBorderWidth === 'number'
-      ? instance.properties.cellBorderWidth
-      : undefined,
-    borderRadius: typeof instance.properties.cellBorderRadius === 'number'
-      ? instance.properties.cellBorderRadius
-      : undefined,
-  };
 }
 
 export function defaultBoardItemFrame(componentType: string, index: number): ComponentFrame {
@@ -76,6 +36,39 @@ export function defaultBoardItemFrame(componentType: string, index: number): Com
   const baseY = 28 + (Math.floor(index / 3) * 98);
 
   switch (componentType) {
+    case 'card':
+      return {
+        x: baseX,
+        y: baseY,
+        width: 168,
+        height: 236,
+        background: 'rgba(255,255,255,0.96)',
+        borderColor: 'rgba(15,118,110,0.18)',
+        borderWidth: 1,
+        borderRadius: 20,
+      };
+    case 'image-area':
+      return {
+        x: baseX,
+        y: baseY,
+        width: 180,
+        height: 132,
+        background: 'rgba(255,255,255,0.92)',
+        borderColor: 'rgba(15,118,110,0.16)',
+        borderWidth: 1,
+        borderRadius: 18,
+      };
+    case 'network':
+      return {
+        x: baseX,
+        y: baseY,
+        width: 260,
+        height: 180,
+        background: 'rgba(239,246,255,0.94)',
+        borderColor: 'rgba(59,130,246,0.18)',
+        borderWidth: 1,
+        borderRadius: 22,
+      };
     case 'space':
       return {
         x: baseX,
@@ -177,6 +170,48 @@ export function defaultBoardItemFrame(componentType: string, index: number): Com
         borderRadius: 18,
       };
   }
+}
+export interface GridCellAppearance {
+  background: string;
+  textureId: BoardSurfaceTextureId | null;
+  textureOpacity: number;
+  borderColor: string | null;
+  borderWidth?: number;
+  borderRadius?: number;
+}
+
+export function getBoardGridCells(instance: ComponentInstanceModel): GridCellCoordinate[] {
+  const fallbackRows = typeof instance.properties.rows === 'number' && Number.isFinite(instance.properties.rows)
+    ? Math.max(1, Math.trunc(instance.properties.rows))
+    : 1;
+  const fallbackColumns = typeof instance.properties.columns === 'number' && Number.isFinite(instance.properties.columns)
+    ? Math.max(1, Math.trunc(instance.properties.columns))
+    : 1;
+
+  return readGridCellCoordinates(instance.properties.cells, fallbackRows, fallbackColumns);
+}
+
+export function getGridCellAppearance(instance: ComponentInstanceModel): GridCellAppearance {
+  return {
+    background: typeof instance.properties.cellBackground === 'string' && instance.properties.cellBackground.trim().length > 0
+      ? instance.properties.cellBackground
+      : 'rgba(255,255,255,0.92)',
+    textureId: typeof instance.properties.cellTextureId === 'string' && instance.properties.cellTextureId !== 'none'
+      ? instance.properties.cellTextureId as BoardSurfaceTextureId
+      : null,
+    textureOpacity: typeof instance.properties.cellTextureOpacity === 'number'
+      ? instance.properties.cellTextureOpacity
+      : 0.3,
+    borderColor: typeof instance.properties.cellBorderColor === 'string' && instance.properties.cellBorderColor.trim().length > 0
+      ? instance.properties.cellBorderColor
+      : null,
+    borderWidth: typeof instance.properties.cellBorderWidth === 'number'
+      ? instance.properties.cellBorderWidth
+      : undefined,
+    borderRadius: typeof instance.properties.cellBorderRadius === 'number'
+      ? instance.properties.cellBorderRadius
+      : undefined,
+  };
 }
 
 export function clampBoardItemFrame(frame: ComponentFrame): ComponentFrame {

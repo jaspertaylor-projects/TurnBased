@@ -99,6 +99,13 @@ export interface AIRulesComponentManifestSummary {
   tags?: string[];
 }
 
+export interface AIRulesComponentInstanceNoteSummary {
+  instanceId: string;
+  componentType: string;
+  displayName: string;
+  notes: string;
+}
+
 export interface AIRulesSummarySource {
   gameDefinition?: Pick<
     GameDefinition,
@@ -107,6 +114,7 @@ export interface AIRulesSummarySource {
   rulesText?: string;
   documents?: AIRulesDocument[];
   componentManifests?: AIRulesComponentManifestSummary[];
+  componentInstanceNotes?: AIRulesComponentInstanceNoteSummary[];
   additionalNotes?: string[];
 }
 

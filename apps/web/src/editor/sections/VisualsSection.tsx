@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent } from 'react';
-import { ChevronRight, Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import {
   BOARD_BORDER_STYLE_OPTIONS,
   getBoardComponentPreset,
@@ -41,7 +41,7 @@ import {
   resizeBoardItemFrame,
 } from '../boardLayout';
 import { parsePropertyValue } from '../helpers';
-import { inputStyle, labelStyle, mutedTextStyle, panelStyle, sectionTitleStyle } from '../styles';
+import { inputStyle, labelStyle, mutedTextStyle, panelStyle, sectionTitleStyle, textareaStyle } from '../styles';
 import type { EditorProject } from '../types';
 
 function getComponentLabel(project: EditorProject, instanceId: string): string {
@@ -54,22 +54,32 @@ function getComponentLabel(project: EditorProject, instanceId: string): string {
   return String(instance.properties.label ?? instance.displayName ?? manifest.displayName);
 }
 
-function getComponentPath(project: EditorProject, instanceId: string): string[] {
-  const path: string[] = [];
-  let currentId: string | null = instanceId;
+function renderImageAreaContent(properties: Record<string, unknown>) {
+  const imageUrl = typeof properties.imageUrl === 'string' ? properties.imageUrl.trim() : '';
+  const opacity = typeof properties.opacity === 'number' ? properties.opacity : 1;
+  const objectFit = properties.objectFit === 'cover' || properties.objectFit === 'fill' ? properties.objectFit : 'contain';
 
-  while (currentId) {
-    const instance: EditorProject['instances'][string] | undefined = project.instances[currentId];
-    if (!instance) {
-      break;
-    }
-
-    path.unshift(currentId);
-    currentId = instance.parentId ? String(instance.parentId) : null;
+  if (!imageUrl) {
+    return <div style={{ color: '#94a3b8', fontSize: '0.82rem' }}>Set an image URL in the properties panel.</div>;
   }
 
-  return path;
+  return (
+    <img
+      src={imageUrl}
+      alt=""
+      draggable={false}
+      style={{
+        width: '100%',
+        height: '100%',
+        objectFit,
+        opacity,
+        pointerEvents: 'none',
+      }}
+    />
+  );
 }
+
+
 
 type BoardInteractionState =
   | null
@@ -133,13 +143,22 @@ const compactInputStyle = {
   fontSize: '0.86rem',
 };
 
-const BOARD_PRESET_FAMILY_ORDER: BoardComponentPresetFamily[] = ['space', 'track', 'text', 'grid'];
+const BOARD_PRESET_FAMILY_ORDER: BoardComponentPresetFamily[] = ['space', 'track', 'grid', 'card', 'network', 'text', 'image'];
+const BOARD_PRESET_ICON_KEYS: Record<BoardComponentPresetFamily, string> = {
+  space: 'space',
+  track: 'track',
+  grid: 'grid',
+  card: 'card',
+  network: 'network',
+  text: 'text-box',
+  image: 'image-area',
+};
 
 export function VisualsSection({
   project,
   selectedComponentId,
   selectedComponent,
-  onSelectComponent,
+  onSelectComponent: _onSelectComponent,
   onAddComponent,
   onUpdateComponent,
   onRemoveComponent,
@@ -193,17 +212,28 @@ export function VisualsSection({
   const resolvedSelectedGridCell = selectedGridCellKey
     ? (selectedGridCells.find((cell) => getGridCoordinateKey(cell) === selectedGridCellKey) ?? null)
     : null;
-  const activeBoardManifest = activeBoard
-    ? getBuiltInComponentManifest(activeBoard.componentType as BuiltInComponentType)
-    : null;
+
+  const activeTargetManifest = useMemo(() => {
+    if (resolvedSelectedGridCell) {
+      return getBuiltInComponentManifest('space');
+    }
+    if (selectedBoardChild) {
+      return getBuiltInComponentManifest(selectedBoardChild.componentType as BuiltInComponentType);
+    }
+    if (activeBoard) {
+      return getBuiltInComponentManifest(activeBoard.componentType as BuiltInComponentType);
+    }
+    return null;
+  }, [resolvedSelectedGridCell, selectedBoardChild, activeBoard]);
+
   const boardPresetGroups = useMemo(() => {
-    if (!activeBoardManifest) {
+    if (!activeTargetManifest) {
       return [] as Array<{ family: BoardComponentPresetFamily; familyLabel: string; presets: BoardComponentPreset[] }>;
     }
 
     const grouped = listBoardComponentPresets().reduce<Map<BoardComponentPresetFamily, BoardComponentPreset[]>>((groups, preset) => {
       const manifest = getBuiltInComponentManifest(preset.componentType);
-      if (!validateComponentPlacement(manifest, activeBoardManifest).valid) {
+      if (!validateComponentPlacement(manifest, activeTargetManifest).valid) {
         return groups;
       }
 
@@ -220,8 +250,8 @@ export function VisualsSection({
         presets: grouped.get(family) ?? [],
       }))
       .filter((group) => group.presets.length > 0);
-  }, [activeBoardManifest]);
-  const selectedPath = activeBoardId ? getComponentPath(project, activeBoardId) : [];
+  }, [activeTargetManifest]);
+
   const paletteOptions = useMemo(() => listProjectPaletteOptions(project), [project]);
   const resolvePaletteColor = (value: string | null | undefined) => (
     resolveProjectPaletteColorValue(project.settings.colorPalette, value) ?? value ?? null
@@ -238,6 +268,18 @@ export function VisualsSection({
   function getPresetFamily(componentType: BuiltInComponentType): BoardComponentPresetFamily | null {
     if (componentType === 'text-box') {
       return 'text';
+    }
+
+    if (componentType === 'image-area') {
+      return 'image';
+    }
+
+    if (componentType === 'card') {
+      return 'card';
+    }
+
+    if (componentType === 'network') {
+      return 'network';
     }
 
     if (componentType === 'hex-grid' || componentType === 'square-grid' || componentType === 'checkerboard-grid') {
@@ -397,13 +439,18 @@ export function VisualsSection({
   }
 
   function addBoardItem(preset: BoardComponentPreset, x?: number, y?: number) {
-    if (!activeBoardId) {
+    const targetParentId = resolvedSelectedBoardChildId || activeBoardId;
+    if (!targetParentId) {
+      return;
+    }
+    const targetParent = project.instances[targetParentId];
+    if (!targetParent) {
       return;
     }
 
-    const childIndex = boardChildIds.length;
+    const childIndex = targetParent.children.length;
     console.debug('[board-editor] add board item', {
-      activeBoardId,
+      targetParentId,
       presetId: preset.id,
       componentType: preset.componentType,
       x,
@@ -411,7 +458,7 @@ export function VisualsSection({
       childIndex,
     });
 
-    const nextInstanceId = onAddComponent(preset.componentType, activeBoardId, {
+    const nextInstanceId = onAddComponent(preset.componentType, targetParentId, {
       focusNewComponent: false,
       initializeComponent: (instance) => applyPresetToInstance(instance, preset, childIndex, {
         x,
@@ -428,7 +475,7 @@ export function VisualsSection({
     }
 
     console.debug('[board-editor] added board item', {
-      activeBoardId,
+      targetParentId,
       instanceId: nextInstanceId,
       presetId: preset.id,
     });
@@ -474,7 +521,7 @@ export function VisualsSection({
       <div style={{ ...panelStyle, minHeight: '360px', display: 'grid', placeItems: 'center', textAlign: 'center' }}>
         <div style={{ maxWidth: '460px', display: 'grid', gap: '0.9rem' }}>
           <div style={{ fontWeight: 800, color: '#064e3b', fontSize: '1.08rem' }}>Board editor is the only active appearance editor right now</div>
-          <p style={mutedTextStyle}>Add a board first. Spaces, tracks, hex grids, and checkerboard grids can then be arranged visually here and will match the preview surface.</p>
+          <p style={mutedTextStyle}>Add a board first. Spaces, tracks, cards, networks, text areas, image areas, and grids can then be arranged visually here and will match the preview surface.</p>
           <div>
             <button
               type="button"
@@ -562,6 +609,17 @@ export function VisualsSection({
             properties={child.properties}
             emptyPlaceholder="Add text, formatting, and :icon_name: tokens in the inspector."
           />
+        )
+        : child.componentType === 'image-area'
+        ? renderImageAreaContent(child.properties)
+        : child.componentType === 'card'
+        ? (
+          <div style={{ display: 'grid', gap: '0.45rem', color: '#064e3b' }}>
+            <strong style={{ fontSize: '0.92rem' }}>{String(child.properties.title ?? child.properties.label ?? 'Card')}</strong>
+            <span style={{ fontSize: '0.8rem', color: '#0f766e', lineHeight: 1.5 }}>
+              {String(child.properties.subtitle ?? 'Add card text in the properties panel.')}
+            </span>
+          </div>
         )
         : isBoardGridComponentType(child.componentType)
         ? (() => {
@@ -655,44 +713,225 @@ export function VisualsSection({
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
       <div style={{ ...panelStyle, display: 'grid', gap: '0.85rem' }}>
-        <div style={{ display: 'grid', gap: '0.35rem' }}>
-              <div style={{ fontSize: '0.78rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#0f766e' }}>
-            Board Editor
-              </div>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.55rem', color: '#064e3b', fontSize: '1.08rem', fontWeight: 800 }}>
-            {renderComponentIcon('board', { size: 18, style: { color: '#064e3b' } })}
-            {getComponentLabel(project, activeBoardId ?? activeBoard.instanceId)}
-          </div>
-          {selectedPath.length > 0 ? (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', alignItems: 'center' }}>
-              {selectedPath.map((instanceId, index) => (
-                <div key={instanceId} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-                  {index > 0 ? <ChevronRight size={14} style={{ color: '#94a3b8' }} /> : null}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', overflow: 'hidden' }}>
+          {(resolvedSelectedBoardChildId || resolvedSelectedGridCell) && (
+            <button
+              type="button"
+              onClick={() => {
+                if (resolvedSelectedGridCell) {
+                  setSelectedGridCellKey(null);
+                } else if (resolvedSelectedBoardChildId) {
+                  clearBoardSelection();
+                }
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '28px',
+                height: '28px',
+                flexShrink: 0,
+                borderRadius: '8px',
+                border: '1px solid rgba(15,118,110,0.15)',
+                background: 'rgba(255,255,255,0.8)',
+                color: '#0f766e',
+                cursor: 'pointer',
+                marginRight: '0.15rem',
+              }}
+              title="Go Up"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M15 18l-6-6 6-6" />
+              </svg>
+            </button>
+          )}
+
+          {(() => {
+            if (resolvedSelectedGridCell && selectedBoardChild && resolvedSelectedBoardChildId) {
+              return (
+                <>
                   <button
                     type="button"
-                    onClick={() => onSelectComponent(instanceId)}
+                    onClick={() => setSelectedGridCellKey(null)}
                     style={{
+                      background: 'none',
                       border: 'none',
-                      borderRadius: '999px',
-                      background: instanceId === activeBoardId ? 'rgba(249,115,22,0.12)' : 'rgba(240,253,244,0.92)',
-                      color: instanceId === activeBoardId ? '#9a3412' : '#065f46',
-                      padding: '0.35rem 0.65rem',
-                      fontSize: '0.8rem',
-                      fontWeight: 700,
+                      padding: 0,
+                      fontSize: '0.9rem',
+                      fontWeight: 500,
+                      color: '#64748b',
+                      cursor: 'pointer',
+                      flexShrink: 10,
+                      minWidth: 0,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      direction: 'rtl',
+                      textAlign: 'left',
                     }}
+                    title={String(selectedBoardChild.displayName || selectedBoardChild.properties.label || 'Component')}
                   >
-                    {getComponentLabel(project, instanceId)}
+                    <span dir="ltr">{String(selectedBoardChild.displayName || selectedBoardChild.properties.label || 'Component')}</span>
                   </button>
-                </div>
-              ))}
-            </div>
-          ) : null}
+                  <span style={{ color: '#94a3b8', fontSize: '0.9rem', flexShrink: 0 }}>›</span>
+                  <span
+                    style={{
+                      flexShrink: 1,
+                      flexGrow: 1,
+                      minWidth: 0,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      direction: 'rtl',
+                      textAlign: 'left',
+                      fontSize: '0.9rem',
+                      fontWeight: 700,
+                      color: '#095c55',
+                    }}
+                    title={`Cell (${resolvedSelectedGridCell.x}, ${resolvedSelectedGridCell.y})`}
+                  >
+                    <span dir="ltr">Cell ({resolvedSelectedGridCell.x}, {resolvedSelectedGridCell.y})</span>
+                  </span>
+                </>
+              );
+            }
+
+            if (selectedBoardChild && resolvedSelectedBoardChildId && activeBoard) {
+              return (
+                <>
+                  <button
+                    type="button"
+                    onClick={clearBoardSelection}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      fontSize: '0.9rem',
+                      fontWeight: 500,
+                      color: '#64748b',
+                      cursor: 'pointer',
+                      flexShrink: 10,
+                      minWidth: 0,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      direction: 'rtl',
+                      textAlign: 'left',
+                    }}
+                    title={String(activeBoard.displayName || activeBoard.properties.label || 'Board')}
+                  >
+                    <span dir="ltr">{String(activeBoard.displayName || activeBoard.properties.label || 'Board')}</span>
+                  </button>
+                  <span style={{ color: '#94a3b8', fontSize: '0.9rem', flexShrink: 0 }}>›</span>
+                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center', flexGrow: 1, minWidth: 0 }}>
+                    <span
+                      style={{
+                        flexShrink: 1,
+                        minWidth: 0,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        direction: 'rtl',
+                        textAlign: 'left',
+                        fontSize: '0.9rem',
+                        fontWeight: 700,
+                        color: '#095c55',
+                      }}
+                      title={String(selectedBoardChild.displayName || selectedBoardChild.properties.label || 'Component')}
+                    >
+                      <span dir="ltr">{String(selectedBoardChild.displayName || selectedBoardChild.properties.label || 'Component')}</span>
+                    </span>
+                    {selectedGridCells.length > 0 && (
+                      <>
+                        <span style={{ fontSize: '0.8rem', color: '#095c55', marginLeft: '0.35rem', flexShrink: 0, pointerEvents: 'none' }}>▼</span>
+                        <select
+                          value=""
+                          onChange={(event) => {
+                            const key = event.target.value;
+                            if (key) {
+                              setSelectedGridCellKey(key);
+                            }
+                          }}
+                          style={{
+                            position: 'absolute',
+                            inset: 0,
+                            opacity: 0,
+                            cursor: 'pointer',
+                            width: '100%',
+                          }}
+                          title="Select Grid Cell"
+                        >
+                          <option value="" disabled hidden>Select Grid Cell</option>
+                          {selectedGridCells.map((cell) => {
+                            const key = getGridCoordinateKey(cell);
+                            return (
+                              <option key={key} value={key}>
+                                Cell ({cell.x}, {cell.y})
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </>
+                    )}
+                  </div>
+                </>
+              );
+            }
+
+            if (activeBoard) {
+              return (
+                <>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontSize: '1.02rem', fontWeight: 800, color: '#064e3b', flexShrink: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {renderComponentIcon('board', { size: 18, style: { color: '#064e3b' } })}
+                    <span>{String(activeBoard.displayName || activeBoard.properties.label || 'Board')}</span>
+                  </div>
+                  {boardChildIds.length > 0 && (
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: '0 0 auto', width: '18px', height: '18px' }}>
+                      <span style={{ fontSize: '0.8rem', color: '#095c55', flexShrink: 0, pointerEvents: 'none' }}>▼</span>
+                      <select
+                        value=""
+                        onChange={(event) => {
+                          const id = event.target.value;
+                          if (id) {
+                            setSelectedBoardChildId(id);
+                            setSelectedGridCellKey(null);
+                          }
+                        }}
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          opacity: 0,
+                          cursor: 'pointer',
+                          width: '100%',
+                          height: '100%',
+                        }}
+                        title="Select Sub Component"
+                      >
+                        <option value="" disabled hidden>Select Sub Component</option>
+                        {boardChildIds.map((id) => {
+                          const child = project.instances[id];
+                          return (
+                            <option key={id} value={id}>
+                              {String(child?.displayName || child?.properties.label || 'Unnamed Component')}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+                  )}
+                </>
+              );
+            }
+
+            return null;
+          })()}
         </div>
 
+        {boardPresetGroups.length > 0 ? (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
           {boardPresetGroups.map((group) => {
             const selectedPreset = getSelectedPresetForFamily(group.family);
-            const groupIconKey = group.family === 'grid' ? 'grid' : group.family;
+            const groupIconKey = BOARD_PRESET_ICON_KEYS[group.family];
 
             if (!selectedPreset) {
               return null;
@@ -711,7 +950,7 @@ export function VisualsSection({
                 }}
               >
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', color: '#064e3b', fontWeight: 800 }}>
-                  {renderComponentIcon(group.family === 'text' ? 'text-box' : groupIconKey, { size: 16, style: { color: '#064e3b' } })}
+                  {renderComponentIcon(groupIconKey, { size: 16, style: { color: '#064e3b' } })}
                   {group.familyLabel}
                 </div>
                 <select
@@ -757,13 +996,14 @@ export function VisualsSection({
                     cursor: 'grab',
                   }}
                 >
-                  {renderComponentIcon(group.family === 'text' ? 'text-box' : groupIconKey, { size: 15, style: { color: '#065f46' } })}
+                  {renderComponentIcon(groupIconKey, { size: 15, style: { color: '#065f46' } })}
                   Drag Or Add
                 </button>
               </div>
             );
           })}
         </div>
+        ) : null}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 280px', gap: '1rem', alignItems: 'start' }}>
@@ -867,7 +1107,7 @@ export function VisualsSection({
               onSurfaceDrop={handleSurfaceDrop}
               emptyState={(
                 <div style={{ maxWidth: '320px', display: 'grid', gap: '0.55rem', color: '#0f766e' }}>
-                  <strong style={{ color: '#064e3b' }}>Drop spaces, tracks, text boxes, and board grids here</strong>
+                  <strong style={{ color: '#064e3b' }}>Drop subcomponents here, then nest text or image leaves where needed</strong>
                   <span>Everything placed on this surface uses the same framing and styling rules as preview.</span>
                 </div>
               )}
@@ -877,244 +1117,10 @@ export function VisualsSection({
         </div>
 
         <div style={{ ...panelStyle, display: 'grid', gap: '0.75rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', borderBottom: '1px solid rgba(15,118,110,0.1)', paddingBottom: '0.8rem', marginBottom: '0.2rem', overflow: 'hidden' }}>
-            {(resolvedSelectedBoardChildId || resolvedSelectedGridCell) && (
-              <button
-                type="button"
-                onClick={() => {
-                  if (resolvedSelectedGridCell) {
-                    setSelectedGridCellKey(null);
-                  } else if (resolvedSelectedBoardChildId) {
-                    clearBoardSelection();
-                  }
-                }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: '24px',
-                  height: '24px',
-                  flexShrink: 0,
-                  borderRadius: '6px',
-                  border: '1px solid rgba(15,118,110,0.15)',
-                  background: 'rgba(255,255,255,0.8)',
-                  color: '#0f766e',
-                  cursor: 'pointer',
-                  marginRight: '0.2rem',
-                }}
-                title="Go Up"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M15 18l-6-6 6-6" />
-                </svg>
-              </button>
-            )}
-
-            {(() => {
-              if (resolvedSelectedGridCell && selectedBoardChild && resolvedSelectedBoardChildId) {
-                return (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedGridCellKey(null)}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        padding: 0,
-                        fontSize: '0.9rem',
-                        fontWeight: 500,
-                        color: '#64748b',
-                        cursor: 'pointer',
-                        flexShrink: 10,
-                        minWidth: 0,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                        direction: 'rtl',
-                        textAlign: 'left',
-                      }}
-                      title={String(selectedBoardChild.displayName || selectedBoardChild.properties.label || 'Component')}
-                    >
-                      <span dir="ltr">{String(selectedBoardChild.displayName || selectedBoardChild.properties.label || 'Component')}</span>
-                    </button>
-
-                    <span style={{ color: '#94a3b8', fontSize: '0.9rem', flexShrink: 0 }}>›</span>
-
-                    <span
-                      style={{
-                        flexShrink: 1,
-                        flexGrow: 1,
-                        minWidth: 0,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                        direction: 'rtl',
-                        textAlign: 'left',
-                        fontSize: '0.9rem',
-                        fontWeight: 700,
-                        color: '#095c55',
-                      }}
-                      title={`Cell (${resolvedSelectedGridCell.x}, ${resolvedSelectedGridCell.y})`}
-                    >
-                      <span dir="ltr">Cell ({resolvedSelectedGridCell.x}, {resolvedSelectedGridCell.y})</span>
-                    </span>
-                  </>
-                );
-              }
-
-              if (selectedBoardChild && resolvedSelectedBoardChildId && activeBoard) {
-                return (
-                  <>
-                    <button
-                      type="button"
-                      onClick={clearBoardSelection}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        padding: 0,
-                        fontSize: '0.9rem',
-                        fontWeight: 500,
-                        color: '#64748b',
-                        cursor: 'pointer',
-                        flexShrink: 10,
-                        minWidth: 0,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                        direction: 'rtl',
-                        textAlign: 'left',
-                      }}
-                      title={String(activeBoard.displayName || activeBoard.properties.label || 'Board')}
-                    >
-                      <span dir="ltr">{String(activeBoard.displayName || activeBoard.properties.label || 'Board')}</span>
-                    </button>
-
-                    <span style={{ color: '#94a3b8', fontSize: '0.9rem', flexShrink: 0 }}>›</span>
-
-                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center', flexGrow: 1, minWidth: 0 }}>
-                      <span
-                        style={{
-                          flexShrink: 1,
-                          minWidth: 0,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                          direction: 'rtl',
-                          textAlign: 'left',
-                          fontSize: '0.9rem',
-                          fontWeight: 700,
-                          color: '#095c55',
-                        }}
-                        title={String(selectedBoardChild.displayName || selectedBoardChild.properties.label || 'Component')}
-                      >
-                        <span dir="ltr">{String(selectedBoardChild.displayName || selectedBoardChild.properties.label || 'Component')}</span>
-                      </span>
-
-                      {selectedGridCells.length > 0 && (
-                        <>
-                          <span style={{ fontSize: '0.8rem', color: '#095c55', marginLeft: '0.35rem', flexShrink: 0, pointerEvents: 'none' }}>▼</span>
-                          <select
-                            value=""
-                            onChange={(event) => {
-                              const key = event.target.value;
-                              if (key) {
-                                setSelectedGridCellKey(key);
-                              }
-                            }}
-                            style={{
-                              position: 'absolute',
-                              inset: 0,
-                              opacity: 0,
-                              cursor: 'pointer',
-                              width: '100%',
-                            }}
-                            title="Select Grid Cell"
-                          >
-                            <option value="" disabled hidden>Select Grid Cell</option>
-                            {selectedGridCells.map((cell) => {
-                              const key = getGridCoordinateKey(cell);
-                              return (
-                                <option key={key} value={key}>
-                                  Cell ({cell.x}, {cell.y})
-                                </option>
-                              );
-                            })}
-                          </select>
-                        </>
-                      )}
-                    </div>
-                  </>
-                );
-              }
-
-              if (activeBoard) {
-                return (
-                  <>
-                    <button
-                      type="button"
-                      onClick={clearBoardSelection}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        padding: 0,
-                        fontSize: '0.9rem',
-                        fontWeight: 700,
-                        color: '#095c55',
-                        cursor: 'pointer',
-                        flexShrink: 1,
-                        flexGrow: 1,
-                        minWidth: 0,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                        direction: 'rtl',
-                        textAlign: 'left',
-                      }}
-                      title={String(activeBoard.displayName || activeBoard.properties.label || 'Board')}
-                    >
-                      <span dir="ltr">{String(activeBoard.displayName || activeBoard.properties.label || 'Board')}</span>
-                    </button>
-                    {boardChildIds.length > 0 && (
-                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: '0 0 auto', width: '18px', height: '18px' }}>
-                        <span style={{ fontSize: '0.8rem', color: '#095c55', flexShrink: 0, pointerEvents: 'none' }}>▼</span>
-                        <select
-                          value=""
-                          onChange={(event) => {
-                            const id = event.target.value;
-                            if (id) {
-                              setSelectedBoardChildId(id);
-                              setSelectedGridCellKey(null);
-                            }
-                          }}
-                          style={{
-                            position: 'absolute',
-                            inset: 0,
-                            opacity: 0,
-                            cursor: 'pointer',
-                            width: '100%',
-                            height: '100%',
-                          }}
-                          title="Select Sub Component"
-                        >
-                          <option value="" disabled hidden>Select Sub Component</option>
-                          {boardChildIds.map((id) => {
-                            const child = project.instances[id];
-                            return (
-                              <option key={id} value={id}>
-                                {String(child?.displayName || child?.properties.label || 'Unnamed Component')}
-                              </option>
-                            );
-                          })}
-                        </select>
-                      </div>
-                    )}
-                  </>
-                );
-              }
-
-              return null;
-            })()}
+          <div style={{ paddingBottom: '0.4rem', borderBottom: '2px solid rgba(15,118,110,0.15)', marginBottom: '0.2rem' }}>
+            <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#064e3b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Properties</span>
           </div>
+
           {selectedBoardChild && resolvedSelectedBoardChildId ? (
             <>
               {showGridShapePopup ? (
@@ -1332,6 +1338,24 @@ export function VisualsSection({
                             },
                           }))}
                           style={compactInputStyle}
+                        />
+                      </label>
+
+                      <label style={labelStyle}>
+                        Notes
+                        <textarea
+                          value={selectedBoardChild.notes ?? ''}
+                          onChange={(event) => onUpdateComponent(resolvedSelectedBoardChildId, (instance) => ({
+                            ...instance,
+                            notes: event.target.value,
+                          }))}
+                          placeholder="Non-visual design notes for this component. These can later inform AI-generated rules and logic."
+                          style={{
+                            ...textareaStyle,
+                            minHeight: '96px',
+                            padding: '0.62rem 0.68rem',
+                            fontSize: '0.86rem',
+                          }}
                         />
                       </label>
                     </InspectorAccordion>

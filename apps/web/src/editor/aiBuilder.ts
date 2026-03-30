@@ -760,14 +760,14 @@ export function buildProjectWithAI(brief: RulesBuilderBrief): EditorProject {
 }
 
 export function getSuggestedComponentTypes(brief: RulesBuilderBrief): BuiltInComponentType[] {
-  const suggestions: BuiltInComponentType[] = ['board', 'space', 'zone', 'piece'];
+  const suggestions: BuiltInComponentType[] = ['board', 'space', 'track', 'deck', 'piece', 'card'];
 
   if (brief.isCampaignGame) {
-    suggestions.push('counter');
+    suggestions.push('text-box');
   }
 
   if (brief.maxPlayers > 4) {
-    suggestions.push('token');
+    suggestions.push('network');
   }
 
   return Array.from(new Set(suggestions)).filter((type) => Boolean(getBuiltInComponentManifest(type)));
