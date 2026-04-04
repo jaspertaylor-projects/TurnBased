@@ -1,5 +1,6 @@
 import { useEffect, useEffectEvent, useMemo, useState } from 'react';
 
+import { AppPageFrame } from '../components/AppPageFrame';
 import { loadEditorProjects } from '../editor/storage';
 import type { EditorProject } from '../editor/types';
 import { supabase } from '../lib/supabaseClient';
@@ -243,7 +244,7 @@ export const Lobby = () => {
   }
 
   return (
-    <div style={{ maxWidth: '1180px', margin: '0 auto', padding: '2rem' }}>
+    <AppPageFrame contentStyle={{ maxWidth: '1180px', margin: '0 auto' }}>
       <div style={{ maxWidth: '760px', marginBottom: '1.5rem' }}>
         <p style={{ textTransform: 'uppercase', letterSpacing: '0.08em', color: '#0f766e', fontSize: '0.82rem', marginBottom: '0.5rem' }}>
           Multiplayer Rooms
@@ -494,6 +495,6 @@ export const Lobby = () => {
           </div>
         )}
       </section>
-    </div>
+    </AppPageFrame>
   );
 };

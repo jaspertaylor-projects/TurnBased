@@ -11,10 +11,20 @@ import { Play } from './pages/Play'
 import { Lobby } from './pages/Lobby'
 import { Marketplace } from './pages/Marketplace'
 import { CreateBlankProject } from './pages/CreateBlankProject'
+import { usePageZoomLock } from './usePageZoomLock'
+
+const APP_NAV_HEIGHT = 88
+
+function isLandingRoute(route: string) {
+  return route === '' || route === '#/'
+}
 
 function App() {
   const [route, setRoute] = useState(window.location.hash);
   const [session, setSession] = useState<Session | null>(null);
+  const isLanding = isLandingRoute(route);
+
+  usePageZoomLock();
 
   useEffect(() => {
     // Read route on load
@@ -47,6 +57,26 @@ function App() {
     };
   }, []);
 
+  useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const previousHtmlOverflow = html.style.overflow;
+    const previousBodyOverflow = body.style.overflow;
+
+    if (isLanding) {
+      html.style.overflow = '';
+      body.style.overflow = '';
+    } else {
+      html.style.overflow = 'hidden';
+      body.style.overflow = 'hidden';
+    }
+
+    return () => {
+      html.style.overflow = previousHtmlOverflow;
+      body.style.overflow = previousBodyOverflow;
+    };
+  }, [isLanding]);
+
   const handleSignOut = async () => {
       await supabase.auth.signOut();
       window.location.hash = '#/';
@@ -71,7 +101,7 @@ function App() {
 
   return (
     <>
-      <nav style={{ padding: '1rem', display: 'flex', alignItems: 'center', gap: '1.5rem', background: 'rgba(240,253,244,0.85)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', position: 'sticky', top: 0, zIndex: 50 }}>
+      <nav style={{ padding: '1rem', minHeight: `${APP_NAV_HEIGHT}px`, boxSizing: 'border-box', display: 'flex', alignItems: 'center', gap: '1.5rem', background: 'rgba(240,253,244,0.85)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', position: 'sticky', top: 0, zIndex: 50, borderBottom: '1px solid rgba(101, 67, 33, 0.18)' }}>
         <a href="#/" style={{ fontWeight: 'bold', fontSize: '1.25rem', color: 'var(--text-primary)', marginRight: 'auto' }}>TurnBased.</a>
         
         <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
@@ -99,7 +129,16 @@ function App() {
             )}
         </div>
       </nav>
-      <main>
+      <main
+        style={{
+          flex: '1 1 0',
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: 0,
+          height: isLanding ? 'auto' : `calc(100vh - ${APP_NAV_HEIGHT}px)`,
+          overflow: isLanding ? 'visible' : 'hidden',
+        }}
+      >
         {renderRoute()}
       </main>
     </>

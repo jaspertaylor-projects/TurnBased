@@ -6,11 +6,141 @@ import {
   type GridCellCoordinate,
 } from '@turnbased/engine-components';
 
+export interface CanonicalGeometry {
+  localWidth: number;
+  localHeight: number;
+  localX: number;
+  localY: number;
+  absX: number;
+  absY: number;
+  absW: number;
+  absH: number;
+  renderedX: number;
+  renderedY: number;
+  renderedWidth: number;
+  renderedHeight: number;
+  clipPath?: string | null;
+  background?: string | null;
+  textureId?: BoardSurfaceTextureId | null;
+  textureOpacity?: number | null;
+  borderColor?: string | null;
+  borderWidth?: number;
+  borderRadius?: number;
+}
+
 export const BOARD_SURFACE_WIDTH = 760;
 export const BOARD_SURFACE_HEIGHT = 520;
-export const BOARD_SURFACE_BACKGROUND = 'linear-gradient(160deg, rgba(16,185,129,0.16), rgba(14,165,233,0.08), rgba(250,204,21,0.12))';
-export const MIN_BOARD_ITEM_WIDTH = 56;
-export const MIN_BOARD_ITEM_HEIGHT = 48;
+export const BOARD_SURFACE_BACKGROUND = 'linear-gradient(160deg, #d1fae5, #e0f2fe, #fef9c3)';
+export const MIN_BOARD_ITEM_WIDTH = 24;
+export const MIN_BOARD_ITEM_HEIGHT = 24;
+
+export interface ZoomRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * Walk a drill path and compute the absolute board-level rectangle of the
+ * deepest drilled component. Each entry in the drill path is an instance id.
+ * Uses exact logical computed geometry rather than approximations.
+ */
+export function computeZoomRect(
+  drillPath: string[],
+  geometries: Record<string, CanonicalGeometry>,
+): ZoomRect {
+  if (drillPath.length === 0) {
+    return { x: 0, y: 0, width: BOARD_SURFACE_WIDTH, height: BOARD_SURFACE_HEIGHT };
+  }
+  
+  const targetId = drillPath[drillPath.length - 1];
+  const geometry = geometries[targetId];
+  if (geometry) {
+    return {
+      x: geometry.absX,
+      y: geometry.absY,
+      width: geometry.absW,
+      height: geometry.absH,
+    };
+  }
+
+  return { x: 0, y: 0, width: BOARD_SURFACE_WIDTH, height: BOARD_SURFACE_HEIGHT };
+}
+
+export function computeCanonicalGeometries(
+  instances: Record<string, ComponentInstanceModel>,
+  rootBoardId: string,
+  boardRenderWidth: number,
+  boardRenderHeight: number,
+): Record<string, CanonicalGeometry> {
+  const result: Record<string, CanonicalGeometry> = {};
+  const board = instances[rootBoardId];
+  if (!board) return result;
+
+  const boardRenderScaleX = boardRenderWidth / BOARD_SURFACE_WIDTH;
+  const boardRenderScaleY = boardRenderHeight / BOARD_SURFACE_HEIGHT;
+
+  function walk(instanceId: string, depth: number, parentAbsX: number, parentAbsY: number, parentAbsW: number, parentAbsH: number, parentLocalW: number, parentLocalH: number, childIndex: number) {
+    const instance = instances[instanceId];
+    if (!instance) return;
+
+    const isDirect = depth === 0;
+    const clampW = isDirect ? BOARD_SURFACE_WIDTH : parentLocalW;
+    const clampH = isDirect ? BOARD_SURFACE_HEIGHT : parentLocalH;
+
+    const localFrame = isDirect
+      ? getResolvedBoardItemFrame(instance, childIndex)
+      : getResolvedChildItemFrame(instance, childIndex, clampW, clampH);
+
+    const absX = parentAbsX + (localFrame.x / clampW) * parentAbsW;
+    const absY = parentAbsY + (localFrame.y / clampH) * parentAbsH;
+    const absW = (localFrame.width / clampW) * parentAbsW;
+    const absH = (localFrame.height / clampH) * parentAbsH;
+
+    result[instanceId] = {
+      localWidth: localFrame.width,
+      localHeight: localFrame.height,
+      localX: localFrame.x,
+      localY: localFrame.y,
+      absX,
+      absY,
+      absW,
+      absH,
+      renderedX: absX * boardRenderScaleX,
+      renderedY: absY * boardRenderScaleY,
+      renderedWidth: absW * boardRenderScaleX,
+      renderedHeight: absH * boardRenderScaleY,
+      clipPath: localFrame.clipPath ?? null,
+      background: localFrame.background,
+      textureId: localFrame.textureId,
+      textureOpacity: localFrame.textureOpacity,
+      borderColor: localFrame.borderColor,
+      borderWidth: localFrame.borderWidth,
+      borderRadius: localFrame.borderRadius,
+    };
+
+    let nextIndex = 0;
+    instance.children.forEach((childIdStr) => {
+      const childId = String(childIdStr);
+      const child = instances[childId];
+      if (child && !isMovableComponentType(child.componentType)) {
+        walk(childId, depth + 1, absX, absY, absW, absH, localFrame.width, localFrame.height, nextIndex++);
+      }
+    });
+  }
+
+  let index = 0;
+  board.children.forEach((childIdStr) => {
+    const childId = String(childIdStr);
+    const child = instances[childId];
+    if (child && !isMovableComponentType(child.componentType)) {
+      walk(childId, 0, 0, 0, BOARD_SURFACE_WIDTH, BOARD_SURFACE_HEIGHT, BOARD_SURFACE_WIDTH, BOARD_SURFACE_HEIGHT, index++);
+    }
+  });
+
+  return result;
+}
 
 export function isMovableComponentType(componentType: string): boolean {
   return componentType === 'piece' || componentType === 'token';
@@ -136,17 +266,6 @@ export function defaultBoardItemFrame(componentType: string, index: number): Com
         borderWidth: 1,
         borderRadius: 20,
       };
-    case 'resource-pile':
-      return {
-        x: baseX,
-        y: baseY,
-        width: 190,
-        height: 132,
-        background: 'rgba(236,253,245,0.94)',
-        borderColor: 'rgba(34,197,94,0.2)',
-        borderWidth: 1,
-        borderRadius: 22,
-      };
     case 'score-track':
       return {
         x: baseX,
@@ -229,31 +348,91 @@ export function clampBoardItemFrame(frame: ComponentFrame): ComponentFrame {
   };
 }
 
+export function clampItemFrame(frame: ComponentFrame, surfaceWidth: number, surfaceHeight: number): ComponentFrame {
+  const minW = Math.min(MIN_BOARD_ITEM_WIDTH, surfaceWidth * 0.9);
+  const minH = Math.min(MIN_BOARD_ITEM_HEIGHT, surfaceHeight * 0.9);
+  const width = Math.max(minW, Math.min(frame.width, surfaceWidth));
+  const height = Math.max(minH, Math.min(frame.height, surfaceHeight));
+  return {
+    ...frame,
+    width,
+    height,
+    x: Math.max(0, Math.min(frame.x, surfaceWidth - width)),
+    y: Math.max(0, Math.min(frame.y, surfaceHeight - height)),
+    borderWidth: Math.max(0, frame.borderWidth),
+    borderRadius: Math.max(0, frame.borderRadius),
+  };
+}
+
+/**
+ * Scale a default frame so it fits proportionally within a surface smaller than the board.
+ * Returns the frame unchanged when the surface is board-sized or larger.
+ */
+export function scaleDefaultFrame(frame: ComponentFrame, surfaceWidth: number, surfaceHeight: number): ComponentFrame {
+  if (surfaceWidth >= BOARD_SURFACE_WIDTH && surfaceHeight >= BOARD_SURFACE_HEIGHT) {
+    return frame;
+  }
+
+  const scaleX = surfaceWidth / BOARD_SURFACE_WIDTH;
+  const scaleY = surfaceHeight / BOARD_SURFACE_HEIGHT;
+  const scale = Math.min(scaleX, scaleY);
+
+  // Leave some padding (10%) so the item doesn't fill the entire parent
+  const maxW = surfaceWidth * 0.8;
+  const maxH = surfaceHeight * 0.8;
+  const scaledWidth = Math.min(frame.width * scale, maxW);
+  const scaledHeight = Math.min(frame.height * scale, maxH);
+
+  // Center within the surface
+  return {
+    ...frame,
+    x: Math.max(0, (surfaceWidth - scaledWidth) / 2),
+    y: Math.max(0, (surfaceHeight - scaledHeight) / 2),
+    width: Math.max(16, scaledWidth),
+    height: Math.max(12, scaledHeight),
+    borderRadius: frame.borderRadius >= Math.min(frame.width, frame.height) / 2
+      ? 999
+      : Math.max(0, Math.min(frame.borderRadius * scale, Math.min(scaledWidth, scaledHeight) / 2)),
+  };
+}
+
+export function isLeafComponentType(componentType: string): boolean {
+  return componentType === 'text-box'
+    || componentType === 'image-area'
+    || componentType === 'token'
+    || componentType === 'counter'
+    || componentType === 'score-track';
+}
+
 export function resizeBoardItemFrame(
   startFrame: ComponentFrame,
   dx: number,
   dy: number,
   edges: { left: boolean; right: boolean; top: boolean; bottom: boolean },
+  surfaceWidth: number = BOARD_SURFACE_WIDTH,
+  surfaceHeight: number = BOARD_SURFACE_HEIGHT,
 ): ComponentFrame {
+  const minW = Math.min(MIN_BOARD_ITEM_WIDTH, surfaceWidth * 0.9);
+  const minH = Math.min(MIN_BOARD_ITEM_HEIGHT, surfaceHeight * 0.9);
   let left = startFrame.x;
   let right = startFrame.x + startFrame.width;
   let top = startFrame.y;
   let bottom = startFrame.y + startFrame.height;
 
   if (edges.left) {
-    left = Math.max(0, Math.min(startFrame.x + dx, right - MIN_BOARD_ITEM_WIDTH));
+    left = Math.max(0, Math.min(startFrame.x + dx, right - minW));
   }
 
   if (edges.right) {
-    right = Math.min(BOARD_SURFACE_WIDTH, Math.max(startFrame.x + startFrame.width + dx, left + MIN_BOARD_ITEM_WIDTH));
+    right = Math.min(surfaceWidth, Math.max(startFrame.x + startFrame.width + dx, left + minW));
   }
 
   if (edges.top) {
-    top = Math.max(0, Math.min(startFrame.y + dy, bottom - MIN_BOARD_ITEM_HEIGHT));
+    top = Math.max(0, Math.min(startFrame.y + dy, bottom - minH));
   }
 
   if (edges.bottom) {
-    bottom = Math.min(BOARD_SURFACE_HEIGHT, Math.max(startFrame.y + startFrame.height + dy, top + MIN_BOARD_ITEM_HEIGHT));
+    bottom = Math.min(surfaceHeight, Math.max(startFrame.y + startFrame.height + dy, top + minH));
   }
 
   return {
@@ -269,4 +448,23 @@ export function resizeBoardItemFrame(
 
 export function getResolvedBoardItemFrame(instance: ComponentInstanceModel, index: number): ComponentFrame {
   return clampBoardItemFrame(instance.frame ?? defaultBoardItemFrame(instance.componentType, index));
+}
+
+/**
+ * Resolve a child item's frame clamped to the given parent surface dimensions
+ * rather than the board-level defaults.  Used for items nested inside spaces,
+ * cards, or other non-board containers.
+ */
+export function getResolvedChildItemFrame(
+  instance: ComponentInstanceModel,
+  index: number,
+  parentSurfaceWidth: number,
+  parentSurfaceHeight: number,
+): ComponentFrame {
+  const raw = instance.frame ?? scaleDefaultFrame(
+    defaultBoardItemFrame(instance.componentType, index),
+    parentSurfaceWidth,
+    parentSurfaceHeight,
+  );
+  return clampItemFrame(raw, parentSurfaceWidth, parentSurfaceHeight);
 }

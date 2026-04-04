@@ -39,6 +39,7 @@ describe('engine-components catalog', () => {
       'text-box',
       'deck',
       'piece',
+      'token',
       'image-area',
       'network',
     ]);
@@ -61,9 +62,9 @@ describe('engine-components catalog', () => {
         coordinates: { x: 0, y: 0 },
       },
     });
+    // Pieces are root-level templates, not children of spaces.
     const piece = createComponentInstance(getBuiltInComponentManifest('piece'), {
       instanceId: createComponentInstanceId('piece_red'),
-      parentId: space.instanceId,
       bindings: {
         ownerId: createPlayerId('player_red'),
       },
@@ -71,7 +72,7 @@ describe('engine-components catalog', () => {
 
     expect(board.properties.label).toBe('Board');
     expect(board.notes).toBe('');
-    expect(space.properties.terrain).toBe('plain');
+    expect(space.properties.label).toBe('Space');
     expect(piece.properties.size).toBe('medium');
     expect(getBuiltInComponentManifest('text-box').propertiesSchema.parse({}).fontSize).toBe(22);
 
@@ -99,6 +100,12 @@ describe('engine-components catalog', () => {
         getBuiltInComponentManifest('deck'),
       ).valid,
     ).toBe(true);
+    expect(
+      validateComponentPlacement(
+        getBuiltInComponentManifest('card'),
+        getBuiltInComponentManifest('board'),
+      ).valid,
+    ).toBe(false);
     expect(
       validateComponentPlacement(
         getBuiltInComponentManifest('image-area'),
@@ -168,7 +175,6 @@ describe('engine-components catalog', () => {
     const spaceOne = createComponentInstance(getBuiltInComponentManifest('space'), {
       instanceId: createComponentInstanceId('space_1'),
       parentId: board.instanceId,
-      children: [createComponentInstanceId('piece_1')],
       placement: {
         slotId: 'surface',
         index: 0,
@@ -178,23 +184,22 @@ describe('engine-components catalog', () => {
     const spaceTwo = createComponentInstance(getBuiltInComponentManifest('space'), {
       instanceId: createComponentInstanceId('space_2'),
       parentId: board.instanceId,
-      children: [createComponentInstanceId('piece_2')],
       placement: {
         slotId: 'surface',
         index: 1,
         coordinates: { x: 1, y: 0 },
       },
     });
+    // Pieces and tokens are root-level templates, not children of spaces or
+    // score-tracks. The engine setup function places them into starting zones.
     const pieceOne = createComponentInstance(getBuiltInComponentManifest('piece'), {
       instanceId: createComponentInstanceId('piece_1'),
-      parentId: spaceOne.instanceId,
       bindings: {
         ownerId: playerOneId,
       },
     });
     const pieceTwo = createComponentInstance(getBuiltInComponentManifest('piece'), {
       instanceId: createComponentInstanceId('piece_2'),
-      parentId: spaceTwo.instanceId,
       bindings: {
         ownerId: playerTwoId,
       },
@@ -202,10 +207,6 @@ describe('engine-components catalog', () => {
     const scoreTrack = createComponentInstance(getBuiltInComponentManifest('score-track'), {
       instanceId: createComponentInstanceId('score_track'),
       parentId: board.instanceId,
-      children: [
-        createComponentInstanceId('score_marker_1'),
-        createComponentInstanceId('score_marker_2'),
-      ],
       placement: {
         slotId: 'surface',
         index: 2,
@@ -213,22 +214,14 @@ describe('engine-components catalog', () => {
     });
     const scoreMarkerOne = createComponentInstance(getBuiltInComponentManifest('token'), {
       instanceId: createComponentInstanceId('score_marker_1'),
-      parentId: scoreTrack.instanceId,
       bindings: {
         ownerId: playerOneId,
-      },
-      placement: {
-        trackPosition: 3,
       },
     });
     const scoreMarkerTwo = createComponentInstance(getBuiltInComponentManifest('token'), {
       instanceId: createComponentInstanceId('score_marker_2'),
-      parentId: scoreTrack.instanceId,
       bindings: {
         ownerId: playerTwoId,
-      },
-      placement: {
-        trackPosition: 4,
       },
     });
     const playerArea = createComponentInstance(getBuiltInComponentManifest('zone'), {

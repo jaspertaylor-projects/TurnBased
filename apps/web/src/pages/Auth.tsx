@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
+import { AppPageFrame } from '../components/AppPageFrame';
 
 function getErrorMessage(error: unknown, fallback: string): string {
     return error instanceof Error ? error.message : fallback;
@@ -66,7 +67,10 @@ export const Auth = () => {
     };
 
     return (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 'calc(100vh - 60px)', padding: '2rem' }}>
+        <AppPageFrame
+            frameStyle={{ display: 'grid', placeItems: 'center', padding: '2rem' }}
+            contentStyle={{ maxWidth: '400px' }}
+        >
             <div className="glass-panel animate-fade-in" style={{ width: '100%', maxWidth: '400px', padding: '2.5rem', textAlign: 'center' }}>
                 <div style={{ width: '48px', height: '48px', background: 'var(--gradient-glow)', borderRadius: '12px', margin: '0 auto 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="28" height="28" fill="currentColor">
@@ -177,6 +181,6 @@ export const Auth = () => {
                     </button>
                 </p>
             </div>
-        </div>
+        </AppPageFrame>
     );
 };

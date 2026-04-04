@@ -1,13 +1,16 @@
 import type { CSSProperties } from 'react';
 
 export const pageStyle: CSSProperties = {
-  minHeight: 'calc(100vh - 88px)',
+  flex: '1 1 0',
+  minHeight: 0,
   display: 'flex',
   flexWrap: 'wrap',
   gap: 0,
   padding: 0,
   alignItems: 'flex-start',
   boxSizing: 'border-box',
+  overflowX: 'hidden',
+  maxWidth: '100vw',
 };
 
 export const panelStyle: CSSProperties = {

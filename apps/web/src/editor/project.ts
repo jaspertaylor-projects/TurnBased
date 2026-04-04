@@ -66,6 +66,7 @@ export function createDefaultProjectArtDirection(): EditorArtDirection {
     definedArtStyles: [],
     recurringAssets: [],
     icons: [],
+    images: [],
   };
 }
 
@@ -543,7 +544,6 @@ export function syncGeneratedBoardChildren(project: EditorProject, instanceId: s
         label: nextLabel,
         x: coordinate.x,
         y: coordinate.y,
-        terrain: currentCell?.properties.terrain ?? 'plain',
         maxCapacity: typeof instance.properties.maxCapacity === 'number' ? instance.properties.maxCapacity : null,
       },
       children: currentCell?.children ?? [],

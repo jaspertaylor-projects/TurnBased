@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import type { Dispatch, ReactNode, SetStateAction } from 'react';
 import { Plus } from 'lucide-react';
-import { getBuiltInComponentManifest } from '@turnbased/engine-components';
+import {
+  getBuiltInComponentManifest,
+  listAuthorableBuiltInComponents,
+} from '@turnbased/engine-components';
 import type { BuiltInComponentType } from '@turnbased/engine-components';
 
 import { renderComponentIcon } from '../componentMeta';
@@ -9,6 +12,8 @@ import { SECTION_OPTIONS } from '../constants';
 import type { ComponentEditorMode, EditorSection } from '../constants';
 import { panelStyle, inputStyle, sidebarSectionStyle, textareaStyle } from '../styles';
 import type { EditorProject } from '../types';
+
+const TOP_LEVEL_COMPONENT_OPTIONS = listAuthorableBuiltInComponents('top-level');
 
 function getComponentLabel(project: EditorProject, instanceId: string): string {
   const instance = project.instances[instanceId];
@@ -18,6 +23,14 @@ function getComponentLabel(project: EditorProject, instanceId: string): string {
 
   const manifest = getBuiltInComponentManifest(instance.componentType as BuiltInComponentType);
   return String(instance.properties.label ?? instance.displayName ?? manifest.displayName);
+}
+
+function getComponentQuantity(project: EditorProject, instanceId: string): number {
+  const instance = project.instances[instanceId];
+  if (!instance) return 1;
+  if (instance.componentType !== 'piece' && instance.componentType !== 'token') return 1;
+  const qty = instance.properties.quantity;
+  return typeof qty === 'number' && Number.isFinite(qty) && qty > 1 ? Math.trunc(qty) : 1;
 }
 
 function getComponentSubtitle(project: EditorProject, instanceId: string): string {
@@ -33,6 +46,112 @@ function getComponentSubtitle(project: EditorProject, instanceId: string): strin
   }
 
   return manifest.displayName;
+}
+
+function OutlineNode({
+  project,
+  instanceId,
+  depth,
+  selectedOutlineComponentId,
+  componentEditorMode,
+  onSelectOutlineComponent,
+  onCloseCreateMenu,
+}: {
+  project: EditorProject;
+  instanceId: string;
+  depth: number;
+  selectedOutlineComponentId: string | null;
+  componentEditorMode: string;
+  onSelectOutlineComponent: (instanceId: string) => void;
+  onCloseCreateMenu: () => void;
+}) {
+  const instance = project.instances[instanceId];
+  if (!instance) return null;
+
+  const isSelected = selectedOutlineComponentId === instanceId && componentEditorMode === 'edit';
+  const childIds = instance.children.map(String).filter((childId) => project.instances[childId]);
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => {
+          onCloseCreateMenu();
+          onSelectOutlineComponent(instanceId);
+        }}
+        style={{
+          textAlign: 'left',
+          padding: '0.35rem 0.5rem',
+          paddingLeft: `${0.5 + depth * 0.7}rem`,
+          borderRadius: '12px',
+          border: 'none',
+          width: '100%',
+          background: isSelected ? 'rgba(249,115,22,0.12)' : 'transparent',
+          color: isSelected ? '#9a3412' : '#0f766e',
+          display: 'grid',
+          gap: '0.08rem',
+        }}
+      >
+        <span
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.4rem',
+            minWidth: 0,
+            fontSize: depth === 0 ? '0.82rem' : '0.76rem',
+            fontWeight: isSelected ? 700 : 600,
+          }}
+        >
+          <span
+            style={{
+              width: '18px',
+              height: '18px',
+              borderRadius: '6px',
+              display: 'grid',
+              placeItems: 'center',
+              background: isSelected ? 'rgba(255,237,213,0.95)' : 'rgba(255,255,255,0.82)',
+              border: '1px solid rgba(15,118,110,0.1)',
+              flex: '0 0 auto',
+            }}
+          >
+            {renderComponentIcon(instance.componentType, {
+              size: 11,
+              style: { color: isSelected ? '#c2410c' : '#0f766e' },
+            })}
+          </span>
+          <span style={{ minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {getComponentLabel(project, instanceId)}
+          </span>
+          {getComponentQuantity(project, instanceId) > 1 ? (
+            <span
+              style={{
+                fontSize: '0.68rem',
+                fontWeight: 700,
+                color: isSelected ? '#c2410c' : '#6b7280',
+                background: isSelected ? 'rgba(255,237,213,0.8)' : 'rgba(15,118,110,0.07)',
+                borderRadius: '6px',
+                padding: '0.05rem 0.35rem',
+                flex: '0 0 auto',
+                lineHeight: 1.4,
+              }}
+            >
+              &times;{getComponentQuantity(project, instanceId)}
+            </span>
+          ) : null}
+        </span>
+        {depth === 0 ? (
+          <span style={{ paddingLeft: `${1.5 + depth * 0.7}rem`, fontSize: '0.72rem', color: isSelected ? '#c2410c' : '#6b7280' }}>
+            {getComponentSubtitle(project, instanceId)}
+          </span>
+        ) : null}
+      </button>
+      {depth === 0 && childIds.length > 0 ? (
+        <div style={{ fontSize: '0.72rem', color: '#6b7280', paddingLeft: `${1.5}rem`, paddingBottom: '0.15rem' }}>
+          {childIds.length} sub-component{childIds.length !== 1 ? 's' : ''}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 function SectionButton({
@@ -100,7 +219,7 @@ export function EditorSidebar({
   selectedOutlineComponentId,
   componentEditorMode,
   onOpenComponentEditor,
-  onStartCreateComponent,
+  onCreateTopLevelComponent,
   onSelectOutlineComponent,
   onRenameProject,
   onUpdateDescription,
@@ -115,12 +234,13 @@ export function EditorSidebar({
   selectedOutlineComponentId: string | null;
   componentEditorMode: ComponentEditorMode;
   onOpenComponentEditor: () => void;
-  onStartCreateComponent: () => void;
+  onCreateTopLevelComponent: (type: BuiltInComponentType) => void;
   onSelectOutlineComponent: (instanceId: string) => void;
   onRenameProject: (name: string) => void;
   onUpdateDescription: (description: string) => void;
 }) {
   const [hoveredSection, setHoveredSection] = useState<EditorSection | null>(null);
+  const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false);
 
   return (
     <aside
@@ -170,38 +290,117 @@ export function EditorSidebar({
 
             return (
               <div key={section.id} style={{ display: 'grid', gap: '0.2rem' }}>
-                <SectionButton
-                  active={isActive}
-                  label={section.label}
-                  onClick={onOpenComponentEditor}
-                  onMouseEnter={() => setHoveredSection('component_editor')}
-                  onMouseLeave={() => setHoveredSection((current) => (current === 'component_editor' ? null : current))}
-                  action={(
-                    <button
-                      type="button"
-                      title="Make new component"
-                      aria-label="Make new component"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onStartCreateComponent();
-                      }}
-                      style={{
-                        width: '26px',
-                        height: '26px',
-                        display: 'grid',
-                        placeItems: 'center',
-                        borderRadius: '999px',
-                        border: '1px solid rgba(15,118,110,0.16)',
-                        background: showCreateAction ? 'rgba(255,255,255,0.88)' : 'transparent',
-                        color: showCreateAction ? '#064e3b' : 'rgba(15,118,110,0)',
-                        cursor: 'pointer',
-                        transition: 'all 120ms ease',
-                      }}
-                    >
-                      <Plus size={14} />
-                    </button>
-                  )}
-                />
+                <div style={{ position: 'relative' }}>
+                  <SectionButton
+                    active={isActive}
+                    label={section.label}
+                    onClick={() => {
+                      setIsCreateMenuOpen(false);
+                      onOpenComponentEditor();
+                    }}
+                    onMouseEnter={() => setHoveredSection('component_editor')}
+                    onMouseLeave={() => setHoveredSection((current) => (current === 'component_editor' ? null : current))}
+                    action={(
+                      <button
+                        type="button"
+                        title="Make new top-level component"
+                        aria-label="Make new top-level component"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setIsCreateMenuOpen((current) => !current);
+                        }}
+                        style={{
+                          width: '26px',
+                          height: '26px',
+                          display: 'grid',
+                          placeItems: 'center',
+                          borderRadius: '999px',
+                          border: '1px solid rgba(15,118,110,0.16)',
+                          background: showCreateAction ? 'rgba(255,255,255,0.88)' : 'transparent',
+                          color: showCreateAction ? '#064e3b' : 'rgba(15,118,110,0)',
+                          cursor: 'pointer',
+                          transition: 'all 120ms ease',
+                        }}
+                      >
+                        <Plus size={14} />
+                      </button>
+                    )}
+                  />
+
+                  {isCreateMenuOpen ? (
+                    <>
+                      <div
+                        style={{ position: 'fixed', inset: 0, zIndex: 49 }}
+                        onClick={() => setIsCreateMenuOpen(false)}
+                      />
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: '100%',
+                          right: 0,
+                          zIndex: 50,
+                          marginTop: '0.25rem',
+                          width: '210px',
+                          borderRadius: '14px',
+                          border: '1px solid rgba(15,118,110,0.14)',
+                          background: 'rgba(255,255,255,0.98)',
+                          boxShadow: '0 6px 24px rgba(0,0,0,0.10)',
+                          padding: '0.3rem',
+                          display: 'grid',
+                          gap: '0.2rem',
+                        }}
+                      >
+                        {TOP_LEVEL_COMPONENT_OPTIONS.map((manifest) => (
+                          <button
+                            key={manifest.type}
+                            type="button"
+                            onClick={() => {
+                              setIsCreateMenuOpen(false);
+                              onCreateTopLevelComponent(manifest.type as BuiltInComponentType);
+                            }}
+                            style={{
+                              textAlign: 'left',
+                              padding: '0.55rem 0.6rem',
+                              borderRadius: '10px',
+                              border: 'none',
+                              background: 'transparent',
+                              color: '#064e3b',
+                              display: 'grid',
+                              gap: '0.14rem',
+                              cursor: 'pointer',
+                            }}
+                            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(236,253,245,0.9)'; }}
+                            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
+                          >
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.8rem', fontWeight: 700 }}>
+                              <span
+                                style={{
+                                  width: '20px',
+                                  height: '20px',
+                                  borderRadius: '7px',
+                                  display: 'grid',
+                                  placeItems: 'center',
+                                  background: 'rgba(236,253,245,0.95)',
+                                  border: '1px solid rgba(15,118,110,0.1)',
+                                  flex: '0 0 auto',
+                                }}
+                              >
+                                {renderComponentIcon(manifest.type, {
+                                  size: 12,
+                                  style: { color: '#0f766e' },
+                                })}
+                              </span>
+                              {manifest.displayName}
+                            </span>
+                            <span style={{ fontSize: '0.72rem', color: '#6b7280' }}>
+                              {manifest.description}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  ) : null}
+                </div>
 
                 {isActive ? (
                   <div
@@ -213,67 +412,18 @@ export function EditorSidebar({
                       borderLeft: '1px solid rgba(15,118,110,0.12)',
                     }}
                   >
-                    {componentOutlineIds.length > 0 ? componentOutlineIds.map((instanceId) => {
-                      const instance = project.instances[instanceId];
-                      if (!instance) {
-                        return null;
-                      }
-
-                      const isSelected = selectedOutlineComponentId === instanceId && componentEditorMode === 'edit';
-
-                      return (
-                        <button
-                          key={instanceId}
-                          type="button"
-                          onClick={() => onSelectOutlineComponent(instanceId)}
-                          style={{
-                            textAlign: 'left',
-                            padding: '0.45rem 0.5rem',
-                            borderRadius: '12px',
-                            border: 'none',
-                            background: isSelected ? 'rgba(249,115,22,0.12)' : 'transparent',
-                            color: isSelected ? '#9a3412' : '#0f766e',
-                            display: 'grid',
-                            gap: '0.14rem',
-                          }}
-                        >
-                          <span
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '0.45rem',
-                              minWidth: 0,
-                              fontSize: '0.82rem',
-                              fontWeight: isSelected ? 700 : 600,
-                            }}
-                          >
-                            <span
-                              style={{
-                                width: '20px',
-                                height: '20px',
-                                borderRadius: '7px',
-                                display: 'grid',
-                                placeItems: 'center',
-                                background: isSelected ? 'rgba(255,237,213,0.95)' : 'rgba(255,255,255,0.82)',
-                                border: '1px solid rgba(15,118,110,0.1)',
-                                flex: '0 0 auto',
-                              }}
-                            >
-                              {renderComponentIcon(instance.componentType, {
-                                size: 12,
-                                style: { color: isSelected ? '#c2410c' : '#0f766e' },
-                              })}
-                            </span>
-                            <span style={{ minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              {getComponentLabel(project, instanceId)}
-                            </span>
-                          </span>
-                          <span style={{ paddingLeft: '1.65rem', fontSize: '0.72rem', color: isSelected ? '#c2410c' : '#6b7280' }}>
-                            {getComponentSubtitle(project, instanceId)}
-                          </span>
-                        </button>
-                      );
-                    }) : (
+                    {componentOutlineIds.length > 0 ? componentOutlineIds.map((instanceId) => (
+                      <OutlineNode
+                        key={instanceId}
+                        project={project}
+                        instanceId={instanceId}
+                        depth={0}
+                        selectedOutlineComponentId={selectedOutlineComponentId}
+                        componentEditorMode={componentEditorMode}
+                        onSelectOutlineComponent={onSelectOutlineComponent}
+                        onCloseCreateMenu={() => setIsCreateMenuOpen(false)}
+                      />
+                    )) : (
                       <div style={{ padding: '0.35rem 0.5rem', fontSize: '0.78rem', color: '#6b7280' }}>
                         No outline components yet.
                       </div>

@@ -1,0 +1,293 @@
+import { Visibility } from '@turnbased/shared-types';
+import { z } from 'zod';
+
+import type { BuiltInComponentType } from './types';
+import {
+  countSchema,
+  defaultCollectionRenderHints,
+  type ComponentManifestDefinition,
+} from './catalog-helpers';
+
+export const collectionManifests: Pick<Record<BuiltInComponentType, ComponentManifestDefinition>, 'deck' | 'hand' | 'discard' | 'bag'> = {
+  deck: {
+    type: 'deck',
+    category: 'collection',
+    role: 'top-level',
+    displayName: 'Deck of Cards',
+    description: 'An ordered, usually face-down card collection that supports draw and shuffle actions.',
+    propertyDefinitions: {
+      label: { kind: 'string', label: 'Label' },
+      maxCards: { kind: 'number', label: 'Capacity' },
+    },
+    propertiesSchema: z.object({
+      label: z.string().default('Deck of Cards'),
+      maxCards: countSchema,
+    }),
+    defaultProperties: {
+      label: 'Deck of Cards',
+      maxCards: null,
+    },
+    renderHints: {
+      surface: 'collection',
+      layout: 'stack',
+      orientation: 'vertical',
+      ...defaultCollectionRenderHints,
+    },
+    interactionDefaults: {
+      selectionMode: 'single',
+      primaryAction: 'draw',
+      dragEnabled: false,
+      dropEnabled: true,
+      keyboardNavigable: true,
+      highlightValidDestinations: false,
+    },
+    placementConstraints: {
+      requiresParent: false,
+      allowedParentRoles: [],
+      allowedParentTypes: [],
+      allowedChildRoles: ['top-level', 'sub-component', 'leaf'],
+      allowedChildTypes: ['piece', 'token', 'card'],
+      minChildren: 0,
+      maxChildren: null,
+    },
+    occupancyRules: {
+      mode: 'stack',
+      capacity: null,
+      occupantRoles: ['top-level', 'sub-component', 'leaf'],
+      occupantTypes: ['piece', 'token', 'card'],
+      allowMixedOccupants: true,
+      allowSharedControl: true,
+      perPlayerLimit: null,
+    },
+    visibilityDefaults: {
+      zoneVisibility: Visibility.Hidden,
+      contentsVisibility: Visibility.Hidden,
+      ownerPrivate: false,
+      faceUpByDefault: false,
+    },
+    composition: {
+      strategy: 'children',
+      childSlots: [
+        {
+          id: 'cards',
+          label: 'Cards',
+          acceptsRoles: ['top-level', 'sub-component', 'leaf'],
+          acceptsTypes: ['piece', 'token', 'card'],
+          minChildren: 0,
+          maxChildren: null,
+        },
+      ],
+    },
+    tags: ['ordered', 'draw'],
+  },
+  hand: {
+    type: 'hand',
+    category: 'collection',
+    role: 'top-level',
+    displayName: 'Hand',
+    description: 'A player-owned private collection that presents items in a fan or row.',
+    propertyDefinitions: {
+      label: { kind: 'string', label: 'Label' },
+      maxCards: { kind: 'number', label: 'Capacity' },
+    },
+    propertiesSchema: z.object({
+      label: z.string().default('Hand'),
+      maxCards: countSchema,
+    }),
+    defaultProperties: {
+      label: 'Hand',
+      maxCards: null,
+    },
+    renderHints: {
+      surface: 'collection',
+      layout: 'fan',
+      orientation: 'horizontal',
+      ...defaultCollectionRenderHints,
+    },
+    interactionDefaults: {
+      selectionMode: 'multiple',
+      primaryAction: 'select',
+      dragEnabled: true,
+      dropEnabled: true,
+      keyboardNavigable: true,
+      highlightValidDestinations: true,
+    },
+    placementConstraints: {
+      requiresParent: false,
+      allowedParentRoles: [],
+      allowedParentTypes: [],
+      allowedChildRoles: ['top-level', 'sub-component', 'leaf'],
+      allowedChildTypes: ['piece', 'token', 'card'],
+      minChildren: 0,
+      maxChildren: null,
+    },
+    occupancyRules: {
+      mode: 'multiple',
+      capacity: null,
+      occupantRoles: ['top-level', 'sub-component', 'leaf'],
+      occupantTypes: ['piece', 'token', 'card'],
+      allowMixedOccupants: true,
+      allowSharedControl: false,
+      perPlayerLimit: null,
+    },
+    visibilityDefaults: {
+      zoneVisibility: Visibility.Private,
+      contentsVisibility: Visibility.Private,
+      ownerPrivate: true,
+      faceUpByDefault: true,
+    },
+    composition: {
+      strategy: 'children',
+      childSlots: [
+        {
+          id: 'held-items',
+          label: 'Held Items',
+          acceptsRoles: ['top-level', 'sub-component', 'leaf'],
+          acceptsTypes: ['piece', 'token', 'card'],
+          minChildren: 0,
+          maxChildren: null,
+        },
+      ],
+    },
+    tags: ['player-area', 'private'],
+  },
+  discard: {
+    type: 'discard',
+    category: 'collection',
+    role: 'top-level',
+    displayName: 'Discard',
+    description: 'A public pile of spent or resolved entities.',
+    propertyDefinitions: {
+      label: { kind: 'string', label: 'Label' },
+    },
+    propertiesSchema: z.object({
+      label: z.string().default('Discard'),
+    }),
+    defaultProperties: {
+      label: 'Discard',
+    },
+    renderHints: {
+      surface: 'collection',
+      layout: 'pile',
+      orientation: 'vertical',
+      ...defaultCollectionRenderHints,
+    },
+    interactionDefaults: {
+      selectionMode: 'single',
+      primaryAction: 'inspect',
+      dragEnabled: false,
+      dropEnabled: true,
+      keyboardNavigable: true,
+      highlightValidDestinations: false,
+    },
+    placementConstraints: {
+      requiresParent: false,
+      allowedParentRoles: [],
+      allowedParentTypes: [],
+      allowedChildRoles: ['top-level', 'sub-component', 'leaf'],
+      allowedChildTypes: ['piece', 'token', 'card'],
+      minChildren: 0,
+      maxChildren: null,
+    },
+    occupancyRules: {
+      mode: 'stack',
+      capacity: null,
+      occupantRoles: ['top-level', 'sub-component', 'leaf'],
+      occupantTypes: ['piece', 'token', 'card'],
+      allowMixedOccupants: true,
+      allowSharedControl: true,
+      perPlayerLimit: null,
+    },
+    visibilityDefaults: {
+      zoneVisibility: Visibility.Public,
+      contentsVisibility: Visibility.Public,
+      ownerPrivate: false,
+      faceUpByDefault: true,
+    },
+    composition: {
+      strategy: 'children',
+      childSlots: [
+        {
+          id: 'discarded-items',
+          label: 'Discarded Items',
+          acceptsRoles: ['top-level', 'sub-component', 'leaf'],
+          acceptsTypes: ['piece', 'token', 'card'],
+          minChildren: 0,
+          maxChildren: null,
+        },
+      ],
+    },
+    tags: ['history', 'public'],
+  },
+  bag: {
+    type: 'bag',
+    category: 'collection',
+    role: 'top-level',
+    displayName: 'Bag',
+    description: 'A concealed random-access collection used for draws and pulls.',
+    propertyDefinitions: {
+      label: { kind: 'string', label: 'Label' },
+      maxItems: { kind: 'number', label: 'Capacity' },
+    },
+    propertiesSchema: z.object({
+      label: z.string().default('Bag'),
+      maxItems: countSchema,
+    }),
+    defaultProperties: {
+      label: 'Bag',
+      maxItems: null,
+    },
+    renderHints: {
+      surface: 'collection',
+      layout: 'pile',
+      orientation: 'vertical',
+      ...defaultCollectionRenderHints,
+    },
+    interactionDefaults: {
+      selectionMode: 'single',
+      primaryAction: 'draw',
+      dragEnabled: false,
+      dropEnabled: true,
+      keyboardNavigable: true,
+      highlightValidDestinations: false,
+    },
+    placementConstraints: {
+      requiresParent: false,
+      allowedParentRoles: [],
+      allowedParentTypes: [],
+      allowedChildRoles: ['top-level', 'sub-component', 'leaf'],
+      allowedChildTypes: ['piece', 'token', 'card'],
+      minChildren: 0,
+      maxChildren: null,
+    },
+    occupancyRules: {
+      mode: 'stack',
+      capacity: null,
+      occupantRoles: ['top-level', 'sub-component', 'leaf'],
+      occupantTypes: ['piece', 'token', 'card'],
+      allowMixedOccupants: true,
+      allowSharedControl: true,
+      perPlayerLimit: null,
+    },
+    visibilityDefaults: {
+      zoneVisibility: Visibility.Hidden,
+      contentsVisibility: Visibility.Hidden,
+      ownerPrivate: false,
+      faceUpByDefault: false,
+    },
+    composition: {
+      strategy: 'children',
+      childSlots: [
+        {
+          id: 'contained-items',
+          label: 'Contained Items',
+          acceptsRoles: ['top-level', 'sub-component', 'leaf'],
+          acceptsTypes: ['piece', 'token', 'card'],
+          minChildren: 0,
+          maxChildren: null,
+        },
+      ],
+    },
+    tags: ['randomized', 'hidden'],
+  },
+};

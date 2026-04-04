@@ -1,1031 +1,483 @@
-import { useState } from 'react';
-import { ChevronDown, Plus, Trash2, X } from 'lucide-react';
-import { getBoardSurfaceTextureStyle } from '@turnbased/engine-ui';
+import { useRef, useState, type ReactNode } from 'react';
+import { Sparkles, BookImage, Hexagon, ImagePlus, Upload, Wand2, X, Plus, ArrowLeft } from 'lucide-react';
+import { inputStyle } from '../styles';
+import type { EditorImageAsset, EditorProject } from '../types';
+import { addIconAsset, addReferenceAsset } from './art/artUtils';
+import { ArtReferenceCard } from './art/ArtReferenceCard';
+import { IconAssetCard } from './art/IconAssetCard';
+import { IconArtworkPreview } from './art/IconArtworkPreview';
+import { supabase } from '../../lib/supabaseClient';
 import { generateId } from '@turnbased/shared-utils';
 
-import { NumericInput } from '../../components/NumericInput';
-import { InspectorAccordion, InspectorAppearanceControls, InspectorColorField } from '../components/InspectorControls';
-import { EDITOR_ICON_OPTIONS, renderIcon } from '../iconography';
-import { createProjectPaletteReference, listProjectPaletteOptions, resolveProjectPaletteColorValue } from '../projectPalette';
-import { inputStyle, labelStyle, panelStyle, sectionTitleStyle, textareaStyle } from '../styles';
-import type { EditorArtReference, EditorIconAsset, EditorProject } from '../types';
+// ── Studio background ─────────────────────────────────────────────
 
-const INVISIBLE_ICON_FILL = 'rgba(0,0,0,0)';
+export const STUDIO_BG_VALUE = `
+  radial-gradient(ellipse 80% 60% at 20% 10%, rgba(45,106,79,0.12) 0%, transparent 60%),
+  radial-gradient(ellipse 70% 50% at 85% 30%, rgba(180,145,60,0.10) 0%, transparent 55%),
+  radial-gradient(ellipse 90% 70% at 50% 90%, rgba(27,67,50,0.10) 0%, transparent 60%),
+  radial-gradient(ellipse 50% 40% at 70% 70%, rgba(200,160,50,0.06) 0%, transparent 50%),
+  linear-gradient(175deg, rgba(240,253,244,0.95) 0%, rgba(254,252,232,0.5) 40%, rgba(236,253,245,0.7) 100%)
+`;
 
-function parseTagList(value: string): string[] {
-  return value
-    .split(',')
-    .map((tag) => tag.trim())
-    .filter((tag) => tag.length > 0);
-}
+const STUDIO_BG: React.CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  zIndex: 0,
+  pointerEvents: 'none',
+  background: STUDIO_BG_VALUE,
+};
 
-function formatTagList(tags: readonly string[]): string {
-  return tags.join(', ');
-}
+// ── Shared UI ──────────────────────────────────────────────────────
 
-function addReferenceAsset(
-  items: readonly EditorArtReference[],
-  defaults: Partial<EditorArtReference> = {},
-): EditorArtReference[] {
-  return [...items, {
-    id: generateId('art_ref'),
-    name: '',
-    category: '',
-    description: '',
-    tags: [],
-    ...defaults,
-  }];
-}
-
-function addIconAsset(items: readonly EditorIconAsset[]): EditorIconAsset[] {
-  return [...items, {
-    id: generateId('art_icon'),
-    mode: 'library',
-    name: 'Shield',
-    iconKey: 'shield',
-    iconColor: createProjectPaletteReference('primary'),
-    iconFillColor: INVISIBLE_ICON_FILL,
-    iconStrokeWidth: 1,
-    backgroundColor: 'rgba(255,255,255,0.94)',
-    backgroundTextureId: 'none',
-    backgroundTextureOpacity: 0.35,
-    borderColor: createProjectPaletteReference('secondary'),
-    borderWidth: 1,
-    borderRadius: 20,
-    customSvgMarkup: '',
-    inlineCode: ':shield:',
-    description: '',
-    tags: [],
-  }];
-}
-
-function formatInlineCodeFromIconKey(iconKey: string): string {
-  return `:${iconKey}:`;
-}
-
-function resolveEditorColor(project: EditorProject, value: string): string {
-  return resolveProjectPaletteColorValue(project.settings.colorPalette, value) ?? value;
-}
-
-function clampNonNegativeNumber(value: number, fallback: number): number {
-  if (!Number.isFinite(value)) {
-    return fallback;
-  }
-
-  return Math.max(0, value);
-}
-
-function renderCustomIconArtwork(item: EditorIconAsset, color: string) {
-  const trimmedMarkup = item.customSvgMarkup.trim();
-
-  if (!trimmedMarkup) {
-    return (
-      <div style={{ fontSize: '0.78rem', color: '#0f766e', textAlign: 'center', lineHeight: 1.4, padding: '0.4rem' }}>
-        Add SVG markup or a short glyph to create a custom icon.
-      </div>
-    );
-  }
-
-  if (trimmedMarkup.startsWith('<svg')) {
-    return (
-      <div
-        style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', color }}
-        dangerouslySetInnerHTML={{ __html: trimmedMarkup }}
-      />
-    );
-  }
-
-  return (
-    <div style={{ color, fontSize: '2.6rem', fontWeight: 800, lineHeight: 1 }}>
-      {trimmedMarkup.slice(0, 2)}
-    </div>
-  );
-}
-
-function IconArtworkPreview({
-  item,
-  project,
-  size,
-}: {
-  item: EditorIconAsset;
-  project: EditorProject;
-  size: number;
-}) {
-  const backgroundColor = resolveEditorColor(project, item.backgroundColor);
-  const borderColor = resolveEditorColor(project, item.borderColor);
-  const iconColor = resolveEditorColor(project, item.iconColor);
-  const textureStyle = item.backgroundTextureId !== 'none'
-    ? getBoardSurfaceTextureStyle(item.backgroundTextureId, item.backgroundTextureOpacity)
-    : null;
-
-  return (
-    <div
-      style={{
-        position: 'relative',
-        width: `${size}px`,
-        height: `${size}px`,
-        borderRadius: `${item.borderRadius}px`,
-        border: `${item.borderWidth}px solid ${borderColor}`,
-        background: backgroundColor,
-        overflow: 'hidden',
-        display: 'grid',
-        placeItems: 'center',
-        boxSizing: 'border-box',
-      }}
-    >
-      {textureStyle?.backgroundImage ? (
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            pointerEvents: 'none',
-            ...textureStyle,
-          }}
-        />
-      ) : null}
-
-      <div
-        style={{
-          position: 'relative',
-          zIndex: 1,
-          width: '72%',
-          height: '72%',
-          display: 'grid',
-          placeItems: 'center',
-          color: iconColor,
-          overflow: 'hidden',
-        }}
-      >
-        {item.mode === 'custom'
-          ? renderCustomIconArtwork(item, iconColor)
-          : renderIcon(item.iconKey, {
-            size: size * 0.42,
-            strokeWidth: item.iconStrokeWidth,
-            fillColor: resolveEditorColor(project, item.iconFillColor),
-            style: { color: iconColor },
-          })}
-      </div>
-    </div>
-  );
-}
-
-function AssetSectionHeader({
+function SubPageShell({
   title,
-  description,
-  onAdd,
+  icon,
+  onBack,
+  actions,
+  children,
 }: {
   title: string;
-  description: string;
-  onAdd: () => void;
+  icon: ReactNode;
+  onBack: () => void;
+  actions?: ReactNode;
+  children: ReactNode;
 }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.8rem', flexWrap: 'wrap' }}>
-      <div style={{ display: 'grid', gap: '0.18rem' }}>
-        <div style={{ color: '#064e3b', fontWeight: 800 }}>{title}</div>
-        <div style={{ color: '#0f766e', fontSize: '0.8rem', lineHeight: 1.45 }}>{description}</div>
+    <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: 0, overflow: 'auto' }}>
+      <div style={STUDIO_BG} />
+      <div style={{ position: 'relative', zIndex: 1, maxWidth: '780px', margin: '0 auto', padding: '0.5rem 0.5rem 2rem 0.5rem' }}>
+        {/* Back bar */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.5rem 0 1rem 0',
+        }}>
+          <button type="button" onClick={onBack} style={{
+            display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+            border: 'none', background: 'rgba(255,255,255,0.7)', backdropFilter: 'blur(8px)',
+            borderRadius: '999px', padding: '0.45rem 0.8rem', color: '#064e3b',
+            fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer',
+            boxShadow: '0 2px 8px rgba(6,78,59,0.06)',
+          }}>
+            <ArrowLeft size={14} /> Studio
+          </button>
+          <div style={{ flex: 1 }} />
+          {actions}
+        </div>
+
+        {/* Title */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1rem' }}>
+          <span style={{ color: '#0d9488' }}>{icon}</span>
+          <span style={{ color: '#064e3b', fontWeight: 800, fontSize: '1.15rem' }}>{title}</span>
+        </div>
+
+        {children}
       </div>
-      <button
-        type="button"
-        onClick={onAdd}
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '0.4rem',
-          borderRadius: '999px',
-          border: '1px solid rgba(15,118,110,0.14)',
-          background: 'rgba(240,253,244,0.94)',
-          color: '#065f46',
-          padding: '0.55rem 0.85rem',
-          fontWeight: 700,
-          cursor: 'pointer',
-        }}
-      >
-        <Plus size={14} />
-        Add
-      </button>
     </div>
   );
 }
 
-function ArtReferenceCard({
-  item,
-  categoryLabel,
-  categoryPlaceholder,
-  showCategory = true,
-  showTags = true,
-  showHeader = true,
-  collapsible = false,
-  namePlaceholder = 'Harbor captain',
-  descriptionPlaceholder = 'Describe the silhouette, material language, outfit, or environmental cues we should keep consistent.',
-  onChange,
-  onRemove,
+// ── Home tile ──────────────────────────────────────────────────────
+
+function StudioTile({
+  icon,
+  label,
+  count,
+  children,
+  onClick,
 }: {
-  item: EditorArtReference;
-  categoryLabel?: string;
-  categoryPlaceholder?: string;
-  showCategory?: boolean;
-  showTags?: boolean;
-  showHeader?: boolean;
-  collapsible?: boolean;
-  namePlaceholder?: string;
-  descriptionPlaceholder?: string;
-  onChange: (next: EditorArtReference) => void;
-  onRemove: () => void;
+  icon: ReactNode;
+  label: string;
+  count?: number;
+  children?: ReactNode;
+  onClick: () => void;
 }) {
-  const [isCollapsed, setIsCollapsed] = useState(false);
-
+  const [hovered, setHovered] = useState(false);
   return (
-    <div style={{ borderRadius: '18px', border: '1px solid rgba(15,118,110,0.1)', background: 'rgba(248,250,252,0.86)', padding: '0.9rem', display: 'grid', gap: '0.75rem' }}>
-      {showHeader ? (
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem' }}>
-          <div style={{ color: '#064e3b', fontWeight: 700 }}>{item.name.trim() || 'Untitled Asset'}</div>
-          <button
-            type="button"
-            onClick={onRemove}
-            aria-label="Delete asset"
-            style={{
-              width: '34px',
-              height: '34px',
-              display: 'grid',
-              placeItems: 'center',
-              borderRadius: '999px',
-              border: '1px solid rgba(239,68,68,0.18)',
-              background: 'rgba(254,242,242,0.96)',
-              color: '#b91c1c',
-              cursor: 'pointer',
-            }}
-          >
-            <Trash2 size={15} />
-          </button>
-        </div>
-      ) : null}
-
-      <div style={{ display: 'grid', gridTemplateColumns: showCategory ? 'minmax(0, 1.2fr) minmax(0, 0.8fr)' : 'minmax(0, 1fr)', gap: '0.75rem' }}>
-        {showHeader ? (
-          <label style={labelStyle}>
-            Name
-            <input
-              value={item.name}
-              onChange={(event) => onChange({ ...item, name: event.target.value })}
-              placeholder={namePlaceholder}
-              style={inputStyle}
-            />
-          </label>
-        ) : null}
-        {showCategory ? (
-          <label style={labelStyle}>
-            {categoryLabel}
-            <input
-              value={item.category}
-              onChange={(event) => onChange({ ...item, category: event.target.value })}
-              placeholder={categoryPlaceholder}
-              style={inputStyle}
-            />
-          </label>
-        ) : null}
+    <button
+      type="button"
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        textAlign: 'left',
+        borderRadius: '20px',
+        border: hovered ? '2px solid rgba(13,148,136,0.35)' : '2px solid rgba(15,118,110,0.14)',
+        background: hovered ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.65)',
+        backdropFilter: 'blur(12px)',
+        padding: 0,
+        cursor: 'pointer',
+        overflow: 'hidden',
+        display: 'grid',
+        gridTemplateRows: 'minmax(0, 1fr) auto',
+        height: '100%',
+        transition: 'all 200ms ease',
+        boxShadow: hovered
+          ? '0 12px 40px rgba(6,78,59,0.14)'
+          : '0 2px 12px rgba(6,78,59,0.05)',
+        transform: hovered ? 'translateY(-2px) scale(1.01)' : 'none',
+      }}
+    >
+      <div style={{
+        padding: '1.5rem 1rem',
+        display: 'grid',
+        placeItems: 'center',
+      }}>
+        {children ?? (
+          <span style={{ color: '#0d9488', opacity: 0.3 }}>{icon}</span>
+        )}
       </div>
 
-      {!showHeader ? (
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem' }}>
-          <button
-            type="button"
-            onClick={() => collapsible ? setIsCollapsed((current) => !current) : undefined}
-            aria-label={collapsible ? (isCollapsed ? 'Expand art style' : 'Collapse art style') : undefined}
-            aria-expanded={collapsible ? !isCollapsed : undefined}
-            style={{
-              flex: 1,
-              minWidth: 0,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.75rem',
-              padding: '0.2rem 0',
-              border: 'none',
-              background: 'none',
-              cursor: collapsible ? 'pointer' : 'default',
-              textAlign: 'left',
-              color: '#064e3b',
-            }}
-          >
-            <div style={{ minWidth: 0, display: 'grid', gap: '0.12rem', flex: 1 }}>
-              <div style={{ color: '#064e3b', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {item.name.trim() || 'Unnamed Style'}
-              </div>
-            </div>
-            {collapsible ? (
-              <ChevronDown
-                size={16}
-                style={{
-                  color: '#0d9488',
-                  flexShrink: 0,
-                  transition: 'transform 180ms ease',
-                  transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
-                }}
-              />
-            ) : null}
-          </button>
-          <button
-            type="button"
-            onClick={onRemove}
-            aria-label="Delete asset"
-            style={{
-              width: '34px',
-              height: '34px',
-              display: 'grid',
-              placeItems: 'center',
-              borderRadius: '999px',
-              border: '1px solid rgba(239,68,68,0.18)',
-              background: 'rgba(254,242,242,0.96)',
-              color: '#b91c1c',
-              cursor: 'pointer',
-              flexShrink: 0,
-            }}
-          >
-            <Trash2 size={15} />
-          </button>
-        </div>
-      ) : null}
-
-      {!collapsible || !isCollapsed ? (
-        <>
-          {!showHeader ? (
-            <label style={labelStyle}>
-              Name
-              <input
-                value={item.name}
-                onChange={(event) => onChange({ ...item, name: event.target.value })}
-                placeholder={namePlaceholder}
-                style={inputStyle}
-              />
-            </label>
-          ) : null}
-
-          <label style={labelStyle}>
-            Description
-            <textarea
-              value={item.description}
-              onChange={(event) => onChange({ ...item, description: event.target.value })}
-              placeholder={descriptionPlaceholder}
-              style={{ ...textareaStyle, minHeight: '88px' }}
-            />
-          </label>
-        </>
-      ) : null}
-
-      {showTags ? (
-        <label style={labelStyle}>
-          Tags
-          <input
-            value={formatTagList(item.tags)}
-            onChange={(event) => onChange({ ...item, tags: parseTagList(event.target.value) })}
-            placeholder="boss, undead, swamp, brass"
-            style={inputStyle}
-          />
-        </label>
-      ) : null}
-    </div>
+      <div style={{
+        padding: '0.7rem 1rem',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.5rem',
+        borderTop: '2px solid rgba(15,118,110,0.08)',
+        background: 'rgba(255,255,255,0.75)',
+      }}>
+        <span style={{ color: '#0d9488', flexShrink: 0 }}>{icon}</span>
+        <span style={{ color: '#064e3b', fontWeight: 700, fontSize: '0.85rem', flex: 1 }}>{label}</span>
+        {typeof count === 'number' ? (
+          <span style={{
+            fontSize: '0.7rem', fontWeight: 700, color: '#0d9488',
+            background: 'rgba(13,148,136,0.1)', padding: '0.18rem 0.5rem', borderRadius: '999px',
+          }}>
+            {count}
+          </span>
+        ) : null}
+      </div>
+    </button>
   );
 }
 
-function IconAssetCard({
-  project,
-  item,
-  onChange,
-  onRemove,
-  onAssignPaletteColor,
+// ── Images sub-page content ────────────────────────────────────────
+
+function ImagesContent({
+  projectId, images, onUpdateImages,
 }: {
-  project: EditorProject;
-  item: EditorIconAsset;
-  onChange: (next: EditorIconAsset) => void;
-  onRemove: () => void;
-  onAssignPaletteColor: (paletteId: string, value: string) => void;
+  projectId: string;
+  images: EditorImageAsset[];
+  onUpdateImages: (updater: (images: EditorImageAsset[]) => EditorImageAsset[]) => void;
 }) {
-  const [isPickerOpen, setIsPickerOpen] = useState(false);
-  const [iconSearch, setIconSearch] = useState('');
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const paletteOptions = listProjectPaletteOptions(project);
-  const selectedOption = EDITOR_ICON_OPTIONS.find((option) => option.key === item.iconKey) ?? EDITOR_ICON_OPTIONS[0];
-  const displayName = item.name.trim() || (item.mode === 'custom' ? 'Custom Icon' : selectedOption.label) || item.inlineCode.trim() || 'New Icon';
-  const filteredOptions = EDITOR_ICON_OPTIONS.filter((option) => {
-    const query = iconSearch.trim().toLowerCase();
-    if (!query) {
-      return true;
-    }
+  const [isUploading, setIsUploading] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [showAiInput, setShowAiInput] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-    return option.label.toLowerCase().includes(query) || option.key.toLowerCase().includes(query);
-  });
+  async function handleUpload(file: File) {
+    setIsUploading(true); setError(null);
+    try {
+      const { data: signData, error: signErr } = await supabase.functions.invoke('assets-manager', {
+        body: { action: 'sign-upload', projectId, fileName: file.name, mime: file.type || 'application/octet-stream', sizeBytes: file.size },
+      });
+      if (signErr || !signData?.success) throw new Error(signErr?.message || 'Failed to sign upload');
+      await new Promise((r) => setTimeout(r, 800));
+      const { error: finalizeErr } = await supabase.functions.invoke('assets-manager', {
+        body: { action: 'finalize-upload', projectId, r2Key: signData.r2Key, mime: file.type || 'application/octet-stream', sizeBytes: file.size },
+      });
+      if (finalizeErr) throw new Error(finalizeErr.message || 'Failed to finalize upload');
+      onUpdateImages((c) => [{ id: generateId('img'), name: file.name.replace(/\.[^.]+$/, ''), r2Key: signData.r2Key, mime: file.type || 'application/octet-stream', bytes: file.size, tags: [], createdAt: new Date().toISOString() }, ...c]);
+    } catch (err) { setError(err instanceof Error ? err.message : 'Upload failed'); }
+    finally { setIsUploading(false); }
+  }
+
+  async function handleAiGenerate() {
+    const trimmed = aiPrompt.trim(); if (!trimmed) return;
+    setIsGenerating(true); setError(null);
+    try {
+      const { data, error: genErr } = await supabase.functions.invoke('ai-image-agent', { body: { projectId, prompt: trimmed } });
+      if (genErr) throw new Error(genErr.message || 'Image generation failed');
+      onUpdateImages((c) => [{ id: generateId('img'), name: trimmed.slice(0, 60), r2Key: data?.r2Key ?? `${projectId}/ai-${Date.now()}.png`, mime: 'image/png', bytes: data?.sizeBytes ?? 0, aiPrompt: trimmed, tags: [], createdAt: new Date().toISOString() }, ...c]);
+      setAiPrompt(''); setShowAiInput(false);
+    } catch (err) { setError(err instanceof Error ? err.message : 'Generation failed'); }
+    finally { setIsGenerating(false); }
+  }
 
   return (
-    <div style={{ borderRadius: '18px', border: '1px solid rgba(15,118,110,0.1)', background: 'rgba(248,250,252,0.86)', padding: '0.9rem', display: 'grid', gap: '0.75rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem' }}>
-        <button
-          type="button"
-          onClick={() => setIsCollapsed((current) => !current)}
-          aria-expanded={!isCollapsed}
-          style={{
-            flex: 1,
-            minWidth: 0,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.75rem',
-            padding: '0.2rem 0',
-            border: 'none',
-            background: 'none',
-            cursor: 'pointer',
-            textAlign: 'left',
-            color: '#064e3b',
-          }}
-        >
-          <IconArtworkPreview item={item} project={project} size={isCollapsed ? 40 : 48} />
-          <div style={{ minWidth: 0, display: 'grid', gap: '0.12rem', flex: 1 }}>
-            <div style={{ color: '#064e3b', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {displayName}
-            </div>
-            {!isCollapsed ? (
-              <div style={{ color: '#0f766e', fontSize: '0.76rem' }}>
-                {item.inlineCode.trim() || (item.mode === 'library' ? formatInlineCodeFromIconKey(item.iconKey) : ':custom:')}
-              </div>
-            ) : null}
-          </div>
-          <ChevronDown
-            size={16}
-            style={{
-              color: '#0d9488',
-              flexShrink: 0,
-              transition: 'transform 180ms ease',
-              transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
-            }}
-          />
-        </button>
-        <button
-          type="button"
-          onClick={onRemove}
-          aria-label="Delete icon"
-          style={{
-            width: '34px',
-            height: '34px',
-            display: 'grid',
-            placeItems: 'center',
-            borderRadius: '999px',
-            border: '1px solid rgba(239,68,68,0.18)',
-            background: 'rgba(254,242,242,0.96)',
-            color: '#b91c1c',
-            cursor: 'pointer',
-            flexShrink: 0,
-          }}
-        >
-          <Trash2 size={15} />
-        </button>
+    <div style={{ display: 'grid', gap: '0.85rem' }}>
+      <div style={{ display: 'flex', gap: '0.4rem' }}>
+        <button type="button" onClick={() => setShowAiInput((v) => !v)} style={{
+          display: 'inline-flex', alignItems: 'center', gap: '0.35rem', borderRadius: '999px', border: 'none',
+          background: showAiInput ? 'rgba(139,92,246,0.15)' : 'linear-gradient(135deg, #6d28d9, #8b5cf6)',
+          color: showAiInput ? '#6d28d9' : 'white', padding: '0.5rem 0.85rem', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer',
+        }}><Wand2 size={13} /> Generate</button>
+        <button type="button" onClick={() => fileInputRef.current?.click()} disabled={isUploading} style={{
+          display: 'inline-flex', alignItems: 'center', gap: '0.35rem', borderRadius: '999px', border: 'none',
+          background: 'linear-gradient(135deg, #064e3b, #0d9488)', color: 'white', padding: '0.5rem 0.85rem',
+          fontWeight: 700, fontSize: '0.78rem', cursor: isUploading ? 'wait' : 'pointer', opacity: isUploading ? 0.7 : 1,
+        }}><Upload size={13} /> {isUploading ? 'Uploading...' : 'Upload'}</button>
+        <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUpload(f); e.target.value = ''; }} />
       </div>
 
-      {!isCollapsed ? (
-        <>
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 140px', gap: '0.75rem' }}>
-        <label style={labelStyle}>
-          Icon Name
-          <input
-            value={item.name}
-            onChange={(event) => onChange({ ...item, name: event.target.value })}
-            placeholder="Attack"
-            style={inputStyle}
-          />
-        </label>
-        <label style={labelStyle}>
-          Inline Code
-          <input
-            value={item.inlineCode}
-            onChange={(event) => onChange({ ...item, inlineCode: event.target.value })}
-            placeholder=":attack:"
-            style={inputStyle}
-          />
-        </label>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 196px', gap: '0.75rem', alignItems: 'stretch' }}>
-        <label style={labelStyle}>
-          Meaning / Art Notes
-          <textarea
-            value={item.description}
-            onChange={(event) => onChange({ ...item, description: event.target.value })}
-            placeholder="What this icon communicates, where it appears, and what visual system it should match."
-            style={{ ...textareaStyle, minHeight: '208px' }}
-          />
-        </label>
-
-        <div style={{ display: 'grid', gap: '0.55rem' }}>
-          <span style={labelStyle}>Icon Artwork</span>
-          <button
-            type="button"
-            onClick={() => setIsPickerOpen(true)}
-            style={{
-              borderRadius: '18px',
-              border: '1px solid rgba(15,118,110,0.14)',
-              background: 'rgba(255,255,255,0.94)',
-              padding: '0.85rem 0.75rem',
-              display: 'grid',
-              justifyItems: 'center',
-              alignContent: 'center',
-              gap: '0.55rem',
-              cursor: 'pointer',
-              color: '#064e3b',
-              minHeight: '208px',
-              height: '100%',
-            }}
-          >
-            <IconArtworkPreview item={item} project={project} size={72} />
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.82rem', fontWeight: 700 }}>
-              <span>{item.mode === 'custom' ? 'Custom Icon' : selectedOption.label}</span>
-              <ChevronDown size={14} />
-            </div>
-            <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#065f46', textAlign: 'center' }}>
-              Edit Icon
-            </div>
-            <div style={{ fontSize: '0.72rem', color: '#0f766e', textAlign: 'center', lineHeight: 1.4 }}>
-              Open the icon editor to switch modes, style the tile, or choose from the library.
-            </div>
-          </button>
-        </div>
-      </div>
-
-      {isPickerOpen ? (
-        <div
-          onClick={() => setIsPickerOpen(false)}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 90,
-            background: 'rgba(6,78,59,0.22)',
-            backdropFilter: 'blur(6px)',
-            WebkitBackdropFilter: 'blur(6px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '1.25rem',
-          }}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="Edit icon"
-            onClick={(event) => event.stopPropagation()}
-            style={{
-              width: 'min(1320px, calc(100vw - 2rem))',
-              height: 'min(860px, calc(100vh - 2rem))',
-              borderRadius: '26px',
-              border: '1px solid rgba(15,118,110,0.12)',
-              background: 'rgba(255,255,255,0.98)',
-              boxShadow: '0 32px 70px rgba(15,23,42,0.18)',
-              padding: '1.15rem',
-              display: 'grid',
-              gridTemplateRows: 'auto minmax(0, 1fr)',
-              gap: '1rem',
-              overflow: 'visible',
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem' }}>
-              <div style={{ display: 'grid', gap: '0.18rem' }}>
-                <div style={{ color: '#064e3b', fontWeight: 800, fontSize: '1.02rem' }}>Edit Icon</div>
-                <div style={{ color: '#0f766e', fontSize: '0.82rem' }}>
-                  Pick from the shared library and keep this icon asset aligned with your board game visual language.
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsPickerOpen(false)}
-                aria-label="Close icon editor"
-                style={{
-                  width: '38px',
-                  height: '38px',
-                  display: 'grid',
-                  placeItems: 'center',
-                  borderRadius: '999px',
-                  border: '1px solid rgba(15,118,110,0.14)',
-                  background: 'rgba(248,250,252,0.96)',
-                  color: '#065f46',
-                  cursor: 'pointer',
-                }}
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 360px', gap: '1rem', minHeight: 0, alignItems: 'stretch' }}>
-              <div style={{ display: 'grid', gridTemplateRows: 'auto minmax(0, 1fr) auto', gap: '0.75rem', minHeight: 0 }}>
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.28rem', borderRadius: '999px', background: 'rgba(240,253,244,0.92)', width: 'fit-content' }}>
-                  {[
-                    { id: 'library' as const, label: 'Use Existing Icon' },
-                    { id: 'custom' as const, label: 'Completely Custom Icon' },
-                  ].map((modeOption) => (
-                    <button
-                      key={modeOption.id}
-                      type="button"
-                      onClick={() => onChange({
-                        ...item,
-                        mode: modeOption.id,
-                      })}
-                      style={{
-                        border: 'none',
-                        borderRadius: '999px',
-                        padding: '0.55rem 0.9rem',
-                        background: item.mode === modeOption.id ? 'linear-gradient(135deg, #0f766e, #14b8a6)' : 'transparent',
-                        color: item.mode === modeOption.id ? '#ffffff' : '#065f46',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      {modeOption.label}
-                    </button>
-                  ))}
-                </div>
-
-                <div
-                  style={{
-                    minHeight: 0,
-                    borderRadius: '22px',
-                    border: '1px solid rgba(15,118,110,0.1)',
-                    background: 'rgba(248,250,252,0.84)',
-                    padding: '0.9rem',
-                    display: 'grid',
-                    overflow: 'hidden',
-                  }}
-                >
-                  {item.mode === 'library' ? (
-                    <div
-                      style={{
-                        display: 'grid',
-                        gridTemplateRows: 'auto minmax(0, 1fr)',
-                        gap: '0.75rem',
-                        minHeight: 0,
-                      }}
-                    >
-                      <div style={{ color: '#064e3b', fontWeight: 800, fontSize: '0.9rem' }}>Select From Library</div>
-                      <div style={{ display: 'grid', gap: '0.65rem', minHeight: 0 }}>
-                        <label style={labelStyle}>
-                          Search Icons
-                          <input
-                            value={iconSearch}
-                            onChange={(event) => setIconSearch(event.target.value)}
-                            placeholder="Search icons"
-                            style={inputStyle}
-                          />
-                        </label>
-
-                        <div
-                          style={{
-                            minHeight: 0,
-                            overflowY: 'auto',
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
-                            gap: '0.55rem',
-                            paddingRight: '0.1rem',
-                          }}
-                        >
-                          {filteredOptions.map((option) => (
-                            <button
-                              key={option.key}
-                              type="button"
-                              onClick={() => {
-                                const shouldSyncName = item.name.trim().length === 0 || item.name === selectedOption.label;
-                                const shouldSyncInlineCode = item.inlineCode.trim().length === 0 || item.inlineCode === formatInlineCodeFromIconKey(selectedOption.key);
-
-                                onChange({
-                                  ...item,
-                                  iconKey: option.key,
-                                  name: shouldSyncName ? option.label : item.name,
-                                  inlineCode: shouldSyncInlineCode ? formatInlineCodeFromIconKey(option.key) : item.inlineCode,
-                                });
-                              }}
-                              style={{
-                                borderRadius: '16px',
-                                border: option.key === item.iconKey ? '1px solid rgba(13,148,136,0.45)' : '1px solid rgba(15,118,110,0.1)',
-                                background: option.key === item.iconKey ? 'rgba(240,253,250,0.98)' : 'rgba(255,255,255,0.95)',
-                                padding: '0.7rem 0.5rem',
-                                display: 'grid',
-                                justifyItems: 'center',
-                                gap: '0.45rem',
-                                cursor: 'pointer',
-                                color: '#065f46',
-                              }}
-                            >
-                              {renderIcon(option.key, {
-                                size: 22,
-                                strokeWidth: item.iconStrokeWidth,
-                                fillColor: resolveEditorColor(project, item.iconFillColor),
-                                style: { color: resolveEditorColor(project, item.iconColor) },
-                              })}
-                              <span style={{ fontSize: '0.72rem', fontWeight: 700, textAlign: 'center', lineHeight: 1.2 }}>{option.label}</span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div
-                      style={{
-                        display: 'grid',
-                        gridTemplateRows: 'auto minmax(0, 1fr) auto',
-                        gap: '0.75rem',
-                        minHeight: 0,
-                      }}
-                    >
-                      <div style={{ color: '#064e3b', fontWeight: 800, fontSize: '0.9rem' }}>Custom Icon</div>
-                      <label style={{ ...labelStyle, minHeight: 0, display: 'grid', gridTemplateRows: 'auto minmax(0, 1fr)' }}>
-                        SVG Markup Or Glyph
-                        <textarea
-                          value={item.customSvgMarkup}
-                          onChange={(event) => onChange({ ...item, customSvgMarkup: event.target.value })}
-                          placeholder="<svg viewBox='0 0 24 24' fill='none' stroke='currentColor'>...</svg>"
-                          style={{ ...textareaStyle, minHeight: 0, height: '100%' }}
-                        />
-                      </label>
-                      <div style={{ padding: '0.8rem 0.95rem', borderRadius: '16px', background: 'rgba(239,246,255,0.92)', color: '#155e75', lineHeight: 1.5, fontSize: '0.8rem' }}>
-                        Custom icons can use raw SVG or a short glyph. SVG that uses `currentColor` will follow the icon color control automatically.
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-                  <div style={{ color: '#0f766e', fontSize: '0.8rem' }}>
-                    {item.mode === 'library'
-                      ? `${filteredOptions.length} icon${filteredOptions.length === 1 ? '' : 's'} available`
-                      : 'Custom icon mode lets you author your own artwork.'}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsPickerOpen(false)}
-                    style={{
-                      borderRadius: '999px',
-                      border: '1px solid rgba(15,118,110,0.14)',
-                      background: 'rgba(240,253,244,0.96)',
-                      color: '#065f46',
-                      padding: '0.55rem 0.95rem',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Done
-                  </button>
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateRows: 'auto minmax(0, 1fr)', gap: '0.75rem', minHeight: 0, overflow: 'visible' }}>
-                <div
-                  style={{
-                    borderRadius: '22px',
-                    border: '1px solid rgba(15,118,110,0.12)',
-                    background: 'linear-gradient(180deg, rgba(240,253,244,0.98), rgba(236,253,245,0.82))',
-                    padding: '1rem',
-                    display: 'grid',
-                    gap: '0.85rem',
-                    justifyItems: 'center',
-                  }}
-                >
-                  <IconArtworkPreview item={item} project={project} size={112} />
-                  <div style={{ color: '#064e3b', fontWeight: 800, textAlign: 'center' }}>
-                    {item.name.trim() || (item.mode === 'custom' ? 'Custom Icon' : selectedOption.label)}
-                  </div>
-                  <div style={{ color: '#0f766e', fontSize: '0.8rem', fontWeight: 700, textAlign: 'center' }}>
-                    {item.inlineCode.trim() || (item.mode === 'library' ? formatInlineCodeFromIconKey(item.iconKey) : ':custom:')}
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gap: '0.75rem', minHeight: 0, overflowY: 'auto', paddingRight: '0.1rem', alignContent: 'start' }}>
-                  <InspectorAccordion title="Icon Style" compact>
-                    <InspectorColorField
-                      label="Stroke Color"
-                      value={item.iconColor}
-                      onChange={(value) => onChange({ ...item, iconColor: value })}
-                      palette={paletteOptions}
-                      onAssignPaletteColor={onAssignPaletteColor}
-                    />
-                    <InspectorColorField
-                      label="Fill Color"
-                      value={item.iconFillColor}
-                      onChange={(value) => onChange({ ...item, iconFillColor: value })}
-                      palette={paletteOptions}
-                      onAssignPaletteColor={onAssignPaletteColor}
-                    />
-                    <label style={labelStyle}>
-                      Thickness
-                      <NumericInput
-                        min={0.5}
-                        max={8}
-                        step={0.1}
-                        value={item.iconStrokeWidth}
-                        onValueChange={(value) => onChange({
-                          ...item,
-                          iconStrokeWidth: Math.max(0.5, value),
-                        })}
-                        style={inputStyle}
-                      />
-                    </label>
-                  </InspectorAccordion>
-
-                  <InspectorAppearanceControls
-                    scopeLabel="Tile"
-                    backgroundLabel="Fill"
-                    backgroundValue={item.backgroundColor}
-                    onBackgroundChange={(value) => onChange({ ...item, backgroundColor: value })}
-                    palette={paletteOptions}
-                    onAssignPaletteColor={onAssignPaletteColor}
-                    texture={{
-                      value: item.backgroundTextureId,
-                      onChange: (value) => onChange({ ...item, backgroundTextureId: value }),
-                      opacity: item.backgroundTextureOpacity,
-                      onOpacityChange: (value) => onChange({ ...item, backgroundTextureOpacity: value }),
-                      previewBackground: item.backgroundColor,
-                    }}
-                    accordionCompact
-                    border={{
-                      colorValue: item.borderColor,
-                      onColorChange: (value) => onChange({ ...item, borderColor: value }),
-                      controls: (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.6rem' }}>
-                          <label style={labelStyle}>
-                            Width
-                            <NumericInput
-                              min={0}
-                              max={24}
-                              step={1}
-                              value={item.borderWidth}
-                              onValueChange={(value) => onChange({
-                                ...item,
-                                borderWidth: clampNonNegativeNumber(value, item.borderWidth),
-                              })}
-                              style={inputStyle}
-                            />
-                          </label>
-                          <label style={labelStyle}>
-                            Radius
-                            <NumericInput
-                              min={0}
-                              max={999}
-                              step={1}
-                              value={item.borderRadius}
-                              onValueChange={(value) => onChange({
-                                ...item,
-                                borderRadius: clampNonNegativeNumber(value, item.borderRadius),
-                              })}
-                              style={inputStyle}
-                            />
-                          </label>
-                        </div>
-                      ),
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
+      {showAiInput ? (
+        <div style={{ display: 'flex', gap: '0.45rem', padding: '0.65rem', borderRadius: '14px', background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.14)', alignItems: 'center' }}>
+          <Wand2 size={16} style={{ color: '#8b5cf6', flexShrink: 0 }} />
+          <input autoFocus value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleAiGenerate(); }}
+            placeholder="Describe the image..." style={{ ...inputStyle, flex: 1, border: 'none', background: 'rgba(255,255,255,0.8)', padding: '0.5rem 0.7rem', fontSize: '0.82rem' }} />
+          <button type="button" onClick={handleAiGenerate} disabled={isGenerating || !aiPrompt.trim()} style={{
+            borderRadius: '999px', border: 'none', background: isGenerating ? 'rgba(139,92,246,0.3)' : 'linear-gradient(135deg, #6d28d9, #8b5cf6)',
+            color: 'white', padding: '0.45rem 0.8rem', fontWeight: 700, fontSize: '0.76rem', cursor: isGenerating ? 'wait' : 'pointer', flexShrink: 0,
+          }}>{isGenerating ? 'Creating...' : 'Create'}</button>
         </div>
       ) : null}
 
-        </>
+      {error ? (
+        <div style={{ padding: '0.6rem 0.8rem', borderRadius: '12px', background: 'rgba(254,242,242,0.95)', border: '1px solid rgba(239,68,68,0.18)', color: '#b91c1c', fontSize: '0.78rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>{error}</span>
+          <button type="button" onClick={() => setError(null)} style={{ border: 'none', background: 'none', color: '#b91c1c', cursor: 'pointer' }}><X size={14} /></button>
+        </div>
       ) : null}
+
+      {images.length > 0 ? (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '0.6rem' }}>
+          {images.map((image) => (
+            <div key={image.id} style={{ borderRadius: '16px', border: '1px solid rgba(15,118,110,0.08)', background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(8px)', overflow: 'hidden' }}>
+              <div style={{ aspectRatio: '4 / 3', background: 'linear-gradient(135deg, rgba(240,253,244,0.9), rgba(236,254,255,0.9))', display: 'grid', placeItems: 'center', position: 'relative' }}>
+                {image.aiPrompt ? <Wand2 size={20} style={{ color: '#8b5cf6', opacity: 0.6 }} /> : <ImagePlus size={20} style={{ color: '#0d9488', opacity: 0.6 }} />}
+                <button type="button" onClick={() => onUpdateImages((c) => c.filter((i) => i.id !== image.id))} title="Remove"
+                  style={{ position: 'absolute', top: '0.35rem', right: '0.35rem', width: '24px', height: '24px', borderRadius: '999px', border: 'none', background: 'rgba(0,0,0,0.25)', color: 'white', display: 'grid', placeItems: 'center', cursor: 'pointer' }}><X size={11} /></button>
+              </div>
+              <div style={{ padding: '0.5rem 0.6rem' }}>
+                <div style={{ fontSize: '0.76rem', fontWeight: 700, color: '#064e3b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{image.name || 'Untitled'}</div>
+                <div style={{ fontSize: '0.66rem', color: '#6b7280', marginTop: '0.15rem' }}>{image.aiPrompt ? 'AI' : `${(image.bytes / 1024).toFixed(0)} KB`}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ padding: '2.5rem 1rem', borderRadius: '18px', border: '1px dashed rgba(15,118,110,0.12)', background: 'rgba(255,255,255,0.4)', backdropFilter: 'blur(8px)', color: '#0f766e', fontSize: '0.85rem', textAlign: 'center', lineHeight: 1.6 }}>
+          Upload files or generate art with AI<br />to build your visual library.
+        </div>
+      )}
     </div>
   );
 }
+
+// ── Main component ─────────────────────────────────────────────────
+
+type StudioPage = 'home' | 'themes' | 'assets' | 'icons' | 'images';
 
 export function ArtSection({
   project,
+  projectId,
   onUpdateArt,
   onUpdateTheme,
   onAssignPaletteColor,
 }: {
   project: EditorProject;
+  projectId: string;
   onUpdateArt: (updater: (art: EditorProject['art']) => EditorProject['art']) => void;
   onUpdateTheme: (value: string) => void;
   onAssignPaletteColor: (paletteId: string, value: string) => void;
 }) {
-  return (
-    <div style={{ display: 'grid', gap: '1rem', maxWidth: '980px' }}>
-      <div style={{ ...panelStyle, display: 'grid', gap: '1rem' }}>
-        <p style={sectionTitleStyle}>Art Direction</p>
+  const [page, setPage] = useState<StudioPage>('home');
 
-        <div style={{ display: 'grid', gap: '0.75rem', maxWidth: '440px' }}>
-          <label style={labelStyle}>
-            Theme
-            <input
-              value={project.art.theme}
-              onChange={(event) => onUpdateTheme(event.target.value)}
-              placeholder="Clockwork jungle rebellion"
-              style={inputStyle}
-            />
-          </label>
+  const styleCount = project.art.definedArtStyles.length;
+  const assetCount = project.art.recurringAssets.length;
+  const iconCount = project.art.icons.length;
+  const imageCount = (project.art.images ?? []).length;
+
+  // ── Home ──
+  if (page === 'home') {
+    return (
+      <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div style={STUDIO_BG} />
+
+        {/* Header */}
+        <div style={{
+          position: 'relative', zIndex: 1,
+          padding: '1.2rem 1rem 0 1rem',
+          display: 'flex', alignItems: 'center', gap: '0.5rem',
+        }}>
+          <Sparkles size={18} style={{ color: '#0d9488' }} />
+          <span style={{
+            fontSize: '1.1rem', fontWeight: 800, color: '#064e3b',
+            letterSpacing: '-0.01em',
+          }}>Art Studio</span>
+        </div>
+
+        <div style={{
+          position: 'relative', zIndex: 1,
+          width: '100%', flex: '1 1 0',
+          minHeight: 0,
+          padding: '0.75rem',
+          boxSizing: 'border-box',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+          gridTemplateRows: 'repeat(2, minmax(0, 1fr))',
+          gap: '0.75rem',
+        }}>
+            {/* Themes & Styles */}
+            <StudioTile icon={<Sparkles size={22} />} label="Themes & Styles" count={styleCount || undefined} onClick={() => setPage('themes')}>
+              {styleCount > 0 ? (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', justifyContent: 'center', padding: '0.5rem' }}>
+                  {project.art.definedArtStyles.slice(0, 5).map((s) => (
+                    <span key={s.id} style={{ padding: '0.28rem 0.6rem', borderRadius: '999px', fontSize: '0.7rem', fontWeight: 700, background: 'rgba(255,255,255,0.8)', color: '#064e3b', border: '1px solid rgba(15,118,110,0.1)', maxWidth: '130px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {s.name || 'Untitled'}
+                    </span>
+                  ))}
+                  {styleCount > 5 ? <span style={{ fontSize: '0.7rem', color: '#0d9488', fontWeight: 600, padding: '0.28rem' }}>+{styleCount - 5}</span> : null}
+                </div>
+              ) : (
+                <div style={{ color: '#0d9488', opacity: 0.45, fontSize: '0.76rem', textAlign: 'center', lineHeight: 1.5 }}>
+                  Define the visual<br />language of your game
+                </div>
+              )}
+            </StudioTile>
+
+            {/* Reusable Characters & More */}
+            <StudioTile icon={<BookImage size={22} />} label="Reusable Characters & More" count={assetCount || undefined} onClick={() => setPage('assets')}>
+              {assetCount > 0 ? (
+                <div style={{ display: 'grid', gap: '0.25rem', justifyItems: 'center', padding: '0.5rem' }}>
+                  {project.art.recurringAssets.slice(0, 4).map((a) => (
+                    <span key={a.id} style={{ fontSize: '0.74rem', fontWeight: 600, color: '#064e3b', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {a.name || 'Untitled'}
+                      {a.category ? <span style={{ color: '#6b7280', fontWeight: 400 }}> — {a.category}</span> : null}
+                    </span>
+                  ))}
+                  {assetCount > 4 ? <span style={{ fontSize: '0.7rem', color: '#0d9488', fontWeight: 600 }}>+{assetCount - 4} more</span> : null}
+                </div>
+              ) : (
+                <div style={{ color: '#0d9488', opacity: 0.45, fontSize: '0.76rem', textAlign: 'center', lineHeight: 1.5 }}>
+                  Characters, factions,<br />locations, and props
+                </div>
+              )}
+            </StudioTile>
+
+            {/* Icons */}
+            <StudioTile icon={<Hexagon size={22} />} label="Icons" count={iconCount || undefined} onClick={() => setPage('icons')}>
+              {iconCount > 0 ? (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem', justifyContent: 'center', padding: '0.5rem' }}>
+                  {project.art.icons.slice(0, 8).map((icon) => (
+                    <IconArtworkPreview key={icon.id} item={icon} project={project} size={38} />
+                  ))}
+                  {iconCount > 8 ? <span style={{ fontSize: '0.7rem', color: '#0d9488', fontWeight: 600, alignSelf: 'center' }}>+{iconCount - 8}</span> : null}
+                </div>
+              ) : (
+                <div style={{ color: '#0d9488', opacity: 0.45, fontSize: '0.76rem', textAlign: 'center', lineHeight: 1.5 }}>
+                  Gameplay symbols<br />like :attack: or :vp:
+                </div>
+              )}
+            </StudioTile>
+
+            {/* Images */}
+            <StudioTile icon={<ImagePlus size={22} />} label="Images" count={imageCount || undefined} onClick={() => setPage('images')}>
+              {imageCount > 0 ? (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', justifyContent: 'center', padding: '0.5rem' }}>
+                  {(project.art.images ?? []).slice(0, 6).map((img) => (
+                    <div key={img.id} style={{ width: '52px', height: '40px', borderRadius: '10px', background: 'linear-gradient(135deg, rgba(240,253,244,0.9), rgba(236,254,255,0.9))', border: '1px solid rgba(15,118,110,0.08)', display: 'grid', placeItems: 'center' }}>
+                      {img.aiPrompt ? <Wand2 size={13} style={{ color: '#8b5cf6', opacity: 0.7 }} /> : <ImagePlus size={13} style={{ color: '#0d9488', opacity: 0.7 }} />}
+                    </div>
+                  ))}
+                  {imageCount > 6 ? <span style={{ fontSize: '0.7rem', color: '#0d9488', fontWeight: 600, alignSelf: 'center' }}>+{imageCount - 6}</span> : null}
+                </div>
+              ) : (
+                <div style={{ color: '#0d9488', opacity: 0.45, fontSize: '0.76rem', textAlign: 'center', lineHeight: 1.5 }}>
+                  Upload or AI-generate<br />art for your game
+                </div>
+              )}
+            </StudioTile>
         </div>
       </div>
+    );
+  }
 
-      <div style={{ ...panelStyle, display: 'grid', gap: '0.9rem' }}>
-        <AssetSectionHeader
-          title="Defined Art Styles"
-          description="Capture the specific styles this project can draw from, mix, or switch between."
-          onAdd={() => onUpdateArt((art) => ({
-            ...art,
-            definedArtStyles: addReferenceAsset(art.definedArtStyles),
-          }))}
-        />
+  // ── Themes & Styles ──
+  if (page === 'themes') {
+    return (
+      <SubPageShell title="Themes & Styles" icon={<Sparkles size={22} />} onBack={() => setPage('home')}        actions={
+          <button type="button" onClick={() => onUpdateArt((art) => ({ ...art, definedArtStyles: addReferenceAsset(art.definedArtStyles) }))}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', borderRadius: '999px', border: 'none', background: 'linear-gradient(135deg, #064e3b, #0d9488)', color: 'white', padding: '0.5rem 0.9rem', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer' }}>
+            <Plus size={13} /> Add Style
+          </button>
+        }
+      >
+        {/* Theme input */}
+        <div style={{ marginBottom: '1rem', padding: '0.8rem', borderRadius: '16px', background: 'rgba(255,255,255,0.6)', backdropFilter: 'blur(8px)', border: '1px solid rgba(15,118,110,0.06)' }}>
+          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#0d9488', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.4rem' }}>Theme</div>
+          <input value={project.art.theme} onChange={(e) => onUpdateTheme(e.target.value)} placeholder="Clockwork jungle rebellion..."
+            style={{ ...inputStyle, border: 'none', background: 'rgba(255,255,255,0.7)', padding: '0.6rem 0.8rem', fontSize: '0.88rem', borderRadius: '12px', width: '100%', boxSizing: 'border-box' }} />
+        </div>
 
-        {project.art.definedArtStyles.length > 0 ? (
-          <div style={{ display: 'grid', gap: '0.75rem' }}>
-            {project.art.definedArtStyles.map((style) => (
-              <ArtReferenceCard
-                key={style.id}
-                item={{ ...style, category: '', tags: [] }}
-                showCategory={false}
-                showTags={false}
-                showHeader={false}
-                collapsible
-                namePlaceholder="Painterly storybook"
-                descriptionPlaceholder="Describe the visual lane this style represents so it can later be offered as an art-generation option."
-                onChange={(next) => onUpdateArt((art) => ({
-                  ...art,
-                  definedArtStyles: art.definedArtStyles.map((entry) => entry.id === style.id ? { ...next, category: '', tags: [] } : entry),
-                }))}
-                onRemove={() => onUpdateArt((art) => ({
-                  ...art,
-                  definedArtStyles: art.definedArtStyles.filter((entry) => entry.id !== style.id),
-                }))}
-              />
-            ))}
-          </div>
-        ) : (
-          <div style={{ padding: '0.95rem 1rem', borderRadius: '18px', background: 'rgba(248,250,252,0.82)', color: '#0f766e' }}>
-            No art styles yet. Add one to define visual lanes like painterly boards, flat icons, or monochrome event cards.
-          </div>
-        )}
-      </div>
+        <div style={{ display: 'grid', gap: '0.6rem' }}>
+          {project.art.definedArtStyles.length > 0 ? (
+            project.art.definedArtStyles.map((style) => (
+              <ArtReferenceCard key={style.id} item={{ ...style, category: '', tags: [] }} showCategory={false} showTags={false} showHeader={false} collapsible
+                namePlaceholder="Painterly storybook" descriptionPlaceholder="Describe the visual lane this style represents."
+                onChange={(next) => onUpdateArt((art) => ({ ...art, definedArtStyles: art.definedArtStyles.map((e) => e.id === style.id ? { ...next, category: '', tags: [] } : e) }))}
+                onRemove={() => onUpdateArt((art) => ({ ...art, definedArtStyles: art.definedArtStyles.filter((e) => e.id !== style.id) }))} />
+            ))
+          ) : (
+            <div style={{ padding: '2rem 1rem', borderRadius: '18px', border: '1px dashed rgba(15,118,110,0.12)', background: 'rgba(255,255,255,0.4)', backdropFilter: 'blur(8px)', color: '#0f766e', fontSize: '0.85rem', textAlign: 'center', lineHeight: 1.6 }}>
+              Add art styles to define visual lanes like<br />painterly boards, flat icons, or monochrome cards.
+            </div>
+          )}
+        </div>
+      </SubPageShell>
+    );
+  }
 
-      <div style={{ ...panelStyle, display: 'grid', gap: '0.9rem' }}>
-        <AssetSectionHeader
-          title="Recurring Assets"
-          description="Track reusable characters, locations, factions, monsters, props, and other motifs the project should keep consistent."
-          onAdd={() => onUpdateArt((art) => ({
-            ...art,
-            recurringAssets: addReferenceAsset(art.recurringAssets, { category: 'Character' }),
-          }))}
-        />
+  // ── Reusable Characters & More ──
+  if (page === 'assets') {
+    return (
+      <SubPageShell title="Reusable Characters & More" icon={<BookImage size={22} />} onBack={() => setPage('home')}        actions={
+          <button type="button" onClick={() => onUpdateArt((art) => ({ ...art, recurringAssets: addReferenceAsset(art.recurringAssets, { category: 'Character' }) }))}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', borderRadius: '999px', border: 'none', background: 'linear-gradient(135deg, #064e3b, #0d9488)', color: 'white', padding: '0.5rem 0.9rem', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer' }}>
+            <Plus size={13} /> Add Asset
+          </button>
+        }
+      >
+        <div style={{ display: 'grid', gap: '0.6rem' }}>
+          {project.art.recurringAssets.length > 0 ? (
+            project.art.recurringAssets.map((asset) => (
+              <ArtReferenceCard key={asset.id} item={asset} categoryLabel="Asset Type" categoryPlaceholder="Character, location, monster, relic"
+                onChange={(next) => onUpdateArt((art) => ({ ...art, recurringAssets: art.recurringAssets.map((e) => e.id === asset.id ? next : e) }))}
+                onRemove={() => onUpdateArt((art) => ({ ...art, recurringAssets: art.recurringAssets.filter((e) => e.id !== asset.id) }))} />
+            ))
+          ) : (
+            <div style={{ padding: '2rem 1rem', borderRadius: '18px', border: '1px dashed rgba(15,118,110,0.12)', background: 'rgba(255,255,255,0.4)', backdropFilter: 'blur(8px)', color: '#0f766e', fontSize: '0.85rem', textAlign: 'center', lineHeight: 1.6 }}>
+              Add the monsters, heroes, locations,<br />and props that need visual continuity.
+            </div>
+          )}
+        </div>
+      </SubPageShell>
+    );
+  }
 
-        {project.art.recurringAssets.length > 0 ? (
-          <div style={{ display: 'grid', gap: '0.75rem' }}>
-            {project.art.recurringAssets.map((asset) => (
-              <ArtReferenceCard
-                key={asset.id}
-                item={asset}
-                categoryLabel="Asset Type"
-                categoryPlaceholder="Character, location, monster, relic"
-                onChange={(next) => onUpdateArt((art) => ({
-                  ...art,
-                  recurringAssets: art.recurringAssets.map((entry) => entry.id === asset.id ? next : entry),
-                }))}
-                onRemove={() => onUpdateArt((art) => ({
-                  ...art,
-                  recurringAssets: art.recurringAssets.filter((entry) => entry.id !== asset.id),
-                }))}
-              />
-            ))}
-          </div>
-        ) : (
-          <div style={{ padding: '0.95rem 1rem', borderRadius: '18px', background: 'rgba(248,250,252,0.82)', color: '#0f766e' }}>
-            No recurring assets yet. Add the monsters, locations, heroes, and props that need visual continuity across the game.
-          </div>
-        )}
-      </div>
+  // ── Icons ──
+  if (page === 'icons') {
+    return (
+      <SubPageShell title="Icons" icon={<Hexagon size={22} />} onBack={() => setPage('home')}        actions={
+          <button type="button" onClick={() => onUpdateArt((art) => ({ ...art, icons: addIconAsset(art.icons) }))}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', borderRadius: '999px', border: 'none', background: 'linear-gradient(135deg, #064e3b, #0d9488)', color: 'white', padding: '0.5rem 0.9rem', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer' }}>
+            <Plus size={13} /> Add Icon
+          </button>
+        }
+      >
+        <div style={{ display: 'grid', gap: '0.6rem' }}>
+          {project.art.icons.length > 0 ? (
+            project.art.icons.map((icon) => (
+              <IconAssetCard key={icon.id} project={project} item={icon}
+                onChange={(next) => onUpdateArt((art) => ({ ...art, icons: art.icons.map((e) => e.id === icon.id ? next : e) }))}
+                onRemove={() => onUpdateArt((art) => ({ ...art, icons: art.icons.filter((e) => e.id !== icon.id) }))}
+                onAssignPaletteColor={onAssignPaletteColor} />
+            ))
+          ) : (
+            <div style={{ padding: '2rem 1rem', borderRadius: '18px', border: '1px dashed rgba(15,118,110,0.12)', background: 'rgba(255,255,255,0.4)', backdropFilter: 'blur(8px)', color: '#0f766e', fontSize: '0.85rem', textAlign: 'center', lineHeight: 1.6 }}>
+              Add gameplay symbols like :attack:, :move:,<br />or :vp: as reusable game primitives.
+            </div>
+          )}
+        </div>
+      </SubPageShell>
+    );
+  }
 
-      <div style={{ ...panelStyle, display: 'grid', gap: '0.9rem' }}>
-        <AssetSectionHeader
-          title="Icons"
-          description="Define gameplay icons as durable assets, complete with inline codes for future text and UI placement."
-          onAdd={() => onUpdateArt((art) => ({
-            ...art,
-            icons: addIconAsset(art.icons),
-          }))}
-        />
-
-        {project.art.icons.length > 0 ? (
-          <div style={{ display: 'grid', gap: '0.75rem' }}>
-            {project.art.icons.map((icon) => (
-              <IconAssetCard
-                key={icon.id}
-                project={project}
-                item={icon}
-                onChange={(next) => onUpdateArt((art) => ({
-                  ...art,
-                  icons: art.icons.map((entry) => entry.id === icon.id ? next : entry),
-                }))}
-                onRemove={() => onUpdateArt((art) => ({
-                  ...art,
-                  icons: art.icons.filter((entry) => entry.id !== icon.id),
-                }))}
-                onAssignPaletteColor={onAssignPaletteColor}
-              />
-            ))}
-          </div>
-        ) : (
-          <div style={{ padding: '0.95rem 1rem', borderRadius: '18px', background: 'rgba(248,250,252,0.82)', color: '#0f766e' }}>
-            No icons yet. Add shared symbols like `:attack:`, `:move:`, or `:vp:` so the system can treat them as reusable board-game primitives later.
-          </div>
-        )}
-      </div>
-    </div>
+  // ── Images ──
+  return (
+    <SubPageShell title="Images" icon={<ImagePlus size={22} />} onBack={() => setPage('home')}>
+      <ImagesContent projectId={projectId} images={project.art.images ?? []}
+        onUpdateImages={(updater) => onUpdateArt((art) => ({ ...art, images: updater(art.images ?? []) }))} />
+    </SubPageShell>
   );
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
+import { AppPageFrame } from '../components/AppPageFrame';
 
 type AssetItem = {
     id: string;
@@ -137,10 +138,10 @@ export const Assets = () => {
     }
   };
 
-  if (!projectId) return <div>Loading Project ID...</div>;
+  if (!projectId) return <AppPageFrame>Loading Project ID...</AppPageFrame>;
 
   return (
-    <div style={{ padding: '2rem', maxWidth: '1000px', margin: '0 auto' }}>
+    <AppPageFrame contentStyle={{ maxWidth: '1000px', margin: '0 auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
             <h2>Project Assets</h2>
             <div style={{ display: 'flex', gap: '1rem' }}>
@@ -190,6 +191,6 @@ export const Assets = () => {
                 ))}
             </div>
         )}
-    </div>
+    </AppPageFrame>
   );
 }

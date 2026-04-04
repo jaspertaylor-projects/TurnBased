@@ -127,7 +127,14 @@ button:focus-visible {
   animation: float 6s ease-in-out infinite;
 }
 
-/* Nav */
+/* Layout */
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
 main {
   width: 100%;
+  flex: 1 1 0;
 }

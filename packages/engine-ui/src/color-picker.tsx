@@ -31,9 +31,6 @@ const FALLBACK_COLOR: ParsedColor = {
   b: 110,
   a: 1,
 };
-const COLOR_PICKER_GAP = 10;
-const COLOR_PICKER_VIEWPORT_PADDING = 12;
-const COLOR_PICKER_DEFAULT_HEIGHT = 420;
 
 function clampChannel(value: number): number {
   return Math.max(0, Math.min(255, Math.round(value)));
@@ -144,36 +141,6 @@ function getPopupWidth(): number {
   return Math.min(340, Math.max(260, Math.floor(window.innerWidth * 0.82)));
 }
 
-function getPopupPosition(
-  triggerRect: DOMRect,
-  popupPlacement: ProjectColorPickerProps['popupPlacement'],
-  popupWidth: number,
-  popupHeight: number,
-) {
-  const unclampedLeft = popupPlacement === 'left'
-    ? triggerRect.left - popupWidth - COLOR_PICKER_GAP
-    : triggerRect.left;
-  const unclampedTop = popupPlacement === 'left'
-    ? triggerRect.top
-    : triggerRect.bottom + COLOR_PICKER_GAP;
-  const top = popupPlacement === 'left'
-    ? Math.max(COLOR_PICKER_VIEWPORT_PADDING, triggerRect.top)
-    : Math.max(
-      COLOR_PICKER_VIEWPORT_PADDING,
-      Math.min(unclampedTop, window.innerHeight - popupHeight - COLOR_PICKER_VIEWPORT_PADDING),
-    );
-
-  return {
-    width: popupWidth,
-    left: Math.max(
-      COLOR_PICKER_VIEWPORT_PADDING,
-      Math.min(unclampedLeft, window.innerWidth - popupWidth - COLOR_PICKER_VIEWPORT_PADDING),
-    ),
-    top,
-    maxHeight: Math.max(240, window.innerHeight - top - COLOR_PICKER_VIEWPORT_PADDING),
-  };
-}
-
 export function ProjectColorPicker({
   value,
   onChange,
@@ -181,15 +148,15 @@ export function ProjectColorPicker({
   onAssignPaletteColor,
   label = '',
   compact = false,
-  popupPlacement = 'left',
+  popupPlacement: _popupPlacement = 'left',
 }: ProjectColorPickerProps) {
+  void _popupPlacement;
   const [open, setOpen] = useState(false);
   const [assignTarget, setAssignTarget] = useState<string>(palette[0]?.id ?? '');
   const rootRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const popupRef = useRef<HTMLDivElement | null>(null);
-  const [popupPosition, setPopupPosition] = useState<{ top: number; left: number; width: number; maxHeight: number } | null>(null);
-  const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
+  const colorInputRef = useRef<HTMLInputElement | null>(null);
   const [draftValue, setDraftValue] = useState<string | null>(null);
   const liveValue = open ? draftValue : value;
   const { resolvedValue, activePaletteOption } = useMemo(
@@ -216,52 +183,15 @@ export function ProjectColorPicker({
       return undefined;
     }
 
-    function handlePointerDown(event: MouseEvent) {
-      const target = event.target;
-      if (
-        target instanceof Node
-        && rootRef.current
-        && !rootRef.current.contains(target)
-        && !popupRef.current?.contains(target)
-      ) {
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
         commitDraftAndClose();
       }
     }
 
-    window.addEventListener('mousedown', handlePointerDown);
-    return () => window.removeEventListener('mousedown', handlePointerDown);
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
   }, [draftValue, open, parsed, value]);
-
-  useEffect(() => {
-    if (!open) {
-      setPopupPosition(null);
-      setAnchorRect(null);
-      return undefined;
-    }
-
-    function updatePopupPosition() {
-      const triggerRect = anchorRect ?? triggerRef.current?.getBoundingClientRect();
-      if (!triggerRect) {
-        return;
-      }
-
-      setPopupPosition(getPopupPosition(
-        triggerRect,
-        popupPlacement,
-        getPopupWidth(),
-        popupRef.current?.getBoundingClientRect().height ?? COLOR_PICKER_DEFAULT_HEIGHT,
-      ));
-    }
-
-    updatePopupPosition();
-    const animationFrame = window.requestAnimationFrame(updatePopupPosition);
-    window.addEventListener('resize', updatePopupPosition);
-
-    return () => {
-      window.cancelAnimationFrame(animationFrame);
-      window.removeEventListener('resize', updatePopupPosition);
-    };
-  }, [anchorRect, open, popupPlacement]);
 
   useEffect(() => {
     if (!assignTarget && palette[0]?.id) {
@@ -274,21 +204,13 @@ export function ProjectColorPicker({
       <button
         ref={triggerRef}
         type="button"
-        onClick={(event) => {
-          const triggerRect = event.currentTarget.getBoundingClientRect();
+        onClick={() => {
           if (open) {
             commitDraftAndClose();
             return;
           }
 
-          setAnchorRect(triggerRect);
           setDraftValue(value ?? formatColor(parseColor(resolvedValue)));
-          setPopupPosition(getPopupPosition(
-            triggerRect,
-            popupPlacement,
-            getPopupWidth(),
-            popupRef.current?.getBoundingClientRect().height ?? COLOR_PICKER_DEFAULT_HEIGHT,
-          ));
           setOpen(true);
         }}
         style={{
@@ -331,14 +253,29 @@ export function ProjectColorPicker({
 
       {open ? createPortal(
         <div
-          ref={popupRef}
           style={{
             position: 'fixed',
+            inset: 0,
+            zIndex: 319,
+            background: 'rgba(0,0,0,0.25)',
+            backdropFilter: 'blur(2px)',
+            display: 'grid',
+            placeItems: 'center',
+          }}
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              commitDraftAndClose();
+            }
+          }}
+        >
+        <div
+          ref={popupRef}
+          onMouseDown={(event) => event.stopPropagation()}
+          style={{
+            position: 'relative',
             zIndex: 320,
-            top: popupPosition?.top ?? 12,
-            left: popupPosition?.left ?? 12,
-            width: `${popupPosition?.width ?? getPopupWidth()}px`,
-            maxHeight: `${popupPosition?.maxHeight ?? (window.innerHeight - 24)}px`,
+            width: `${getPopupWidth()}px`,
+            maxHeight: `${window.innerHeight - 48}px`,
             borderRadius: '20px',
             border: '1px solid rgba(15,118,110,0.14)',
             background: 'rgba(255,255,255,0.98)',
@@ -352,18 +289,24 @@ export function ProjectColorPicker({
         >
           <div style={{ display: 'grid', gridTemplateColumns: '96px minmax(0, 1fr)', gap: '0.75rem', alignItems: 'stretch' }}>
             <div
+              role="button"
+              tabIndex={0}
+              onClick={() => colorInputRef.current?.click()}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') colorInputRef.current?.click(); }}
               style={{
                 borderRadius: '18px',
                 border: '1px solid rgba(15,118,110,0.12)',
                 background: colorText,
                 minHeight: '96px',
                 boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.4)',
+                cursor: 'pointer',
               }}
             />
             <div style={{ display: 'grid', gap: '0.65rem' }}>
               <label style={{ display: 'grid', gap: '0.28rem', color: '#0f766e', fontSize: '0.8rem' }}>
                 Base Color
                 <input
+                  ref={colorInputRef}
                   type="color"
                   value={colorToHex(parsed)}
                   onChange={(event) => setDraftValue(formatColor({
@@ -498,6 +441,7 @@ export function ProjectColorPicker({
               </div>
             </div>
           ) : null}
+        </div>
         </div>,
         document.body,
       ) : null}

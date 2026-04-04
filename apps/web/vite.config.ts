@@ -1,3 +1,5 @@
+import path from 'node:path'
+
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
@@ -6,5 +8,8 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     dedupe: ['react', 'react-dom', 'three', '@react-three/fiber'],
+    alias: {
+      'react-konva': path.resolve(__dirname, '../../packages/engine-ui/node_modules/react-konva'),
+    },
   },
 })

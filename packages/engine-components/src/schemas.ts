@@ -13,7 +13,6 @@ export const builtInComponentTypeSchema = z.enum([
   'square-grid',
   'checkerboard-grid',
   'zone',
-  'resource-pile',
   'deck',
   'hand',
   'discard',

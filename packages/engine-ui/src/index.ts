@@ -30,6 +30,9 @@ export {
   BoardSurface,
 } from './board-surface';
 export {
+  KonvaBoardSurface,
+} from './konva-board-surface';
+export {
   getBoardSurfaceTextureStyle,
 } from './board-surface-style';
 export {
@@ -57,6 +60,9 @@ export type {
   BoardSurfaceItem,
   BoardSurfaceProps,
 } from './board-surface';
+export type {
+  KonvaBoardSurfaceProps,
+} from './konva-board-surface';
 export type {
   BoardSurfaceAppearance,
 } from './board-surface-style';

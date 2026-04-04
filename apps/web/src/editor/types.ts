@@ -151,6 +151,7 @@ export interface EditorIconAsset {
   iconColor: string;
   iconFillColor: string;
   iconStrokeWidth: number;
+  iconScale: number;
   backgroundColor: string;
   backgroundTextureId: BoardSurfaceTextureId;
   backgroundTextureOpacity: number;
@@ -163,11 +164,25 @@ export interface EditorIconAsset {
   tags: string[];
 }
 
+export interface EditorImageAsset {
+  id: string;
+  name: string;
+  r2Key: string;
+  mime: string;
+  bytes: number;
+  width?: number;
+  height?: number;
+  aiPrompt?: string;
+  tags: string[];
+  createdAt: string;
+}
+
 export interface EditorArtDirection {
   theme: string;
   definedArtStyles: EditorArtReference[];
   recurringAssets: EditorArtReference[];
   icons: EditorIconAsset[];
+  images: EditorImageAsset[];
 }
 
 export type EditorProjectViewKind = 'shared' | 'player';

@@ -24,7 +24,9 @@ import {
   getBoardGridCells,
   getGridCellAppearance,
   getResolvedBoardItemFrame,
+  getResolvedChildItemFrame,
   isBoardGridComponentType,
+  isLeafComponentType,
   isMovableComponentType,
 } from '../boardLayout';
 import { renderComponentIcon } from '../componentMeta';
@@ -136,37 +138,12 @@ export function PreviewSection({
     ? affordances?.availableActions.find((action) => action.id === 'territory:end-turn' || action.label.toLowerCase() === 'end turn') ?? null
     : null;
 
-  function collectNestedResourcePileIds(instanceId: string): string[] {
-    const instance = project.instances[instanceId];
-    if (!instance) {
-      return [];
-    }
-
-    return instance.children.flatMap((childId) => {
-      const child = project.instances[childId];
-      if (!child) {
-        return [];
-      }
-
-      if (child.componentType === 'resource-pile') {
-        return [String(child.instanceId)];
-      }
-
-      return collectNestedResourcePileIds(String(child.instanceId));
-    });
-  }
-
-  function getRenderableZoneIds(instanceId: string): string[] {
-    const resourcePileIds = collectNestedResourcePileIds(instanceId);
-    return resourcePileIds.length > 0 ? resourcePileIds : [instanceId];
-  }
-
   function getZoneEntityIds(instanceId: string): string[] {
     if (!previewState) {
       return [];
     }
 
-    return getRenderableZoneIds(instanceId).flatMap((zoneId) => previewState.zones[toPreviewZoneId(zoneId)]?.entityIds ?? []);
+    return previewState.zones[toPreviewZoneId(instanceId)]?.entityIds ?? [];
   }
 
   function hasInfiniteSupply(instanceId: string): boolean {
@@ -338,169 +315,227 @@ export function PreviewSection({
 
     const boardAppearance = resolveBoardAppearanceProperties(mainBoard.properties);
 
+    type PreviewItem = NonNullable<Parameters<typeof BoardSurface>[0]['items']>[number];
+
+    function buildPreviewItem(
+      childId: string,
+      index: number,
+      parentOffsetX: number,
+      parentOffsetY: number,
+      parentWidth: number,
+      parentHeight: number,
+      depth: number,
+      parentLocalW: number,
+      parentLocalH: number,
+    ): PreviewItem | null {
+      const child = project.instances[childId];
+      if (!child || !previewState) return null;
+
+      const isDirect = depth === 0;
+      const localFrame = isDirect
+        ? getResolvedBoardItemFrame(child, index)
+        : getResolvedChildItemFrame(child, index, parentLocalW, parentLocalH);
+
+      // Convert local frame to absolute coordinates in the board's space.
+      const parentLocalWidth = isDirect ? BOARD_SURFACE_WIDTH : parentLocalW;
+      const parentLocalHeight = isDirect ? BOARD_SURFACE_HEIGHT : parentLocalH;
+      const absX = isDirect ? localFrame.x : parentOffsetX + (localFrame.x / parentLocalWidth) * parentWidth;
+      const absY = isDirect ? localFrame.y : parentOffsetY + (localFrame.y / parentLocalHeight) * parentHeight;
+      const absW = isDirect ? localFrame.width : (localFrame.width / parentLocalWidth) * parentWidth;
+      const absH = isDirect ? localFrame.height : (localFrame.height / parentLocalHeight) * parentHeight;
+
+      const isGrid = isBoardGridComponentType(child.componentType);
+      const zoneId = toPreviewZoneId(childId);
+      const zone = previewState.zones[zoneId];
+      const zoneState = affordances?.zoneStates[zoneId];
+      const isDropSurface = child.componentType === 'space' || child.componentType === 'zone';
+      const gridCellIds = isGrid
+        ? child.children.map(String).filter((cellId) => project.instances[cellId]?.componentType === 'space')
+        : [];
+      const shouldPulse = isGrid
+        ? hasStarted && gridCellIds.some((cellId) => {
+          const cellState = affordances?.zoneStates[toPreviewZoneId(cellId)];
+          return Boolean(
+            cellState?.interactable
+            || cellState?.highlighted
+            || cellState?.dropTarget
+            || cellState?.selected
+          );
+        })
+        : hasStarted && Boolean(
+          zoneState?.interactable
+          || zoneState?.highlighted
+          || zoneState?.dropTarget
+          || zoneState?.selected
+        );
+      const dropTarget = isGrid
+        ? gridCellIds.some((cellId) => Boolean(affordances?.zoneStates[toPreviewZoneId(cellId)]?.dropTarget))
+        : Boolean(zoneState?.dropTarget);
+      const selected = isGrid
+        ? gridCellIds.some((cellId) => Boolean(affordances?.zoneStates[toPreviewZoneId(cellId)]?.selected))
+        : Boolean(zoneState?.selected);
+
+      return {
+        id: childId,
+        label: String(child.properties.label ?? child.displayName ?? 'Board Item'),
+        typeLabel: '',
+        icon: renderComponentIcon(child.componentType, { size: 16, style: { color: '#064e3b' } }),
+        showHeader: false,
+        x: absX,
+        y: absY,
+        width: absW,
+        height: absH,
+        background: dropTarget ? 'rgba(250,204,21,0.18)' : (resolvePaletteColor(localFrame.background) ?? localFrame.background),
+        borderColor: dropTarget ? '#f97316' : (resolvePaletteColor(localFrame.borderColor) ?? localFrame.borderColor),
+        borderWidth: dropTarget ? 3 : localFrame.borderWidth,
+        borderRadius: localFrame.borderRadius,
+        clipPath: localFrame.clipPath ?? null,
+        padding: child.componentType === 'text-box' ? 0 : undefined,
+        selected,
+        highlighted: shouldPulse,
+        dropTarget,
+        onClick: !isGrid && isDropSurface && hasStarted ? () => onZoneClick(childId) : undefined,
+        onDragOver: isDropSurface
+          ? (event: DragEvent<HTMLDivElement>) => {
+            if (hasStarted && selection.dragEntityId) {
+              event.preventDefault();
+            }
+          }
+          : undefined,
+        onDrop: isDropSurface
+          ? (event: DragEvent<HTMLDivElement>) => {
+            event.preventDefault();
+            handleZoneDrop(childId);
+          }
+          : undefined,
+        content: child.componentType === 'text-box'
+          ? (
+            <TextBoxContent
+              project={project}
+              properties={child.properties}
+              emptyPlaceholder=""
+            />
+          )
+          : child.componentType === 'image-area'
+          ? renderImageAreaContent(child.properties)
+          : child.componentType === 'card'
+          ? (
+            <div style={{ display: 'grid', gap: '0.45rem', color: '#064e3b' }}>
+              <strong style={{ fontSize: '0.92rem' }}>{String(child.properties.title ?? child.properties.label ?? 'Card')}</strong>
+              <span style={{ fontSize: '0.8rem', color: '#0f766e', lineHeight: 1.5 }}>
+                {String(child.properties.subtitle ?? '')}
+              </span>
+            </div>
+          )
+          : isGrid
+          ? (() => {
+            const gridCells = getBoardGridCells(child);
+
+            return (
+              <BoardGrid
+                kind={child.componentType as 'hex-grid' | 'square-grid' | 'checkerboard-grid'}
+                cells={gridCellIds.map((cellId, cellIndex) => {
+                  const cell = project.instances[cellId];
+                  const cellZoneId = toPreviewZoneId(cellId);
+                  const cellZone = previewState.zones[cellZoneId];
+                  const cellState = affordances?.zoneStates[cellZoneId];
+                  const cellAppearance = getGridCellAppearance(child);
+                  const row = typeof cell?.placement?.coordinates?.y === 'number'
+                    ? cell.placement.coordinates.y
+                    : (gridCells[cellIndex]?.y ?? cellIndex);
+                  const column = typeof cell?.placement?.coordinates?.x === 'number'
+                    ? cell.placement.coordinates.x
+                    : (gridCells[cellIndex]?.x ?? 0);
+
+                  return {
+                    id: cellId,
+                    row,
+                    column,
+                    label: String(cell?.properties.label ?? cell?.displayName ?? `Cell ${cellIndex + 1}`),
+                    background: cellState?.dropTarget
+                      ? 'rgba(250,204,21,0.24)'
+                      : (resolvePaletteColor(cellAppearance.background) ?? cellAppearance.background),
+                    textureId: cellAppearance.textureId,
+                    textureOpacity: cellAppearance.textureOpacity,
+                    borderColor: cellState?.dropTarget
+                      ? '#f97316'
+                      : (resolvePaletteColor(cellAppearance.borderColor) ?? (child.componentType === 'hex-grid' ? undefined : 'rgba(15,118,110,0.18)')),
+                    borderWidth: cellState?.dropTarget ? 2 : cellAppearance.borderWidth,
+                    borderRadius: cellAppearance.borderRadius,
+                    selected: Boolean(cellState?.selected),
+                    highlighted: Boolean(cellState?.highlighted || cellState?.interactable),
+                    dropTarget: Boolean(cellState?.dropTarget),
+                    onClick: hasStarted ? () => onZoneClick(cellId) : undefined,
+                    onDragOver: (event: DragEvent<HTMLDivElement>) => {
+                      if (hasStarted && selection.dragEntityId) {
+                        event.preventDefault();
+                      }
+                    },
+                    onDrop: (event: DragEvent<HTMLDivElement>) => {
+                      event.preventDefault();
+                      handleZoneDrop(cellId);
+                    },
+                    content: (cellZone?.entityIds ?? []).length
+                      ? (
+                        <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
+                          {cellZone?.entityIds.map((entityId) => renderCube(entityId))}
+                        </div>
+                      )
+                      : null,
+                  };
+                })}
+              />
+            );
+          })()
+          : (
+            <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
+              {(zone?.entityIds ?? []).length
+                ? zone?.entityIds.map((entityId) => renderCube(entityId))
+                : (
+                  <span style={{ color: '#94a3b8', fontSize: '0.88rem', textAlign: 'center' }}>
+                    {''}
+                  </span>
+                )}
+            </div>
+          ),
+      };
+    }
+
+    function collectPreviewItems(
+      childIds: string[],
+      offsetX: number,
+      offsetY: number,
+      parentWidth: number,
+      parentHeight: number,
+      depth: number,
+      parentLocalW: number,
+      parentLocalH: number,
+    ): PreviewItem[] {
+      const items: PreviewItem[] = [];
+      for (let i = 0; i < childIds.length; i++) {
+        const item = buildPreviewItem(childIds[i], i, offsetX, offsetY, parentWidth, parentHeight, depth, parentLocalW, parentLocalH);
+        if (!item) continue;
+        items.push(item);
+
+        const child = project.instances[childIds[i]];
+        if (child && !isLeafComponentType(child.componentType) && !isBoardGridComponentType(child.componentType)) {
+          const grandchildIds = child.children.map(String).filter((gcId) => {
+            const gc = project.instances[gcId];
+            return gc && !isMovableComponentType(gc.componentType);
+          });
+          if (grandchildIds.length > 0) {
+            const childLocalW = child.frame?.width ?? item.width;
+            const childLocalH = child.frame?.height ?? item.height;
+            items.push(...collectPreviewItems(grandchildIds, item.x, item.y, item.width, item.height, depth + 1, childLocalW, childLocalH));
+          }
+        }
+      }
+      return items;
+    }
+
     return (
       <BoardSurface
-        items={mainBoardChildIds.map((childId, index) => {
-          const child = project.instances[childId];
-          if (!child) {
-            return null;
-          }
-
-          const frame = getResolvedBoardItemFrame(child, index);
-          const isGrid = isBoardGridComponentType(child.componentType);
-          const zoneId = toPreviewZoneId(childId);
-          const zone = previewState.zones[zoneId];
-          const zoneState = affordances?.zoneStates[zoneId];
-          const isDropSurface = child.componentType === 'space' || child.componentType === 'zone';
-          const gridCellIds = isGrid
-            ? child.children.map(String).filter((cellId) => project.instances[cellId]?.componentType === 'space')
-            : [];
-          const shouldPulse = isGrid
-            ? hasStarted && gridCellIds.some((cellId) => {
-              const cellState = affordances?.zoneStates[toPreviewZoneId(cellId)];
-              return Boolean(
-                cellState?.interactable
-                || cellState?.highlighted
-                || cellState?.dropTarget
-                || cellState?.selected
-              );
-            })
-            : hasStarted && Boolean(
-              zoneState?.interactable
-              || zoneState?.highlighted
-              || zoneState?.dropTarget
-              || zoneState?.selected
-            );
-          const dropTarget = isGrid
-            ? gridCellIds.some((cellId) => Boolean(affordances?.zoneStates[toPreviewZoneId(cellId)]?.dropTarget))
-            : Boolean(zoneState?.dropTarget);
-          const selected = isGrid
-            ? gridCellIds.some((cellId) => Boolean(affordances?.zoneStates[toPreviewZoneId(cellId)]?.selected))
-            : Boolean(zoneState?.selected);
-
-          return {
-            id: childId,
-            label: String(child.properties.label ?? child.displayName ?? 'Board Item'),
-            typeLabel: child.componentType.replace('-', ' '),
-            icon: renderComponentIcon(child.componentType, { size: 16, style: { color: '#064e3b' } }),
-            showHeader: child.componentType !== 'text-box',
-            x: frame.x,
-            y: frame.y,
-            width: frame.width,
-            height: frame.height,
-            background: dropTarget ? 'rgba(250,204,21,0.18)' : (resolvePaletteColor(frame.background) ?? frame.background),
-            borderColor: dropTarget ? '#f97316' : (resolvePaletteColor(frame.borderColor) ?? frame.borderColor),
-            borderWidth: dropTarget ? 3 : frame.borderWidth,
-            borderRadius: frame.borderRadius,
-            selected,
-            highlighted: shouldPulse,
-            dropTarget,
-            onClick: !isGrid && isDropSurface && hasStarted ? () => onZoneClick(childId) : undefined,
-            onDragOver: isDropSurface
-              ? (event: DragEvent<HTMLDivElement>) => {
-                if (hasStarted && selection.dragEntityId) {
-                  event.preventDefault();
-                }
-              }
-              : undefined,
-            onDrop: isDropSurface
-              ? (event: DragEvent<HTMLDivElement>) => {
-                event.preventDefault();
-                handleZoneDrop(childId);
-              }
-              : undefined,
-            content: child.componentType === 'text-box'
-              ? (
-                <TextBoxContent
-                  project={project}
-                  properties={child.properties}
-                  emptyPlaceholder="Add text in the component editor."
-                />
-              )
-              : child.componentType === 'image-area'
-              ? renderImageAreaContent(child.properties)
-              : child.componentType === 'card'
-              ? (
-                <div style={{ display: 'grid', gap: '0.45rem', color: '#064e3b' }}>
-                  <strong style={{ fontSize: '0.92rem' }}>{String(child.properties.title ?? child.properties.label ?? 'Card')}</strong>
-                  <span style={{ fontSize: '0.8rem', color: '#0f766e', lineHeight: 1.5 }}>
-                    {String(child.properties.subtitle ?? 'Card text')}
-                  </span>
-                </div>
-              )
-              : isGrid
-              ? (() => {
-                const gridCells = getBoardGridCells(child);
-
-                return (
-                  <BoardGrid
-                    kind={child.componentType as 'hex-grid' | 'square-grid' | 'checkerboard-grid'}
-                    cells={gridCellIds.map((cellId, cellIndex) => {
-                      const cell = project.instances[cellId];
-                      const cellZoneId = toPreviewZoneId(cellId);
-                      const cellZone = previewState.zones[cellZoneId];
-                      const cellState = affordances?.zoneStates[cellZoneId];
-                      const cellAppearance = getGridCellAppearance(child);
-                      const row = typeof cell?.placement?.coordinates?.y === 'number'
-                        ? cell.placement.coordinates.y
-                        : (gridCells[cellIndex]?.y ?? cellIndex);
-                      const column = typeof cell?.placement?.coordinates?.x === 'number'
-                        ? cell.placement.coordinates.x
-                        : (gridCells[cellIndex]?.x ?? 0);
-
-                      return {
-                        id: cellId,
-                        row,
-                        column,
-                        label: String(cell?.properties.label ?? cell?.displayName ?? `Cell ${cellIndex + 1}`),
-                        background: cellState?.dropTarget
-                          ? 'rgba(250,204,21,0.24)'
-                          : (resolvePaletteColor(cellAppearance.background) ?? cellAppearance.background),
-                        textureId: cellAppearance.textureId,
-                        textureOpacity: cellAppearance.textureOpacity,
-                        borderColor: cellState?.dropTarget
-                          ? '#f97316'
-                          : (resolvePaletteColor(cellAppearance.borderColor) ?? (child.componentType === 'hex-grid' ? undefined : 'rgba(15,118,110,0.18)')),
-                        borderWidth: cellState?.dropTarget ? 2 : cellAppearance.borderWidth,
-                        borderRadius: cellAppearance.borderRadius,
-                        selected: Boolean(cellState?.selected),
-                        highlighted: Boolean(cellState?.highlighted || cellState?.interactable),
-                        dropTarget: Boolean(cellState?.dropTarget),
-                        onClick: hasStarted ? () => onZoneClick(cellId) : undefined,
-                        onDragOver: (event: DragEvent<HTMLDivElement>) => {
-                          if (hasStarted && selection.dragEntityId) {
-                            event.preventDefault();
-                          }
-                        },
-                        onDrop: (event: DragEvent<HTMLDivElement>) => {
-                          event.preventDefault();
-                          handleZoneDrop(cellId);
-                        },
-                        content: (cellZone?.entityIds ?? []).length
-                          ? (
-                            <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
-                              {cellZone?.entityIds.map((entityId) => renderCube(entityId))}
-                            </div>
-                          )
-                          : null,
-                      };
-                    })}
-                  />
-                );
-              })()
-              : (
-                <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
-                  {(zone?.entityIds ?? []).length
-                    ? zone?.entityIds.map((entityId) => renderCube(entityId))
-                    : (
-                      <span style={{ color: '#94a3b8', fontSize: '0.88rem', textAlign: 'center' }}>
-                        {isDropSurface ? 'Drop pieces here' : 'Styled board item'}
-                      </span>
-                    )}
-                </div>
-              ),
-          };
-        }).filter((item): item is NonNullable<typeof item> => Boolean(item))}
+        items={collectPreviewItems(mainBoardChildIds, 0, 0, BOARD_SURFACE_WIDTH, BOARD_SURFACE_HEIGHT, 0, BOARD_SURFACE_WIDTH, BOARD_SURFACE_HEIGHT)}
         width={BOARD_SURFACE_WIDTH}
         height={BOARD_SURFACE_HEIGHT}
         minHeight={520}

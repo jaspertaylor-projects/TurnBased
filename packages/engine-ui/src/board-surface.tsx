@@ -24,11 +24,14 @@ export interface BoardSurfaceItem {
   borderColor?: string | null;
   borderWidth?: number;
   borderRadius?: number;
+  clipPath?: string | null;
+  padding?: string | number;
   selected?: boolean;
   highlighted?: boolean;
   dropTarget?: boolean;
   content?: ReactNode;
   onClick?: () => void;
+  onDoubleClick?: () => void;
   onMouseDown?: MouseEventHandler<HTMLDivElement>;
   onMouseMove?: MouseEventHandler<HTMLDivElement>;
   onDragOver?: DragEventHandler<HTMLDivElement>;
@@ -43,6 +46,7 @@ export interface BoardSurfaceProps {
   minHeight?: number;
   background?: string;
   surfaceAppearance?: BoardSurfaceAppearance;
+  surfaceBorderRadius?: number | string;
   showGrid?: boolean;
   editable?: boolean;
   showItemHeader?: boolean;
@@ -56,6 +60,39 @@ export interface BoardSurfaceProps {
 const defaultBackground =
   'linear-gradient(160deg, rgba(16,185,129,0.16), rgba(14,165,233,0.08), rgba(250,204,21,0.12))';
 
+/** Parse a CSS `polygon(...)` value into SVG `<polygon points="...">` coords on a 0-100 viewBox. */
+function parsePolygonPoints(clipPath: string): string | null {
+  const match = clipPath.match(/^polygon\((.+)\)$/);
+  if (!match) return null;
+  return match[1]
+    .split(',')
+    .map((pair) => {
+      const [x, y] = pair.trim().split(/\s+/).map((v) => parseFloat(v));
+      return `${x},${y}`;
+    })
+    .join(' ');
+}
+
+function ClipPathBorder({ clipPath, color, width: strokeWidth }: { clipPath: string; color: string; width: number }) {
+  const points = parsePolygonPoints(clipPath);
+  if (!points) return null;
+  return (
+    <svg
+      viewBox="0 0 100 100"
+      preserveAspectRatio="none"
+      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
+    >
+      <polygon
+        points={points}
+        fill="none"
+        stroke={color}
+        strokeWidth={strokeWidth * 1.4}
+        vectorEffect="non-scaling-stroke"
+      />
+    </svg>
+  );
+}
+
 function getItemStyle(
   item: BoardSurfaceItem,
   width: number,
@@ -65,20 +102,26 @@ function getItemStyle(
 ): CSSProperties {
   return {
     position: 'absolute',
+    // border-box: border is drawn INSIDE the percentage-based size so items
+    // at their parent's edge don't overflow when the CSS transform zooms in.
+    boxSizing: 'border-box',
     left: `${(item.x / width) * 100}%`,
     top: `${(item.y / height) * 100}%`,
     width: `${(item.width / width) * 100}%`,
     height: `${(item.height / height) * 100}%`,
-    borderRadius: `${item.borderRadius ?? 18}px`,
-    border: `${item.borderWidth ?? 1}px solid ${item.dropTarget ? '#f97316' : item.borderColor ?? 'rgba(15,118,110,0.16)'}`,
+    borderRadius: item.clipPath ? 0 : `${item.borderRadius ?? 18}px`,
+    clipPath: item.clipPath ?? undefined,
+    border: item.clipPath ? 'none' : `${item.borderWidth ?? 1}px solid ${item.dropTarget ? '#f97316' : item.borderColor ?? 'rgba(15,118,110,0.16)'}`,
     background: item.background ?? 'rgba(255,255,255,0.92)',
+    // Use inset shadows so selection/highlight indicators don't extend
+    // outside the item's box (which would be clipped when zoomed in).
     boxShadow: item.selected
-      ? '0 0 0 2px rgba(249,115,22,0.24), 0 16px 36px rgba(6,78,59,0.12)'
+      ? 'inset 0 0 0 2px rgba(249,115,22,0.45), 0 16px 36px rgba(6,78,59,0.12)'
       : item.highlighted
-        ? '0 0 0 1px rgba(14,165,233,0.18), 0 16px 36px rgba(6,78,59,0.1)'
+        ? 'inset 0 0 0 1px rgba(14,165,233,0.3), 0 16px 36px rgba(6,78,59,0.1)'
         : '0 14px 32px rgba(6,78,59,0.08)',
     color: '#064e3b',
-    padding: editable ? '0.8rem 0.8rem 1rem 0.8rem' : '0.7rem',
+    padding: item.padding !== undefined ? item.padding : editable ? '0.8rem 0.8rem 1rem 0.8rem' : '0.7rem',
     textAlign: 'left',
     display: 'grid',
     gridTemplateRows: showHeader ? 'auto minmax(0, 1fr)' : 'minmax(0, 1fr)',
@@ -160,6 +203,7 @@ export function BoardSurface({
   minHeight = 420,
   background = defaultBackground,
   surfaceAppearance,
+  surfaceBorderRadius,
   showGrid = false,
   editable = false,
   showItemHeader = true,
@@ -184,7 +228,7 @@ export function BoardSurface({
         width: '100%',
         minHeight: `${minHeight}px`,
         aspectRatio: `${width} / ${height}`,
-        borderRadius: '30px',
+        borderRadius: surfaceBorderRadius ?? 0,
         border: `${resolvedBorderWidth}px ${resolvedBorderStyle} ${resolvedBorderColor}`,
         background: surfaceAppearance?.background ?? background,
         overflow: 'hidden',
@@ -232,7 +276,7 @@ export function BoardSurface({
 
       {items.map((item) => {
         const resolvedShowHeader = item.showHeader ?? showItemHeader;
-        const interactive = Boolean(item.onClick || item.onMouseDown || item.onDragOver || item.onDrop);
+        const interactive = Boolean(item.onClick || item.onDoubleClick || item.onMouseDown || item.onDragOver || item.onDrop);
 
         if (!interactive) {
           const itemTextureOverlay = getItemTextureOverlayStyle(item);
@@ -240,6 +284,7 @@ export function BoardSurface({
           return (
             <div key={item.id} style={getItemStyle(item, width, height, editable, resolvedShowHeader)}>
               {itemTextureOverlay ? <div style={itemTextureOverlay} /> : null}
+              {item.clipPath ? <ClipPathBorder clipPath={item.clipPath} color={item.dropTarget ? '#f97316' : item.borderColor ?? 'rgba(15,118,110,0.16)'} width={item.borderWidth ?? 1} /> : null}
               <BoardSurfaceItemInner item={item} showHeader={resolvedShowHeader} />
             </div>
           );
@@ -251,6 +296,7 @@ export function BoardSurface({
             role={item.onClick ? 'button' : undefined}
             tabIndex={item.onClick ? 0 : undefined}
             onClick={item.onClick}
+            onDoubleClick={item.onDoubleClick}
             onMouseDown={item.onMouseDown}
             onMouseMove={item.onMouseMove}
             onDragOver={item.onDragOver}
@@ -269,6 +315,7 @@ export function BoardSurface({
               const itemTextureOverlay = getItemTextureOverlayStyle(item);
               return itemTextureOverlay ? <div style={itemTextureOverlay} /> : null;
             })()}
+            {item.clipPath ? <ClipPathBorder clipPath={item.clipPath} color={item.dropTarget ? '#f97316' : item.borderColor ?? 'rgba(15,118,110,0.16)'} width={item.borderWidth ?? 1} /> : null}
             <BoardSurfaceItemInner item={item} showHeader={resolvedShowHeader} />
             {editable && showResizeHandle && item.onResizeMouseDown ? (
               <span

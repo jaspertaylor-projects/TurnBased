@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useUndoRedo, useUndoRedoKeyboard } from '../editor/useUndoRedo';
 import { createUIAffordanceState } from '@turnbased/engine-ui';
 import type { UISelectionState } from '@turnbased/engine-ui';
 import {
@@ -29,12 +30,11 @@ import type { ComponentEditorMode, EditorSection } from '../editor/constants';
 import { createPreviewSignature, readProjectIdFromHash } from '../editor/helpers';
 import { pageStyle, panelStyle, sectionTitleStyle } from '../editor/styles';
 import { EditorSidebar } from '../editor/components/EditorSidebar';
-import { RequirementsNotice } from '../editor/components/RequirementsNotice';
 import { VisualsSection } from '../editor/sections/VisualsSection';
 import { PreviewSection } from '../editor/sections/PreviewSection';
 import { VersionsSection } from '../editor/sections/VersionsSection';
 import { AppLayoutSection } from '../editor/sections/AppLayoutSection';
-import { ArtSection } from '../editor/sections/ArtSection';
+import { ArtSection, STUDIO_BG_VALUE } from '../editor/sections/ArtSection';
 import { SettingsSection } from '../editor/sections/SettingsSection';
 import type { BuiltInComponentType, ComponentInstanceModel } from '@turnbased/engine-components';
 import { commitProjectVersion, getProjectGitStatus, listProjectGitCommits, restoreProjectFromCommit } from '../editor/git';
@@ -45,7 +45,6 @@ const PENDING_EDITOR_NOTICE_KEY = 'turnbased.creator.pendingEditorNotice';
 const PREVIEW_ZONE_COMPONENT_TYPES = new Set([
   'space',
   'zone',
-  'resource-pile',
   'track',
   'deck',
   'hand',
@@ -53,6 +52,12 @@ const PREVIEW_ZONE_COMPONENT_TYPES = new Set([
   'bag',
   'score-track',
 ]);
+
+// Component types that represent physical, designable game objects.
+// These appear in the Component Editor. Conceptual/functional types (zone, hand,
+// deck, discard, bag, counter, score-track, network, track) belong
+// in App Layout where the creator configures placement and game-structure concerns.
+const COMPONENT_EDITOR_TYPES = new Set(['board', 'piece', 'token', 'card']);
 
 function isMovableTemplateType(componentType: string): boolean {
   return componentType === 'piece' || componentType === 'token';
@@ -63,7 +68,11 @@ function listComponentOutlineIds(project: EditorProject): string[] {
     .filter((instance) => isMovableTemplateType(instance.componentType))
     .map((instance) => String(instance.instanceId));
 
-  return Array.from(new Set([...project.rootInstanceIds, ...movableTemplateIds]));
+  const designableRootIds = project.rootInstanceIds.filter(
+    (instanceId) => COMPONENT_EDITOR_TYPES.has(project.instances[instanceId]?.componentType ?? ''),
+  );
+
+  return Array.from(new Set([...designableRootIds, ...movableTemplateIds]));
 }
 
 function findComponentOutlineId(project: EditorProject, instanceId: string | null): string | null {
@@ -90,7 +99,9 @@ function findComponentOutlineId(project: EditorProject, instanceId: string | nul
 
 export const Editor = () => {
   const [projectId, setProjectId] = useState<string | null>(null);
-  const [project, setProject] = useState<EditorProject | null>(null);
+  const projectHistory = useUndoRedo<EditorProject | null>(null);
+  const project = projectHistory.value;
+  const setProject = projectHistory.set;
   const [activeSection, setActiveSection] = useState<EditorSection>('preview');
   const [componentEditorMode, setComponentEditorMode] = useState<ComponentEditorMode>('edit');
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
@@ -108,7 +119,7 @@ export const Editor = () => {
       const pendingNotice = window.sessionStorage.getItem(PENDING_EDITOR_NOTICE_KEY);
 
       setProjectId(nextProjectId);
-      setProject(nextProject);
+      projectHistory.reset(nextProject);
       setActiveSection('preview');
       setComponentEditorMode('edit');
       setSelectedComponentId(null);
@@ -141,6 +152,8 @@ export const Editor = () => {
     const runtime = buildPreviewRuntime(project);
     saveProjectWorkspace(project.id, createWorkspaceFiles(project, runtime));
   }, [project]);
+
+  useUndoRedoKeyboard(projectHistory.undo, projectHistory.redo);
 
   const runtime = project ? buildPreviewRuntime(project) : null;
   const moveTree = previewState && runtime ? createPreviewMoveTree(previewState, runtime) : null;
@@ -305,9 +318,9 @@ export const Editor = () => {
     setSelectedComponentId(instanceId);
   }
 
-  function startCreateComponent() {
+  function createTopLevelComponent(type: BuiltInComponentType) {
     setActiveSection('component_editor');
-    setComponentEditorMode('create');
+    handleAddComponent(type, null, { focusNewComponent: true });
   }
 
   function handleEntityClick(entityId: string) {
@@ -388,6 +401,7 @@ export const Editor = () => {
         return (
           <ArtSection
             project={currentProject}
+            projectId={currentProject.id}
             onUpdateArt={(updater) => commitProject(updateProjectArt(currentProject, updater))}
             onUpdateTheme={(value) => commitProject(
               updateProjectBrief(
@@ -436,7 +450,7 @@ export const Editor = () => {
             onRestoreCommit={(commitSha) => {
               try {
                 const restoredProject = restoreProjectFromCommit(currentProject.id, commitSha);
-                setProject(restoredProject);
+                projectHistory.reset(restoredProject);
                 setPreviewState(buildPreviewRuntime(restoredProject).initialState);
                 setSelectedComponentId(null);
                 setSelection(EMPTY_SELECTION);
@@ -478,7 +492,10 @@ export const Editor = () => {
   }
 
   return (
-    <div style={pageStyle}>
+    <div style={{
+      ...pageStyle,
+      ...(activeSection === 'art' ? { flex: '1 1 0', overflow: 'hidden', background: STUDIO_BG_VALUE, flexWrap: 'nowrap' as const, alignItems: 'stretch' } : {}),
+    }}>
       <EditorSidebar
         project={currentProject}
         activeSection={activeSection}
@@ -490,14 +507,23 @@ export const Editor = () => {
         selectedOutlineComponentId={selectedOutlineComponentId}
         componentEditorMode={componentEditorMode}
         onOpenComponentEditor={openComponentEditor}
-        onStartCreateComponent={startCreateComponent}
+        onCreateTopLevelComponent={createTopLevelComponent}
         onSelectOutlineComponent={selectComponent}
         onRenameProject={(name) => commitProject(renameProject(currentProject, name))}
         onUpdateDescription={(description) => commitProject(updateProjectDescription(currentProject, description))}
       />
 
-      <section style={{ flex: '1 1 760px', minWidth: 0, display: 'grid', gap: '0.85rem', padding: '0.75rem 1rem 1rem 1rem' }}>
-        {activeSection !== 'component_editor' ? (
+      <section style={{
+        flex: '1 1 0',
+        minWidth: 0,
+        display: 'grid',
+        gridTemplateRows: activeSection === 'art' ? 'minmax(0, 1fr)' : 'auto auto minmax(0, 1fr)',
+        gap: activeSection === 'art' ? 0 : '0.85rem',
+        padding: activeSection === 'art' ? 0 : '0.75rem 1rem 1rem 1rem',
+        overflow: 'hidden',
+        ...(activeSection === 'art' ? { height: '100%' } : {}),
+      }}>
+        {activeSection !== 'component_editor' && activeSection !== 'art' ? (
           <div style={{ padding: '0.2rem 0.15rem 0 0.15rem', color: '#0f766e', fontSize: '0.84rem', display: 'flex', gap: '0.7rem', alignItems: 'center', flexWrap: 'wrap' }}>
             <span style={{ fontWeight: 700, color: '#064e3b' }}>
               {currentSectionMeta.label.toLowerCase()}
@@ -505,14 +531,13 @@ export const Editor = () => {
           </div>
         ) : null}
 
-        {editorNotice && (
+        {editorNotice && activeSection !== 'art' && (
           <div style={{ ...panelStyle, background: 'rgba(255,247,237,0.94)', border: '1px solid rgba(249,115,22,0.18)' }}>
             <p style={{ ...sectionTitleStyle, marginBottom: '0.25rem', color: '#c2410c' }}>Notice</p>
             <p style={{ margin: 0, color: '#9a3412' }}>{editorNotice}</p>
           </div>
         )}
 
-        <RequirementsNotice requirements={runtime.requirements} />
         {renderActiveSection()}
       </section>
     </div>

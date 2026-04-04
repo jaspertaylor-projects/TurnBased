@@ -63,7 +63,7 @@ export const BOARD_SURFACE_TEXTURE_OPTIONS: ReadonlyArray<{
 ] as const;
 
 const DEFAULT_BOARD_APPEARANCE: BoardAppearanceProperties = {
-  surfaceColor: 'rgba(248,250,252,0.98)',
+  surfaceColor: '#f8fafc',
   surfaceTexture: 'none',
   surfaceTextureOpacity: 0.3,
   surfaceBorderColor: 'rgba(15,118,110,0.18)',

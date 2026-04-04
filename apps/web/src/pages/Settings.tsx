@@ -1,8 +1,9 @@
 
+import { AppPageFrame } from '../components/AppPageFrame';
 
 export const Settings = () => {
   return (
-    <div style={{ padding: '2rem' }}>
+    <AppPageFrame contentStyle={{ maxWidth: '960px', margin: '0 auto' }}>
       <h1>Account Settings</h1>
       
       <section style={{ marginTop: '2rem' }}>
@@ -28,6 +29,6 @@ export const Settings = () => {
           Add Credits
         </button>
       </section>
-    </div>
+    </AppPageFrame>
   );
 };

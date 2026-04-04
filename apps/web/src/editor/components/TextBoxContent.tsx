@@ -1,12 +1,11 @@
-import { Fragment, createElement, type CSSProperties, type ReactNode } from 'react';
-import { getBoardSurfaceTextureStyle } from '@turnbased/engine-ui';
+import { Fragment, cloneElement, createElement, isValidElement, type CSSProperties, type ReactNode } from 'react';
 
-import { renderIcon } from '../iconography';
 import { resolveProjectPaletteColorValue } from '../projectPalette';
 import type { EditorIconAsset, EditorProject } from '../types';
+import { IconTile } from './IconTile';
 
 export type TextBoxFontFamily = 'sans' | 'serif' | 'display' | 'mono';
-export type TextBoxTextAlign = 'left' | 'center' | 'right' | 'justify';
+export type TextBoxTextAlign = 'left' | 'center' | 'right';
 export type TextBoxVerticalAlign = 'start' | 'center' | 'end';
 
 export interface ResolvedTextBoxProperties {
@@ -17,7 +16,10 @@ export interface ResolvedTextBoxProperties {
   textColor: string;
   textAlign: TextBoxTextAlign;
   verticalAlign: TextBoxVerticalAlign;
-  padding: number;
+  paddingTop: number;
+  paddingRight: number;
+  paddingBottom: number;
+  paddingLeft: number;
 }
 
 export const TEXT_BOX_FONT_OPTIONS: Array<{ value: TextBoxFontFamily; label: string }> = [
@@ -31,7 +33,6 @@ export const TEXT_BOX_TEXT_ALIGN_OPTIONS: Array<{ value: TextBoxTextAlign; label
   { value: 'left', label: 'Left' },
   { value: 'center', label: 'Center' },
   { value: 'right', label: 'Right' },
-  { value: 'justify', label: 'Justify' },
 ];
 
 export const TEXT_BOX_VERTICAL_ALIGN_OPTIONS: Array<{ value: TextBoxVerticalAlign; label: string }> = [
@@ -40,7 +41,7 @@ export const TEXT_BOX_VERTICAL_ALIGN_OPTIONS: Array<{ value: TextBoxVerticalAlig
   { value: 'end', label: 'Bottom' },
 ];
 
-const FONT_FAMILY_MAP: Record<TextBoxFontFamily, string> = {
+export const FONT_FAMILY_MAP: Record<TextBoxFontFamily, string> = {
   sans: '"Trebuchet MS", "Avenir Next", Avenir, "Segoe UI", sans-serif',
   serif: 'Georgia, "Times New Roman", serif',
   display: '"Alegreya Sans SC", "Trebuchet MS", "Segoe UI", sans-serif',
@@ -173,33 +174,6 @@ function getSafeInlineStyle(element: HTMLElement, tagName: string): CSSPropertie
   return nextStyle;
 }
 
-function renderCustomIconArtwork(item: EditorIconAsset, color: string, size: number) {
-  const trimmedMarkup = item.customSvgMarkup.trim();
-
-  if (!trimmedMarkup) {
-    return (
-      <span style={{ color, fontSize: `${size * 0.38}px`, fontWeight: 800, lineHeight: 1 }}>
-        ?
-      </span>
-    );
-  }
-
-  if (trimmedMarkup.startsWith('<svg')) {
-    return (
-      <span
-        style={{ width: '72%', height: '72%', display: 'inline-grid', placeItems: 'center', color }}
-        dangerouslySetInnerHTML={{ __html: trimmedMarkup }}
-      />
-    );
-  }
-
-  return (
-    <span style={{ color, fontSize: `${size * 0.5}px`, fontWeight: 800, lineHeight: 1 }}>
-      {trimmedMarkup.slice(0, 2)}
-    </span>
-  );
-}
-
 export function ProjectInlineIcon({
   project,
   item,
@@ -209,66 +183,7 @@ export function ProjectInlineIcon({
   item: EditorIconAsset;
   size: number;
 }) {
-  const backgroundColor = resolveProjectColor(project, item.backgroundColor);
-  const borderColor = resolveProjectColor(project, item.borderColor);
-  const iconColor = resolveProjectColor(project, item.iconColor);
-  const fillColor = resolveProjectColor(project, item.iconFillColor);
-  const textureStyle = item.backgroundTextureId !== 'none'
-    ? getBoardSurfaceTextureStyle(item.backgroundTextureId, item.backgroundTextureOpacity)
-    : null;
-
-  return (
-    <span
-      style={{
-        position: 'relative',
-        display: 'inline-grid',
-        placeItems: 'center',
-        width: `${size}px`,
-        height: `${size}px`,
-        marginInline: '0.08em',
-        borderRadius: `${Math.min(item.borderRadius, size / 2)}px`,
-        border: `${item.borderWidth}px solid ${borderColor}`,
-        background: backgroundColor,
-        boxSizing: 'border-box',
-        overflow: 'hidden',
-        verticalAlign: 'middle',
-        lineHeight: 0,
-      }}
-    >
-      {textureStyle?.backgroundImage ? (
-        <span
-          style={{
-            position: 'absolute',
-            inset: 0,
-            pointerEvents: 'none',
-            ...textureStyle,
-          }}
-        />
-      ) : null}
-
-      <span
-        style={{
-          position: 'relative',
-          zIndex: 1,
-          width: '72%',
-          height: '72%',
-          display: 'inline-grid',
-          placeItems: 'center',
-          color: iconColor,
-          overflow: 'hidden',
-        }}
-      >
-        {item.mode === 'custom'
-          ? renderCustomIconArtwork(item, iconColor, size)
-          : renderIcon(item.iconKey, {
-            size: size * 0.46,
-            strokeWidth: item.iconStrokeWidth,
-            fillColor,
-            style: { color: iconColor },
-          })}
-      </span>
-    </span>
-  );
+  return <IconTile item={item} project={project} size={size} inline />;
 }
 
 function renderTextSegments(
@@ -361,9 +276,42 @@ function renderRichTextContent(project: EditorProject, contentHtml: string, icon
   const parser = new DOMParser();
   const document = parser.parseFromString(`<body>${contentHtml}</body>`, 'text/html');
 
-  return document.body.childNodes.length > 0
-    ? Array.from(document.body.childNodes).map((node, index) => renderRichNode(node, `text:${index}`, project, iconSize))
-    : renderTextSegments(contentHtml, 'text:fallback', project, iconSize);
+  if (document.body.childNodes.length === 0) {
+    return renderTextSegments(contentHtml, 'text:fallback', project, iconSize);
+  }
+
+  const nodes = Array.from(document.body.childNodes).map((node, index) =>
+    renderRichNode(node, `text:${index}`, project, iconSize),
+  );
+
+  // Strip the bottom margin from the last block element so text can sit flush
+  // against the container edge when vertically aligned to bottom with 0 inset.
+  // (Flex containers don't collapse margins, so the trailing margin would
+  // otherwise prevent the content from reaching the edge.)
+  const last = nodes[nodes.length - 1];
+  if (last != null && isValidElement(last)) {
+    const existingStyle = (last.props as Record<string, unknown>).style as CSSProperties | undefined;
+    nodes[nodes.length - 1] = cloneElement(last, {
+      style: { ...existingStyle, marginBottom: 0 },
+    });
+  }
+
+  return nodes;
+}
+
+function clampInset(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.min(value, 64)) : fallback;
+}
+
+function resolveTextBoxInset(properties: Record<string, unknown>): Pick<ResolvedTextBoxProperties, 'paddingTop' | 'paddingRight' | 'paddingBottom' | 'paddingLeft'> {
+  // Support legacy single `padding` value as a fallback for all sides.
+  const legacy = typeof properties.padding === 'number' && Number.isFinite(properties.padding) ? properties.padding : 18;
+  return {
+    paddingTop: clampInset(properties.paddingTop, legacy),
+    paddingRight: clampInset(properties.paddingRight, legacy),
+    paddingBottom: clampInset(properties.paddingBottom, legacy),
+    paddingLeft: clampInset(properties.paddingLeft, legacy),
+  };
 }
 
 export function resolveTextBoxProperties(properties: Record<string, unknown>): ResolvedTextBoxProperties {
@@ -383,11 +331,9 @@ export function resolveTextBoxProperties(properties: Record<string, unknown>): R
     textColor: typeof properties.textColor === 'string' && properties.textColor.trim().length > 0
       ? properties.textColor
       : '#064e3b',
-    textAlign: textAlign === 'center' || textAlign === 'right' || textAlign === 'justify' ? textAlign : 'left',
+    textAlign: textAlign === 'center' || textAlign === 'right' ? textAlign : 'left',
     verticalAlign: verticalAlign === 'start' || verticalAlign === 'end' ? verticalAlign : 'center',
-    padding: typeof properties.padding === 'number' && Number.isFinite(properties.padding)
-      ? Math.max(0, Math.min(properties.padding, 64))
-      : 18,
+    ...resolveTextBoxInset(properties),
   };
 }
 
@@ -419,7 +365,7 @@ export function TextBoxContent({
           : resolved.verticalAlign === 'end'
             ? 'flex-end'
             : 'center',
-        padding: `${resolved.padding}px`,
+        padding: `${resolved.paddingTop}px ${resolved.paddingRight}px ${resolved.paddingBottom}px ${resolved.paddingLeft}px`,
         boxSizing: 'border-box',
         color: resolvedColor,
         fontFamily: FONT_FAMILY_MAP[resolved.fontFamily],

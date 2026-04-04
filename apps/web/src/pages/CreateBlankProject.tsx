@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Brush, Flag, Users } from 'lucide-react';
 
+import { AppPageFrame } from '../components/AppPageFrame';
 import { NumericInput } from '../components/NumericInput';
 import { buildProjectWithAI, getCreatorEnvironmentStatus } from '../editor/aiBuildService';
 import { commitProjectVersion } from '../editor/git';
@@ -100,7 +101,7 @@ export const CreateBlankProject = () => {
   }
 
   return (
-    <div style={{ padding: '2rem', maxWidth: '880px', margin: '0 auto' }}>
+    <AppPageFrame contentStyle={{ maxWidth: '880px', margin: '0 auto' }}>
       <div style={{ padding: '1.5rem', borderRadius: '28px', background: 'rgba(255,255,255,0.92)', border: '1px solid rgba(16,185,129,0.14)', boxShadow: '0 18px 48px rgba(6,78,59,0.08)', display: 'grid', gap: '1rem' }}>
         <div>
           <p style={{ textTransform: 'uppercase', letterSpacing: '0.08em', color: '#0f766e', fontSize: '0.82rem', marginBottom: '0.45rem' }}>
@@ -224,6 +225,6 @@ export const CreateBlankProject = () => {
           </div>
         )}
       </div>
-    </div>
+    </AppPageFrame>
   );
 };

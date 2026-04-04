@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
+import { AppPageFrame } from '../components/AppPageFrame';
 
 interface MarketplaceListing {
     id: string;
@@ -103,7 +104,7 @@ export const Marketplace = () => {
     if (error) return <div style={{ padding: '2rem', color: 'red' }}>Error: {error}</div>;
 
     return (
-        <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '2rem' }}>
+        <AppPageFrame contentStyle={{ maxWidth: '1000px', margin: '0 auto' }}>
             <h2>Marketplace</h2>
             <p style={{ color: '#64748b', marginBottom: '2rem' }}>Discover and purchase new board games from the community.</p>
 
@@ -171,6 +172,6 @@ export const Marketplace = () => {
                     ))}
                 </div>
             )}
-        </div>
+        </AppPageFrame>
     );
 };

@@ -493,28 +493,13 @@ function addZoneWithPieces(
     },
   }));
 
-  const resourcePileResult = addProjectComponent(nextProject, 'resource-pile', zoneId, config.ownerId);
-  nextProject = resourcePileResult.project;
-  const resourcePileId = resourcePileResult.instanceId ?? null;
-  if (!resourcePileId) {
-    return nextProject;
-  }
-
-  nextProject = updateInstance(nextProject, resourcePileId, (instance) => ({
-    ...instance,
-    displayName: 'Resource Pile',
-    properties: {
-      ...instance.properties,
-      label: 'Resource Pile',
-      maxCapacity: config.maxCapacity,
-    },
-  }));
-
   if (config.pieceCount <= 0) {
     return nextProject;
   }
 
-  const pieceResult = addProjectComponent(nextProject, config.pieceType, resourcePileId, config.ownerId);
+  // Pieces/tokens are root-level templates, not children of zones.
+  // The engine setup function places them into their starting zones.
+  const pieceResult = addProjectComponent(nextProject, config.pieceType, null, config.ownerId);
   nextProject = pieceResult.project;
   if (!pieceResult.instanceId) {
     return nextProject;

@@ -5,6 +5,7 @@ import { listProjectGitCommits } from '../editor/git';
 import { getLatestBuild } from '../editor/shipping';
 import { deleteEditorProject, loadEditorProjects } from '../editor/storage';
 import type { EditorProject } from '../editor/types';
+import { AppPageFrame } from '../components/AppPageFrame';
 
 export const Dashboard = () => {
   const [projects, setProjects] = useState<EditorProject[]>(() => loadEditorProjects());
@@ -26,7 +27,7 @@ export const Dashboard = () => {
   }
 
   return (
-    <div style={{ padding: '2rem', maxWidth: '1100px', margin: '0 auto' }}>
+    <AppPageFrame contentStyle={{ maxWidth: '1100px', margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
         <div>
           <p style={{ textTransform: 'uppercase', letterSpacing: '0.08em', color: '#0f766e', fontSize: '0.82rem', marginBottom: '0.45rem' }}>
@@ -183,6 +184,6 @@ export const Dashboard = () => {
           </div>
         )}
       </div>
-    </div>
+    </AppPageFrame>
   );
 };

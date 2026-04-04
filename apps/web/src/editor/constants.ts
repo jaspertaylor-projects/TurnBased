@@ -26,7 +26,7 @@ export const SECTION_OPTIONS: EditorSectionOption[] = [
   },
   {
     id: 'art',
-    label: 'Art',
+    label: 'Art Studio',
     description: 'Manage theme, art styles, recurring visual assets, and first-class icon tokens.',
   },
   {
@@ -36,7 +36,7 @@ export const SECTION_OPTIONS: EditorSectionOption[] = [
   },
   {
     id: 'preview',
-    label: 'Preview',
+    label: 'Play Test',
     description: 'Playtest the generated prototype.',
   },
   {

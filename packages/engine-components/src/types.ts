@@ -19,7 +19,6 @@ export type BuiltInComponentType =
   | 'square-grid'
   | 'checkerboard-grid'
   | 'zone'
-  | 'resource-pile'
   | 'deck'
   | 'hand'
   | 'discard'
@@ -195,6 +194,7 @@ export interface ComponentFrame {
   borderColor: string | null;
   borderWidth: number;
   borderRadius: number;
+  clipPath?: string | null;
 }
 
 export interface BoardAppearanceProperties {

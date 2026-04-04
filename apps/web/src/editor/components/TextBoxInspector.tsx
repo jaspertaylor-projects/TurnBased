@@ -1,5 +1,5 @@
 import { useEffect, useRef, type ReactNode } from 'react';
-import { AlignCenter, AlignJustify, AlignLeft, AlignRight, Bold, Italic, Underline } from 'lucide-react';
+import { AlignCenter, AlignCenterHorizontal, AlignEndHorizontal, AlignLeft, AlignRight, AlignStartHorizontal, Bold, Italic, Underline } from 'lucide-react';
 import type { PaletteColorOption } from '@turnbased/engine-ui';
 
 import { NumericInput } from '../../components/NumericInput';
@@ -9,8 +9,6 @@ import { InspectorAccordion, InspectorColorField } from './InspectorControls';
 import {
   ProjectInlineIcon,
   TEXT_BOX_FONT_OPTIONS,
-  TEXT_BOX_VERTICAL_ALIGN_OPTIONS,
-  TextBoxContent,
   getProjectIconToken,
   resolveTextBoxProperties,
 } from './TextBoxContent';
@@ -20,18 +18,6 @@ const compactInputStyle = {
   padding: '0.58rem 0.68rem',
   fontSize: '0.86rem',
 };
-
-function formatCommandLabel(value: string): string {
-  if (value === 'start') {
-    return 'Top';
-  }
-
-  if (value === 'end') {
-    return 'Bottom';
-  }
-
-  return value.charAt(0).toUpperCase() + value.slice(1);
-}
 
 function CommandButton({
   title,
@@ -119,8 +105,38 @@ export function TextBoxInspector({
   return (
     <>
       <InspectorAccordion title="Text" defaultOpen>
-        <div style={{ display: 'grid', gap: '0.65rem' }}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem' }}>
+        <div style={{ display: 'grid', gap: '0.6rem' }}>
+          <div
+            ref={editorRef}
+            contentEditable
+            suppressContentEditableWarning
+            onInput={syncEditorHtml}
+            onBlur={syncEditorHtml}
+            style={{
+              minHeight: '128px',
+              borderRadius: '12px',
+              border: '1px solid rgba(15,118,110,0.12)',
+              background: 'rgba(255,255,255,0.96)',
+              padding: '0.7rem 0.8rem',
+              color: '#064e3b',
+              fontSize: '0.92rem',
+              lineHeight: 1.45,
+              outline: 'none',
+              overflowY: 'auto',
+            }}
+          />
+
+          {project.art.icons.length > 0 ? (
+            <div style={{ color: '#94a3b8', fontSize: '0.72rem', lineHeight: 1.4 }}>
+              Use <code style={{ background: 'rgba(15,118,110,0.06)', padding: '0.1rem 0.3rem', borderRadius: '4px' }}>:icon_name:</code> to insert project icons.
+            </div>
+          ) : null}
+        </div>
+      </InspectorAccordion>
+
+      <InspectorAccordion title="Typography & Alignment" defaultOpen>
+        <div style={{ display: 'grid', gap: '0.6rem' }}>
+          <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'flex-end' }}>
             <CommandButton title="Bold (Ctrl/Cmd+B)" onClick={() => applyCommand('bold')}>
               <Bold size={15} />
             </CommandButton>
@@ -130,6 +146,38 @@ export function TextBoxInspector({
             <CommandButton title="Underline (Ctrl/Cmd+U)" onClick={() => applyCommand('underline')}>
               <Underline size={15} />
             </CommandButton>
+            <div style={{ width: '1px', alignSelf: 'stretch', background: 'rgba(15,118,110,0.15)', margin: '0 0.1rem' }} />
+            <label style={{ ...labelStyle, flex: 1, minWidth: 0 }}>
+              Size
+              <NumericInput
+                value={resolved.fontSize}
+                min={10}
+                max={96}
+                step={1}
+                onValueChange={(value) => onUpdateProperties((current) => ({
+                  ...current,
+                  fontSize: value,
+                }))}
+                style={{ ...compactInputStyle, padding: '0.48rem 0.5rem' }}
+              />
+            </label>
+            <label style={{ ...labelStyle, flex: 1, minWidth: 0 }}>
+              Height
+              <NumericInput
+                value={resolved.lineHeight}
+                min={1}
+                max={2.4}
+                step={0.1}
+                onValueChange={(value) => onUpdateProperties((current) => ({
+                  ...current,
+                  lineHeight: value,
+                }))}
+                style={{ ...compactInputStyle, padding: '0.48rem 0.5rem' }}
+              />
+            </label>
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
             <CommandButton title="Align left" active={resolved.textAlign === 'left'} onClick={() => onUpdateProperties((current) => ({
               ...current,
               textAlign: 'left',
@@ -148,47 +196,27 @@ export function TextBoxInspector({
             }))}>
               <AlignRight size={15} />
             </CommandButton>
-            <CommandButton title="Justify" active={resolved.textAlign === 'justify'} onClick={() => onUpdateProperties((current) => ({
+            <div style={{ width: '1px', height: '20px', background: 'rgba(15,118,110,0.15)', margin: '0 0.1rem' }} />
+            <CommandButton title="Align top" active={resolved.verticalAlign === 'start'} onClick={() => onUpdateProperties((current) => ({
               ...current,
-              textAlign: 'justify',
+              verticalAlign: 'start',
             }))}>
-              <AlignJustify size={15} />
+              <AlignStartHorizontal size={15} />
+            </CommandButton>
+            <CommandButton title="Align middle" active={resolved.verticalAlign === 'center'} onClick={() => onUpdateProperties((current) => ({
+              ...current,
+              verticalAlign: 'center',
+            }))}>
+              <AlignCenterHorizontal size={15} />
+            </CommandButton>
+            <CommandButton title="Align bottom" active={resolved.verticalAlign === 'end'} onClick={() => onUpdateProperties((current) => ({
+              ...current,
+              verticalAlign: 'end',
+            }))}>
+              <AlignEndHorizontal size={15} />
             </CommandButton>
           </div>
 
-          <div
-            style={{
-              color: '#0f766e',
-              fontSize: '0.76rem',
-              lineHeight: 1.45,
-            }}
-          >
-            Rich text shortcuts work here. Use <code>:icon_name:</code> tokens or tap a project icon below to insert one.
-          </div>
-
-          <div
-            ref={editorRef}
-            contentEditable
-            suppressContentEditableWarning
-            onInput={syncEditorHtml}
-            onBlur={syncEditorHtml}
-            style={{
-              minHeight: '148px',
-              borderRadius: '14px',
-              border: '1px solid rgba(15,118,110,0.12)',
-              background: 'rgba(255,255,255,0.96)',
-              padding: '0.8rem 0.9rem',
-              color: '#064e3b',
-              lineHeight: 1.45,
-              outline: 'none',
-              overflowY: 'auto',
-            }}
-          />
-        </div>
-      </InspectorAccordion>
-
-      <InspectorAccordion title="Typography">
-        <div style={{ display: 'grid', gap: '0.6rem' }}>
           <label style={labelStyle}>
             Font Family
             <select
@@ -207,51 +235,6 @@ export function TextBoxInspector({
             </select>
           </label>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '0.6rem' }}>
-            <label style={labelStyle}>
-              Size
-              <NumericInput
-                value={resolved.fontSize}
-                min={10}
-                max={96}
-                step={1}
-                onValueChange={(value) => onUpdateProperties((current) => ({
-                  ...current,
-                  fontSize: value,
-                }))}
-                style={compactInputStyle}
-              />
-            </label>
-            <label style={labelStyle}>
-              Line Height
-              <NumericInput
-                value={resolved.lineHeight}
-                min={1}
-                max={2.4}
-                step={0.1}
-                onValueChange={(value) => onUpdateProperties((current) => ({
-                  ...current,
-                  lineHeight: value,
-                }))}
-                style={compactInputStyle}
-              />
-            </label>
-            <label style={labelStyle}>
-              Padding
-              <NumericInput
-                value={resolved.padding}
-                min={0}
-                max={64}
-                step={1}
-                onValueChange={(value) => onUpdateProperties((current) => ({
-                  ...current,
-                  padding: value,
-                }))}
-                style={compactInputStyle}
-              />
-            </label>
-          </div>
-
           <InspectorColorField
             label="Text Color"
             value={resolved.textColor}
@@ -263,32 +246,65 @@ export function TextBoxInspector({
             onAssignPaletteColor={onAssignProjectPaletteColor}
           />
 
-          <div style={{ display: 'grid', gap: '0.35rem' }}>
-            <div style={{ ...labelStyle, gap: '0.45rem' }}>
-              Vertical Align
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem' }}>
-              {TEXT_BOX_VERTICAL_ALIGN_OPTIONS.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => onUpdateProperties((current) => ({
+          <div style={{ display: 'grid', gap: '0.25rem' }}>
+            <span style={{ fontSize: '0.76rem', fontWeight: 600, color: '#0f766e' }}>Inset</span>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '0.35rem' }}>
+              <label style={labelStyle}>
+                Top
+                <NumericInput
+                  value={resolved.paddingTop}
+                  min={0}
+                  max={64}
+                  step={1}
+                  onValueChange={(value) => onUpdateProperties((current) => ({
                     ...current,
-                    verticalAlign: option.value,
+                    paddingTop: value,
                   }))}
-                  style={{
-                    borderRadius: '999px',
-                    border: option.value === resolved.verticalAlign ? '1px solid rgba(13,148,136,0.4)' : '1px solid rgba(15,118,110,0.12)',
-                    background: option.value === resolved.verticalAlign ? 'rgba(240,253,250,0.98)' : 'rgba(255,255,255,0.94)',
-                    color: option.value === resolved.verticalAlign ? '#0f766e' : '#065f46',
-                    padding: '0.42rem 0.72rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                  }}
-                >
-                  {formatCommandLabel(option.value)}
-                </button>
-              ))}
+                  style={compactInputStyle}
+                />
+              </label>
+              <label style={labelStyle}>
+                Right
+                <NumericInput
+                  value={resolved.paddingRight}
+                  min={0}
+                  max={64}
+                  step={1}
+                  onValueChange={(value) => onUpdateProperties((current) => ({
+                    ...current,
+                    paddingRight: value,
+                  }))}
+                  style={compactInputStyle}
+                />
+              </label>
+              <label style={labelStyle}>
+                Bottom
+                <NumericInput
+                  value={resolved.paddingBottom}
+                  min={0}
+                  max={64}
+                  step={1}
+                  onValueChange={(value) => onUpdateProperties((current) => ({
+                    ...current,
+                    paddingBottom: value,
+                  }))}
+                  style={compactInputStyle}
+                />
+              </label>
+              <label style={labelStyle}>
+                Left
+                <NumericInput
+                  value={resolved.paddingLeft}
+                  min={0}
+                  max={64}
+                  step={1}
+                  onValueChange={(value) => onUpdateProperties((current) => ({
+                    ...current,
+                    paddingLeft: value,
+                  }))}
+                  style={compactInputStyle}
+                />
+              </label>
             </div>
           </div>
         </div>
@@ -342,19 +358,6 @@ export function TextBoxInspector({
         </InspectorAccordion>
       ) : null}
 
-      <InspectorAccordion title="Rendered Preview">
-        <div
-          style={{
-            minHeight: '128px',
-            borderRadius: '16px',
-            border: '1px solid rgba(15,118,110,0.12)',
-            background: 'rgba(255,255,255,0.94)',
-            overflow: 'hidden',
-          }}
-        >
-          <TextBoxContent project={project} properties={properties} />
-        </div>
-      </InspectorAccordion>
     </>
   );
 }

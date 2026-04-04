@@ -27,7 +27,7 @@ import {
 
 import type { EditorProject, PreviewRuntime } from './types';
 
-const ZONE_TYPES = new Set(['space', 'zone', 'resource-pile', 'track', 'deck', 'hand', 'discard', 'bag', 'score-track']);
+const ZONE_TYPES = new Set(['space', 'zone', 'track', 'deck', 'hand', 'discard', 'bag', 'score-track']);
 const DESTINATION_TYPES = new Set(['space', 'zone']);
 
 export function toPreviewZoneId(instanceId: string): ZoneId {
@@ -83,7 +83,7 @@ function getZoneCapacity(componentType: string, properties: Record<string, unkno
     return typeof properties.maxCapacity === 'number' ? properties.maxCapacity : null;
   }
 
-  if (componentType === 'zone' || componentType === 'resource-pile') {
+  if (componentType === 'zone') {
     return typeof properties.maxCapacity === 'number' ? properties.maxCapacity : null;
   }
 
@@ -134,6 +134,8 @@ function buildZoneIdsByType(project: EditorProject): Record<string, ZoneId[]> {
   }, {});
 }
 
+const SUPPLY_ZONE_ID = createZoneId('zone_supply');
+
 function buildZones(project: EditorProject): Record<string, Zone> {
   return Object.values(project.instances).reduce<Record<string, Zone>>((zones, instance) => {
     if (!isZoneType(instance.componentType)) {
@@ -147,19 +149,7 @@ function buildZones(project: EditorProject): Record<string, Zone> {
       type: instance.componentType,
       name: getZoneName(instance),
       ownerId: instance.bindings.ownerId ? createPlayerId(instance.bindings.ownerId) : null,
-      entityIds: instance.children
-        .filter((childId) => {
-          const child = project.instances[childId];
-          return child && (child.componentType === 'piece' || child.componentType === 'token' || child.componentType === 'card');
-        })
-        .flatMap((childId) => {
-          const child = project.instances[childId];
-          const quantity = child ? getEntityQuantity(child) : 1;
-
-          return Array.from({ length: quantity }, (_unused, copyIndex) => (
-            quantity > 1 ? toPreviewEntityId(childId, copyIndex) : toPreviewEntityId(childId)
-          ));
-        }),
+      entityIds: [],
       maxCapacity: getZoneCapacity(instance.componentType, instance.properties),
       visibility: {
         defaultVisibility: getZoneVisibility(instance.componentType),
@@ -174,18 +164,23 @@ function buildZones(project: EditorProject): Record<string, Zone> {
   }, {});
 }
 
-function buildEntities(project: EditorProject): GameState['entities'] {
-  return Object.values(project.instances).reduce<GameState['entities']>((entities, instance) => {
+/**
+ * Build entities from all piece/token/card templates.
+ * Entities are location-independent: they start in a shared supply zone.
+ * The engine setup function is responsible for placing them into their
+ * starting zones at game start.
+ */
+function buildEntities(project: EditorProject): { entities: GameState['entities']; supplyEntityIds: string[] } {
+  const entities: GameState['entities'] = {};
+  const supplyEntityIds: string[] = [];
+  let positionCounter = 0;
+
+  for (const instance of Object.values(project.instances)) {
     if (instance.componentType !== 'piece' && instance.componentType !== 'token' && instance.componentType !== 'card') {
-      return entities;
+      continue;
     }
 
-    const parent = instance.parentId ? project.instances[instance.parentId] : null;
-    if (!parent || !isZoneType(parent.componentType)) {
-      return entities;
-    }
-
-    const ownerId = instance.bindings.ownerId ?? parent.bindings.ownerId ?? project.seats[0]?.id ?? null;
+    const ownerId = instance.bindings.ownerId ?? project.seats[0]?.id ?? null;
     const quantity = getEntityQuantity(instance);
 
     for (let copyIndex = 0; copyIndex < quantity; copyIndex += 1) {
@@ -196,11 +191,11 @@ function buildEntities(project: EditorProject): GameState['entities'] {
         id: entityId,
         type: instance.componentType,
         componentType: instance.componentType,
-        zoneId: toPreviewZoneId(parent.instanceId),
+        zoneId: SUPPLY_ZONE_ID,
         ownerId: ownerId ? createPlayerId(ownerId) : null,
         controllerId: ownerId ? createPlayerId(ownerId) : null,
-        position: typeof instance.placement?.index === 'number' ? instance.placement.index + copyIndex : copyIndex,
-        faceUp: getZoneVisibility(parent.componentType) !== Visibility.Hidden,
+        position: positionCounter,
+        faceUp: true,
         properties: {
           ...instance.properties,
           instanceId: instance.instanceId,
@@ -208,10 +203,12 @@ function buildEntities(project: EditorProject): GameState['entities'] {
         },
         tags: [instance.componentType],
       };
+      supplyEntityIds.push(entityId);
+      positionCounter += 1;
     }
+  }
 
-    return entities;
-  }, {});
+  return { entities, supplyEntityIds };
 }
 
 function buildPlayers(project: EditorProject): GameState['players'] {
@@ -500,12 +497,30 @@ function createEndTurnDefinition(): LegalMoveDefinition {
 export function buildPreviewRuntime(project: EditorProject): PreviewRuntime {
   const phases = clonePhases(project.rules.phases.length > 0 ? project.rules.phases : ['main']);
   const zones = buildZones(project);
+  const { entities, supplyEntityIds } = buildEntities(project);
+
+  // Create a shared supply zone that holds all entity templates until setup places them.
+  if (supplyEntityIds.length > 0) {
+    zones[SUPPLY_ZONE_ID] = {
+      id: SUPPLY_ZONE_ID,
+      type: 'zone',
+      name: 'Supply',
+      ownerId: null,
+      entityIds: supplyEntityIds,
+      maxCapacity: null,
+      visibility: {
+        defaultVisibility: Visibility.Public,
+        overrides: {},
+      },
+      properties: {},
+    };
+  }
+
   const zoneIdsByType = buildZoneIdsByType(project);
   const scoringZoneIds = Object.values(project.instances)
     .filter((instance) => isDestinationType(instance.componentType))
     .map((instance) => toPreviewZoneId(instance.instanceId));
   const destinationZoneIds = [...scoringZoneIds];
-  const entities = buildEntities(project);
   const players = buildPlayers(project);
   const validation = validateComponentTree(project.instances, builtInCatalog);
   const requirements: string[] = [];
@@ -519,7 +534,7 @@ export function buildPreviewRuntime(project: EditorProject): PreviewRuntime {
   }
 
   if (Object.keys(entities).length === 0) {
-    requirements.push('Add one or more `Piece` or `Token` components and assign them to players.');
+    requirements.push('Add one or more `Piece` or `Token` templates and assign them to players.');
   }
 
   const initialState: GameState = {
