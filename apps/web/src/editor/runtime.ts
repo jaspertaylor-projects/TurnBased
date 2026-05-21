@@ -21,6 +21,7 @@ import {
   createGameId,
   createPlayerId,
   createZoneId,
+  type EntityId,
   ParticipantRole,
   Visibility,
 } from '@turnbased/shared-types';
@@ -170,9 +171,9 @@ function buildZones(project: EditorProject): Record<string, Zone> {
  * The engine setup function is responsible for placing them into their
  * starting zones at game start.
  */
-function buildEntities(project: EditorProject): { entities: GameState['entities']; supplyEntityIds: string[] } {
+function buildEntities(project: EditorProject): { entities: GameState['entities']; supplyEntityIds: EntityId[] } {
   const entities: GameState['entities'] = {};
-  const supplyEntityIds: string[] = [];
+  const supplyEntityIds: EntityId[] = [];
   let positionCounter = 0;
 
   for (const instance of Object.values(project.instances)) {

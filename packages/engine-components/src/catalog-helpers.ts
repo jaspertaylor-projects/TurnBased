@@ -8,6 +8,7 @@ export const countSchema = z.number().int().nonnegative().nullable();
 export const boardSurfaceTextureIdSchema = z.enum(['none', 'felt', 'water', 'grass', 'wood', 'marble', 'leather', 'stone', 'sand', 'metal']);
 export const primaryComponentTypes = new Set<BuiltInComponentType>([
   'board',
+  'tile',
   'deck',
   'piece',
   'token',

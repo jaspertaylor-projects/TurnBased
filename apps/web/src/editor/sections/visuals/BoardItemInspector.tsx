@@ -1,7 +1,6 @@
-import { Minus, Plus, Trash2 } from 'lucide-react';
+import { Minus, Plus, RotateCw, Trash2 } from 'lucide-react';
 import {
   getBoardComponentPreset,
-  getBuiltInComponentManifest,
   getGridCoordinateKey,
 } from '@turnbased/engine-components';
 import type {
@@ -17,11 +16,12 @@ import { NumericInput } from '../../../components/NumericInput';
 import { InspectorAccordion, InspectorAppearanceControls } from '../../components/InspectorControls';
 import { TextBoxInspector } from '../../components/TextBoxInspector';
 import {
+  getBoardGridCells,
   getGridCellAppearance,
   getResolvedChildItemFrame,
   isBoardGridComponentType,
 } from '../../boardLayout';
-import { parsePropertyValue } from '../../helpers';
+import { resolveBoardGridLayout } from '@turnbased/engine-ui';
 import { labelStyle, textareaStyle } from '../../styles';
 import type { EditorProject } from '../../types';
 import type { listProjectPaletteOptions } from '../../projectPalette';
@@ -55,8 +55,6 @@ interface BoardItemInspectorProps {
     ) => Partial<Record<BoardComponentPresetFamily, string>>,
   ) => void;
   onSetSelectedGridCellKey: (key: string | null) => void;
-  onSetSelectedBoardChildId: (id: string | null) => void;
-  onRemoveComponent: (instanceId: string) => void;
   onUpdateComponent: (instanceId: string, updater: (instance: ComponentInstanceModel) => ComponentInstanceModel) => void;
   onAssignProjectPaletteColor: (paletteId: string, value: string) => void;
   applyPresetToInstance: (instance: ComponentInstanceModel, preset: BoardComponentPreset, childIndex: number) => ComponentInstanceModel;
@@ -65,6 +63,8 @@ interface BoardItemInspectorProps {
   /** Parent surface dimensions for correct frame clamping. */
   parentSurfaceWidth: number;
   parentSurfaceHeight: number;
+  parentRenderedWidth: number;
+  parentRenderedHeight: number;
 }
 
 export function BoardItemInspector({
@@ -82,8 +82,6 @@ export function BoardItemInspector({
   paletteOptions,
   onSetSelectedPresetIds,
   onSetSelectedGridCellKey,
-  onSetSelectedBoardChildId,
-  onRemoveComponent,
   onUpdateComponent,
   onAssignProjectPaletteColor,
   applyPresetToInstance,
@@ -91,11 +89,87 @@ export function BoardItemInspector({
   updateGridCells,
   parentSurfaceWidth,
   parentSurfaceHeight,
+  parentRenderedWidth,
+  parentRenderedHeight,
 }: BoardItemInspectorProps) {
   return (
     <>
       {showGridShapePopup ? (
         <InspectorAccordion title={selectedBoardChild.componentType === 'hex-grid' ? 'Hex Tools' : 'Grid Tools'}>
+          {/* Bulk extend buttons — add full row or column */}
+          {selectedGridCells.length > 0 && gridPopupComponentId && (
+            <div data-layout="gridBulkExtend" style={{
+              display: 'flex',
+              gap: 6,
+              paddingBottom: '0.5rem',
+              marginBottom: '0.5rem',
+              borderBottom: '1px solid rgba(15,118,110,0.1)',
+            }}>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!gridPopupComponentId) return;
+                  const maxRow = selectedGridCells.reduce((m, c) => Math.max(m, c.y), 0);
+                  const minCol = selectedGridCells.reduce((m, c) => Math.min(m, c.x), Infinity);
+                  const maxCol = selectedGridCells.reduce((m, c) => Math.max(m, c.x), 0);
+                  const newCells: GridCellCoordinate[] = [];
+                  for (let x = minCol; x <= maxCol; x++) {
+                    newCells.push({ x, y: maxRow + 1 });
+                  }
+                  updateGridCells(gridPopupComponentId, (cells) => [...cells, ...newCells]);
+                }}
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 4,
+                  padding: '6px 8px',
+                  borderRadius: 6,
+                  border: '1px solid rgba(15,118,110,0.15)',
+                  background: 'rgba(240,253,244,0.96)',
+                  color: '#065f46',
+                  fontSize: '0.78rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                <Plus size={13} /> Row
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!gridPopupComponentId) return;
+                  const maxCol = selectedGridCells.reduce((m, c) => Math.max(m, c.x), 0);
+                  const minRow = selectedGridCells.reduce((m, c) => Math.min(m, c.y), Infinity);
+                  const maxRow = selectedGridCells.reduce((m, c) => Math.max(m, c.y), 0);
+                  const newCells: GridCellCoordinate[] = [];
+                  for (let y = minRow; y <= maxRow; y++) {
+                    newCells.push({ x: maxCol + 1, y });
+                  }
+                  updateGridCells(gridPopupComponentId, (cells) => [...cells, ...newCells]);
+                }}
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 4,
+                  padding: '6px 8px',
+                  borderRadius: 6,
+                  border: '1px solid rgba(15,118,110,0.15)',
+                  background: 'rgba(240,253,244,0.96)',
+                  color: '#065f46',
+                  fontSize: '0.78rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                <Plus size={13} /> Column
+              </button>
+            </div>
+          )}
+
           {resolvedSelectedGridCell ? (
             <>
               {gridAllNeighborOptions.map((option) => (
@@ -244,22 +318,12 @@ export function BoardItemInspector({
           : null;
         const childIndex = currentSurfaceChildIds.indexOf(resolvedSelectedBoardChildId);
         const frame = getResolvedChildItemFrame(selectedBoardChild, Math.max(childIndex, 0), parentSurfaceWidth, parentSurfaceHeight);
-        const manifest = getBuiltInComponentManifest(selectedBoardChild.componentType as BuiltInComponentType);
         const hasQuantity = componentType === 'piece' || componentType === 'token';
         const currentQuantity = hasQuantity
           ? (typeof selectedBoardChild.properties.quantity === 'number' && Number.isFinite(selectedBoardChild.properties.quantity)
             ? Math.max(1, Math.trunc(selectedBoardChild.properties.quantity as number))
             : 1)
           : 1;
-        const hiddenParameterKeys = isBoardGridComponentType(selectedBoardChild.componentType)
-          ? ['label', 'x', 'y', 'rows', 'columns', 'cells', 'cellLabelPrefix', 'maxCapacity', 'cellStyles', 'cellBackground', 'cellTextureId', 'cellTextureOpacity', 'cellBorderColor', 'cellBorderWidth', 'cellBorderRadius']
-          : isTextBox
-            ? ['label', 'contentHtml', 'fontFamily', 'fontSize', 'lineHeight', 'textColor', 'textAlign', 'verticalAlign', 'padding', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft']
-          : hasQuantity
-            ? ['label', 'x', 'y', 'quantity']
-          : ['label', 'x', 'y'];
-        const parameterEntries = Object.entries(manifest.propertyDefinitions)
-          .filter(([key]) => !hiddenParameterKeys.includes(key));
         const cellAppearance = isBoardGridComponentType(selectedBoardChild.componentType)
           ? getGridCellAppearance(selectedBoardChild)
           : null;
@@ -270,12 +334,55 @@ export function BoardItemInspector({
         const cellBorderColor = cellAppearance?.borderColor
           ?? (selectedBoardChild.componentType === 'hex-grid' ? 'rgba(15,118,110,0.52)' : 'rgba(15,118,110,0.18)');
 
+        const isGrid = isBoardGridComponentType(componentType);
+        const gridCells = isGrid ? getBoardGridCells(selectedBoardChild) : [];
+        const gridCellCount = gridCells.length;
+        const gridBounds = gridCells.reduce((bounds, cell) => ({
+          minX: Math.min(bounds.minX, cell.x),
+          maxX: Math.max(bounds.maxX, cell.x),
+          minY: Math.min(bounds.minY, cell.y),
+          maxY: Math.max(bounds.maxY, cell.y),
+        }), {
+          minX: Number.POSITIVE_INFINITY,
+          maxX: Number.NEGATIVE_INFINITY,
+          minY: Number.POSITIVE_INFINITY,
+          maxY: Number.NEGATIVE_INFINITY,
+        });
+        const gridRows = Number.isFinite(gridBounds.minY)
+          ? (gridBounds.maxY - gridBounds.minY) + 1
+          : 1;
+        const gridColumns = Number.isFinite(gridBounds.minX)
+          ? (gridBounds.maxX - gridBounds.minX) + 1
+          : 1;
+        const gridLayoutMetrics = isGrid
+          ? resolveBoardGridLayout(
+            componentType,
+            gridCells.map((cell) => ({ row: cell.y, column: cell.x })),
+          )
+          : null;
+        const gridScaleRatio = parentRenderedWidth > 0 && parentRenderedHeight > 0
+          ? (parentRenderedWidth / Math.max(parentSurfaceWidth, 1)) / (parentRenderedHeight / Math.max(parentSurfaceHeight, 1))
+          : 1;
+
+        function updateGridFrameByCellSize(cellSize: number) {
+          if (!gridLayoutMetrics) {
+            return;
+          }
+
+          const nextCellSize = Math.max(1, cellSize);
+          updateBoardChildFrame(resolvedSelectedBoardChildId, (current) => ({
+            ...current,
+            width: Math.round(nextCellSize * gridLayoutMetrics.totalWidth),
+            height: Math.round(nextCellSize * gridLayoutMetrics.totalHeight * gridScaleRatio),
+          }));
+        }
+
         return (
           <>
-            <InspectorAccordion title="General">
+            <InspectorAccordion title="Info" defaultOpen>
               {presets.length > 0 ? (
                 <label style={labelStyle}>
-                  Preset
+                  Type
                   <select
                     value={selectedPreset?.id ?? presets[0]?.id ?? ''}
                     onChange={(event) => {
@@ -306,7 +413,7 @@ export function BoardItemInspector({
               ) : null}
 
               <label style={labelStyle}>
-                Label
+                Name
                 <input
                   value={String(selectedBoardChild.properties.label ?? selectedBoardChild.displayName ?? '')}
                   onChange={(event) => onUpdateComponent(resolvedSelectedBoardChildId, (instance) => ({
@@ -416,6 +523,31 @@ export function BoardItemInspector({
               ) : null}
             </InspectorAccordion>
 
+            {isGrid ? (() => {
+              const isHex = componentType === 'hex-grid';
+              const cellW = gridLayoutMetrics
+                ? Math.max(1, Math.round(frame.width / Math.max(gridLayoutMetrics.totalWidth, 1)))
+                : 1;
+
+              return (
+                <InspectorAccordion title="Size" defaultOpen>
+                  <label style={labelStyle}>
+                    Cell Size
+                    <NumericInput
+                      value={cellW}
+                      min={8}
+                      max={200}
+                      onValueChange={updateGridFrameByCellSize}
+                      style={compactInputStyle}
+                    />
+                  </label>
+                  <span style={{ fontSize: '0.72rem', color: '#6b7280' }}>
+                    {gridRows} × {gridColumns} footprint · {gridCellCount} {isHex ? 'hexes' : 'cells'}
+                  </span>
+                </InspectorAccordion>
+              );
+            })() : null}
+
             <InspectorAccordion title="Layout">
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.6rem' }}>
                 <label style={labelStyle}>
@@ -444,10 +576,17 @@ export function BoardItemInspector({
                   Width
                   <NumericInput
                     value={Math.round(frame.width)}
-                    onValueChange={(value) => updateBoardChildFrame(resolvedSelectedBoardChildId, (current) => ({
-                      ...current,
-                      width: value,
-                    }))}
+                    onValueChange={(value) => {
+                      if (isGrid && gridLayoutMetrics) {
+                        updateGridFrameByCellSize(value / Math.max(gridLayoutMetrics.totalWidth, 1));
+                        return;
+                      }
+
+                      updateBoardChildFrame(resolvedSelectedBoardChildId, (current) => ({
+                        ...current,
+                        width: value,
+                      }));
+                    }}
                     style={compactInputStyle}
                   />
                 </label>
@@ -455,18 +594,41 @@ export function BoardItemInspector({
                   Height
                   <NumericInput
                     value={Math.round(frame.height)}
-                    onValueChange={(value) => updateBoardChildFrame(resolvedSelectedBoardChildId, (current) => ({
-                      ...current,
-                      height: value,
-                    }))}
+                    onValueChange={(value) => {
+                      if (isGrid && gridLayoutMetrics) {
+                        updateGridFrameByCellSize(value / Math.max(gridLayoutMetrics.totalHeight * gridScaleRatio, 1));
+                        return;
+                      }
+
+                      updateBoardChildFrame(resolvedSelectedBoardChildId, (current) => ({
+                        ...current,
+                        height: value,
+                      }));
+                    }}
                     style={compactInputStyle}
                   />
                 </label>
               </div>
+              <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <RotateCw size={13} style={{ color: '#0f766e', flexShrink: 0 }} />
+                Rotation
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flex: 1, minWidth: 0 }}>
+                  <NumericInput
+                    value={Math.round(frame.rotation ?? 0)}
+                    onValueChange={(value) => updateBoardChildFrame(resolvedSelectedBoardChildId, (current) => ({
+                      ...current,
+                      rotation: value,
+                    }))}
+                    style={{ ...compactInputStyle, flex: 1, minWidth: 0 }}
+                  />
+                  <span style={{ fontSize: '0.78rem', color: '#6b7280', flexShrink: 0 }}>°</span>
+                </div>
+              </label>
             </InspectorAccordion>
 
             {isTextBox ? (
               <TextBoxInspector
+                key={resolvedSelectedBoardChildId}
                 project={project}
                 properties={selectedBoardChild.properties}
                 paletteOptions={paletteOptions}
@@ -622,78 +784,6 @@ export function BoardItemInspector({
               />
             ) : null}
 
-            {parameterEntries.length > 0 ? (
-              <InspectorAccordion title="Parameters">
-                {parameterEntries.map(([key, definition]) => {
-                  const value = selectedBoardChild.properties[key];
-
-                  if (definition.kind === 'boolean') {
-                    return (
-                      <label key={key} style={labelStyle}>
-                        {definition.label}
-                        <select
-                          value={String(Boolean(value))}
-                          onChange={(event) => onUpdateComponent(resolvedSelectedBoardChildId, (instance) => ({
-                            ...instance,
-                            properties: {
-                              ...instance.properties,
-                              [key]: parsePropertyValue(definition, event.target.value),
-                            },
-                          }))}
-                          style={compactInputStyle}
-                        >
-                          <option value="true">True</option>
-                          <option value="false">False</option>
-                        </select>
-                      </label>
-                    );
-                  }
-
-                  if (definition.kind === 'enum') {
-                    return (
-                      <label key={key} style={labelStyle}>
-                        {definition.label}
-                        <select
-                          value={String(value ?? '')}
-                          onChange={(event) => onUpdateComponent(resolvedSelectedBoardChildId, (instance) => ({
-                            ...instance,
-                            properties: {
-                              ...instance.properties,
-                              [key]: event.target.value,
-                            },
-                          }))}
-                          style={compactInputStyle}
-                        >
-                          {(definition.options ?? []).map((option) => (
-                            <option key={option} value={option}>
-                              {option}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    );
-                  }
-
-                  return (
-                    <label key={key} style={labelStyle}>
-                      {definition.label}
-                      <input
-                        type={definition.kind === 'number' ? 'number' : 'text'}
-                        value={String(value ?? '')}
-                        onChange={(event) => onUpdateComponent(resolvedSelectedBoardChildId, (instance) => ({
-                          ...instance,
-                          properties: {
-                            ...instance.properties,
-                            [key]: parsePropertyValue(definition, event.target.value),
-                          },
-                        }))}
-                        style={compactInputStyle}
-                      />
-                    </label>
-                  );
-                })}
-              </InspectorAccordion>
-            ) : null}
           </>
         );
       })() : null}

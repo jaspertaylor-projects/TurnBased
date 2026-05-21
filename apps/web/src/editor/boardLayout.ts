@@ -232,17 +232,24 @@ export function defaultBoardItemFrame(componentType: string, index: number): Com
         borderWidth: 1,
         borderRadius: 18,
       };
-    case 'hex-grid':
+    case 'hex-grid': {
+      // Default hex grid is 4 rows × 5 columns.
+      // Compute tight frame from hex geometry so the bounding box fits snugly.
+      const hh = 2 / Math.sqrt(3);
+      const hTotalW = 5 + 0.5; // columns + offset for odd rows
+      const hTotalH = hh + 3 * (hh * 0.75);
+      const hCellW = 56; // ~56 board-units per hex cell width
       return {
         x: baseX,
         y: baseY,
-        width: 300,
-        height: 236,
+        width: Math.round(hTotalW * hCellW),
+        height: Math.round(hTotalH * hCellW),
         background: 'rgba(239,246,255,0.94)',
         borderColor: 'rgba(59,130,246,0.18)',
         borderWidth: 1,
         borderRadius: 22,
       };
+    }
     case 'square-grid':
     case 'checkerboard-grid':
       return {

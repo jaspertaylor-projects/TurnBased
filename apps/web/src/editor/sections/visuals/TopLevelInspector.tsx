@@ -1,40 +1,33 @@
+import type { CSSProperties } from 'react';
 import { Minus, Plus } from 'lucide-react';
 import {
-  getBuiltInComponentManifest,
   resolveBoardAppearanceProperties,
 } from '@turnbased/engine-components';
 import type {
-  BuiltInComponentType,
   ComponentInstanceModel,
 } from '@turnbased/engine-components';
 import { createPlayerId } from '@turnbased/shared-types';
 
-import { NumericInput } from '../../../components/NumericInput';
 import { InspectorAccordion, InspectorAppearanceControls } from '../../components/InspectorControls';
-import { parsePropertyValue } from '../../helpers';
 import { labelStyle, textareaStyle } from '../../styles';
 import type { EditorProject } from '../../types';
 import type { listProjectPaletteOptions } from '../../projectPalette';
+import { formatLength } from '../../units';
+import { useUserSettings } from '../../../userSettings';
+import { CatalogPicker } from './CatalogPicker';
 import { compactInputStyle } from './boardEditorUtils';
 
-const BOARD_SIZE_PRESETS = [
-  { id: 'square', label: '400 × 400 mm', widthMm: 400, heightMm: 400 },
-  { id: 'standard_landscape', label: '500 × 350 mm', widthMm: 500, heightMm: 350 },
-  { id: 'wide_landscape', label: '620 × 360 mm', widthMm: 620, heightMm: 360 },
-  { id: 'portrait', label: '350 × 500 mm', widthMm: 350, heightMm: 500 },
-] as const;
-
-function getBoardSizePresetId(widthMm: number | null, heightMm: number | null): string {
-  if (widthMm == null || heightMm == null) {
-    return 'custom';
-  }
-
-  const matchingPreset = BOARD_SIZE_PRESETS.find((preset) => (
-    preset.widthMm === widthMm && preset.heightMm === heightMm
-  ));
-
-  return matchingPreset?.id ?? 'custom';
-}
+/** Visual match for `compactInputStyle` but non-interactive — used for read-only field values. */
+const readonlyValueStyle: CSSProperties = {
+  padding: '0.58rem 0.68rem',
+  fontSize: '0.86rem',
+  fontWeight: 700,
+  color: '#064e3b',
+  background: 'rgba(236,253,245,0.8)',
+  border: '1px solid rgba(15,118,110,0.15)',
+  borderRadius: '10px',
+  userSelect: 'text',
+};
 
 interface TopLevelInspectorProps {
   project: EditorProject;
@@ -59,9 +52,11 @@ export function TopLevelInspector({
   onAssignProjectPaletteColor,
   updateBoardAppearanceProperty,
 }: TopLevelInspectorProps) {
-  const manifest = getBuiltInComponentManifest(selectedTopLevelComponent.componentType as BuiltInComponentType);
-  const isBoard = selectedTopLevelComponent.componentType === 'board';
-  const hasQuantity = selectedTopLevelComponent.componentType === 'piece' || selectedTopLevelComponent.componentType === 'token';
+  const componentType = selectedTopLevelComponent.componentType;
+  const isBoardLike = componentType === 'board' || componentType === 'tile';
+  const isDeck = componentType === 'deck';
+  const hasCatalog = isBoardLike || isDeck;
+  const hasQuantity = componentType === 'piece' || componentType === 'token';
   const currentQuantity = hasQuantity
     ? (typeof selectedTopLevelComponent.properties.quantity === 'number' && Number.isFinite(selectedTopLevelComponent.properties.quantity)
       ? Math.max(1, Math.trunc(selectedTopLevelComponent.properties.quantity as number))
@@ -71,28 +66,25 @@ export function TopLevelInspector({
     ? selectedTopLevelComponent.properties.physicalWidthMm as number : null;
   const physicalH = typeof selectedTopLevelComponent.properties.physicalHeightMm === 'number'
     ? selectedTopLevelComponent.properties.physicalHeightMm as number : null;
-  const boardSizePresetId = isBoard ? getBoardSizePresetId(physicalW, physicalH) : null;
-  const alwaysHidden = ['physicalWidthMm', 'physicalHeightMm'];
-  const hiddenParameterKeys: string[] = selectedTopLevelComponent.componentType === 'board'
-    ? [...alwaysHidden, 'surfaceColor', 'surfaceTexture', 'surfaceTextureOpacity', 'surfaceBorderColor', 'surfaceBorderWidth', 'surfaceBorderStyle']
-    : selectedTopLevelComponent.componentType === 'piece'
-    ? [...alwaysHidden, 'backgroundColor', 'borderColor', 'borderWidth', 'quantity']
-    : hasQuantity
-    ? [...alwaysHidden, 'quantity']
-    : [...alwaysHidden];
-  const parameterEntries = Object.entries(manifest.propertyDefinitions)
-    .filter(([key]) => !hiddenParameterKeys.includes(key));
+
+  // Physical dimensions are always displayed read-only when a catalog-driven
+  // component has them — the user changes them by picking a different catalog
+  // size from the CatalogPicker, not by editing numbers here.
+  const showDimensionsReadout = hasCatalog && physicalW != null && physicalH != null;
+  // Units preference lives in user settings (top-bar Settings page), not the
+  // per-project settings, so it applies uniformly across every project.
+  const { preferredUnits } = useUserSettings();
   const supportsOwnerSeat = (
-    selectedTopLevelComponent.componentType === 'piece'
-    || selectedTopLevelComponent.componentType === 'token'
-    || selectedTopLevelComponent.componentType === 'zone'
-    || selectedTopLevelComponent.componentType === 'hand'
-    || selectedTopLevelComponent.componentType === 'deck'
+    componentType === 'piece'
+    || componentType === 'token'
+    || componentType === 'zone'
+    || componentType === 'hand'
+    || componentType === 'deck'
   );
 
   return (
     <>
-      <InspectorAccordion title="General">
+      <InspectorAccordion title="Info" defaultOpen>
         <label style={labelStyle}>
           Display Name
           <input
@@ -104,76 +96,6 @@ export function TopLevelInspector({
             style={compactInputStyle}
           />
         </label>
-
-        {isBoard ? (
-          <label style={labelStyle}>
-            Board Size
-            <select
-              value={boardSizePresetId ?? 'custom'}
-              onChange={(event) => {
-                const nextPresetId = event.target.value;
-                const preset = BOARD_SIZE_PRESETS.find((entry) => entry.id === nextPresetId);
-                if (!preset) {
-                  return;
-                }
-
-                onUpdateComponent(selectedTopLevelComponentId, (instance) => ({
-                  ...instance,
-                  properties: {
-                    ...instance.properties,
-                    physicalWidthMm: preset.widthMm,
-                    physicalHeightMm: preset.heightMm,
-                  },
-                }));
-              }}
-              style={compactInputStyle}
-            >
-              {BOARD_SIZE_PRESETS.map((preset) => (
-                <option key={preset.id} value={preset.id}>
-                  {preset.label}
-                </option>
-              ))}
-              <option value="custom">Custom</option>
-            </select>
-          </label>
-        ) : null}
-
-        {physicalW != null && physicalH != null ? (
-          boardSizePresetId === 'custom' || !isBoard ? (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
-              <label style={labelStyle}>
-                Width (mm)
-                <NumericInput
-                  value={physicalW}
-                  onValueChange={(value) => onUpdateComponent(selectedTopLevelComponentId, (instance) => ({
-                    ...instance,
-                    properties: { ...instance.properties, physicalWidthMm: Math.max(1, value) },
-                  }))}
-                  min={1}
-                  step={1}
-                  style={compactInputStyle}
-                />
-              </label>
-              <label style={labelStyle}>
-                Height (mm)
-                <NumericInput
-                  value={physicalH}
-                  onValueChange={(value) => onUpdateComponent(selectedTopLevelComponentId, (instance) => ({
-                    ...instance,
-                    properties: { ...instance.properties, physicalHeightMm: Math.max(1, value) },
-                  }))}
-                  min={1}
-                  step={1}
-                  style={compactInputStyle}
-                />
-              </label>
-            </div>
-          ) : (
-            <div style={{ fontSize: '0.78rem', color: '#64748b', lineHeight: 1.5 }}>
-              {physicalW}mm × {physicalH}mm
-            </div>
-          )
-        ) : null}
 
         <label style={labelStyle}>
           Notes
@@ -290,80 +212,37 @@ export function TopLevelInspector({
         ) : null}
       </InspectorAccordion>
 
-      {parameterEntries.length > 0 ? (
-        <InspectorAccordion title="Parameters">
-          {parameterEntries.map(([key, definition]) => {
-            const value = selectedTopLevelComponent.properties[key];
+      {hasCatalog ? (
+        <InspectorAccordion title="General" defaultOpen>
+          <CatalogPicker
+            componentType={componentType as 'tile' | 'board' | 'deck'}
+            instanceId={selectedTopLevelComponentId}
+            instance={selectedTopLevelComponent}
+            preferredUnits={preferredUnits}
+            onUpdateComponent={onUpdateComponent}
+          />
 
-            if (definition.kind === 'boolean') {
-              return (
-                <label key={key} style={labelStyle}>
-                  {definition.label}
-                  <select
-                    value={String(Boolean(value))}
-                    onChange={(event) => onUpdateComponent(selectedTopLevelComponentId, (instance) => ({
-                      ...instance,
-                      properties: {
-                        ...instance.properties,
-                        [key]: parsePropertyValue(definition, event.target.value),
-                      },
-                    }))}
-                    style={compactInputStyle}
-                  >
-                    <option value="true">True</option>
-                    <option value="false">False</option>
-                  </select>
-                </label>
-              );
-            }
-
-            if (definition.kind === 'enum') {
-              return (
-                <label key={key} style={labelStyle}>
-                  {definition.label}
-                  <select
-                    value={String(value ?? '')}
-                    onChange={(event) => onUpdateComponent(selectedTopLevelComponentId, (instance) => ({
-                      ...instance,
-                      properties: {
-                        ...instance.properties,
-                        [key]: event.target.value,
-                      },
-                    }))}
-                    style={compactInputStyle}
-                  >
-                    {(definition.options ?? []).map((option) => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              );
-            }
-
-            return (
-              <label key={key} style={labelStyle}>
-                {definition.label}
-                <input
-                  type={definition.kind === 'number' ? 'number' : 'text'}
-                  value={String(value ?? '')}
-                  onChange={(event) => onUpdateComponent(selectedTopLevelComponentId, (instance) => ({
-                    ...instance,
-                    properties: {
-                      ...instance.properties,
-                      [key]: parsePropertyValue(definition, event.target.value),
-                    },
-                  }))}
-                  style={compactInputStyle}
-                />
-              </label>
-            );
-          })}
+          {showDimensionsReadout ? (
+            <div
+              data-layout="physicalDimensionsReadout"
+              /* read-only width/height display — user changes dimensions via CatalogPicker */
+              style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}
+            >
+              <div data-layout="physicalWidthReadoutCell" /* width column */ style={{ display: 'grid', gap: '0.25rem' }}>
+                <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#374151' }}>Width</span>
+                <div style={readonlyValueStyle}>{formatLength(physicalW!, preferredUnits)}</div>
+              </div>
+              <div data-layout="physicalHeightReadoutCell" /* height column */ style={{ display: 'grid', gap: '0.25rem' }}>
+                <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#374151' }}>Height</span>
+                <div style={readonlyValueStyle}>{formatLength(physicalH!, preferredUnits)}</div>
+              </div>
+            </div>
+          ) : null}
         </InspectorAccordion>
       ) : null}
 
-      {selectedTopLevelComponent.componentType === 'piece' ? (
+
+      {componentType === 'piece' ? (
         <InspectorAppearanceControls
           scopeLabel="Piece"
           backgroundValue={String(selectedTopLevelComponent.properties.backgroundColor ?? '#10b981')}
@@ -400,7 +279,7 @@ export function TopLevelInspector({
         />
       ) : null}
 
-      {selectedTopLevelComponent.componentType === 'board' && boardAppearance && activeBoardId ? (
+      {isBoardLike && boardAppearance && activeBoardId ? (
         <InspectorAppearanceControls
           scopeLabel="Surface"
           backgroundValue={boardAppearance.surfaceColor}

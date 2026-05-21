@@ -4,7 +4,6 @@ import type { replayRoomLog, getRoomSeatAssignments } from '../../rooms/runtime'
 import type { createPreviewMoveTree } from '../../editor/runtime';
 import type {
   PlaySessionTokenResponse,
-  RoomMemberRecord,
   RoomMoveRecord,
   RoomRecord,
 } from '../../rooms/types';
@@ -39,7 +38,6 @@ interface RoomViewProps {
   moveTree: MoveTree | null;
   affordances: AffordancesState | null;
   playSession: PlaySessionTokenResponse | null;
-  members: RoomMemberRecord[];
   moves: RoomMoveRecord[];
   currentUserId: string | null;
   moveNotice: string | null;
@@ -59,7 +57,6 @@ export function RoomView({
   moveTree,
   affordances,
   playSession,
-  members,
   moves,
   currentUserId,
   moveNotice,

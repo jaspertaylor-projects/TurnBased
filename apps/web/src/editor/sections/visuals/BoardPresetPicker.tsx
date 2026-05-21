@@ -13,7 +13,7 @@ import type {
 
 import { renderComponentIcon } from '../../componentMeta';
 import type { EditorProject } from '../../types';
-import { getComponentLabel, BOARD_PRESET_ICON_KEYS } from './boardEditorUtils';
+import { getComponentLabel, getGridCellSelectionLabel, BOARD_PRESET_ICON_KEYS } from './boardEditorUtils';
 
 interface BoardPresetPickerProps {
   project: EditorProject;
@@ -102,7 +102,9 @@ export function BoardPresetPicker({
     segments.push({
       key: 'cell',
       icon: renderComponentIcon('space', { size: 12, style: { color: 'currentColor', flexShrink: 0 } }),
-      label: `Cell (${resolvedSelectedGridCell.x}, ${resolvedSelectedGridCell.y})`,
+      label: selectedBoardChild
+        ? getGridCellSelectionLabel(project, selectedBoardChild, resolvedSelectedGridCell)
+        : getGridCoordinateKey(resolvedSelectedGridCell),
       onClick: null,
     });
   }
@@ -172,7 +174,11 @@ export function BoardPresetPicker({
               <option value="" disabled hidden>Jump to cell</option>
               {selectedGridCells.map((cell) => {
                 const key = getGridCoordinateKey(cell);
-                return <option key={key} value={key}>Cell ({cell.x}, {cell.y})</option>;
+                return (
+                  <option key={key} value={key}>
+                    {selectedBoardChild ? getGridCellSelectionLabel(project, selectedBoardChild, cell) : key}
+                  </option>
+                );
               })}
             </select>
           </div>

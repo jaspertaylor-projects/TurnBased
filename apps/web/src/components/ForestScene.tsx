@@ -1,4 +1,4 @@
-import { useRef, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
@@ -196,7 +196,9 @@ function ScrollCamera({ scrollProgress }: { scrollProgress: number }) {
 
     // Background + fog color
     lerpColor(BG_COLORS[idx], BG_COLORS[Math.min(idx + 1, BG_COLORS.length - 1)], smooth, tmpColor);
-    scene.background = tmpColor.clone();
+    if (scene.background !== tmpColor) {
+      scene.background = tmpColor;
+    }
     if (scene.fog && scene.fog instanceof THREE.Fog) {
       scene.fog.color.copy(tmpColor);
       scene.fog.near = lerp(a.fogNear, b.fogNear, smooth);
@@ -347,11 +349,26 @@ function ContinuousWorld({ scrollProgress }: { scrollProgress: number }) {
 /* ══════════════════════════════════════════════ */
 
 export function ForestWorld({ scrollProgress, onReady }: { scrollProgress: number; onReady?: () => void }) {
+  const [isPageVisible, setIsPageVisible] = useState(() => (
+    typeof document === 'undefined' ? true : !document.hidden
+  ));
+
+  useEffect(() => {
+    function handleVisibilityChange() {
+      setIsPageVisible(!document.hidden);
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
+
   return (
     <Canvas
       style={{ position: 'fixed', inset: 0, width: '100%', height: '100%', zIndex: 0 }}
       camera={{ position: [8, 5.5, 10], fov: 50 }}
-      gl={{ antialias: true }}
+      dpr={[1, 1.5]}
+      frameloop={isPageVisible ? 'always' : 'never'}
+      gl={{ antialias: true, powerPreference: 'low-power' }}
       onCreated={() => { if (onReady) onReady(); }}
     >
       <fog attach="fog" args={['#e8f5e9', 8, 26]} />

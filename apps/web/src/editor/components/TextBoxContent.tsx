@@ -289,8 +289,8 @@ function renderRichTextContent(project: EditorProject, contentHtml: string, icon
   // (Flex containers don't collapse margins, so the trailing margin would
   // otherwise prevent the content from reaching the edge.)
   const last = nodes[nodes.length - 1];
-  if (last != null && isValidElement(last)) {
-    const existingStyle = (last.props as Record<string, unknown>).style as CSSProperties | undefined;
+  if (last != null && isValidElement<{ style?: CSSProperties }>(last)) {
+    const existingStyle = last.props.style;
     nodes[nodes.length - 1] = cloneElement(last, {
       style: { ...existingStyle, marginBottom: 0 },
     });
@@ -305,7 +305,8 @@ function clampInset(value: unknown, fallback: number): number {
 
 function resolveTextBoxInset(properties: Record<string, unknown>): Pick<ResolvedTextBoxProperties, 'paddingTop' | 'paddingRight' | 'paddingBottom' | 'paddingLeft'> {
   // Support legacy single `padding` value as a fallback for all sides.
-  const legacy = typeof properties.padding === 'number' && Number.isFinite(properties.padding) ? properties.padding : 18;
+  // Default inset is 0 — 0 should mean zero, no invisible cushion.
+  const legacy = typeof properties.padding === 'number' && Number.isFinite(properties.padding) ? properties.padding : 0;
   return {
     paddingTop: clampInset(properties.paddingTop, legacy),
     paddingRight: clampInset(properties.paddingRight, legacy),
@@ -378,7 +379,11 @@ export function TextBoxContent({
       }}
     >
       {contentHtml.length > 0 ? (
-        <div style={{ width: '100%' }}>
+        // `text-box: trim-both cap alphabetic` trims the font's intrinsic
+        // ascent/descent (above cap-height and below the alphabetic baseline)
+        // so glyphs sit flush against the container walls at inset 0 instead
+        // of appearing to have extra padding from the font metrics.
+        <div style={{ width: '100%', textBoxTrim: 'trim-both', textBoxEdge: 'cap alphabetic' } as CSSProperties}>
           {renderRichTextContent(project, contentHtml, iconSize)}
         </div>
       ) : (

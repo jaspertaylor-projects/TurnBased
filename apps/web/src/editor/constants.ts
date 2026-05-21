@@ -1,6 +1,4 @@
-import type { UISelectionState } from '@turnbased/engine-ui';
-
-export type EditorSection = 'settings' | 'art' | 'component_editor' | 'preview' | 'versions' | 'app_layout';
+export type EditorSection = 'settings' | 'art' | 'component_editor' | 'versions' | 'app_layout';
 export type ComponentEditorMode = 'edit' | 'create';
 
 export interface EditorSectionOption {
@@ -8,15 +6,6 @@ export interface EditorSectionOption {
   label: string;
   description: string;
 }
-
-export const EMPTY_SELECTION: UISelectionState = {
-  selectedActionId: null,
-  selectedEntityId: null,
-  selectedZoneId: null,
-  selectedTargetEntityId: null,
-  dragEntityId: null,
-  subChoiceSelections: {},
-};
 
 export const SECTION_OPTIONS: EditorSectionOption[] = [
   {
@@ -33,11 +22,6 @@ export const SECTION_OPTIONS: EditorSectionOption[] = [
     id: 'component_editor',
     label: 'Component Editor',
     description: 'Browse top-level components from the left rail and edit or create focused components here.',
-  },
-  {
-    id: 'preview',
-    label: 'Play Test',
-    description: 'Playtest the generated prototype.',
   },
   {
     id: 'versions',

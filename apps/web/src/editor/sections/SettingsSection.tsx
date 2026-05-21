@@ -22,7 +22,7 @@ export function SettingsSection({
 
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
-      <div style={{ display: 'grid', maxWidth: '780px' }}>
+      <div style={{ display: 'grid', maxWidth: '780px', margin: '0 auto', width: '100%' }}>
         <div style={{ ...panelStyle, display: 'grid', gap: '0.9rem' }}>
           <p style={sectionTitleStyle}>Game Setup</p>
 

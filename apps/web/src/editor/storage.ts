@@ -58,6 +58,9 @@ function normalizeIconAsset(
     iconStrokeWidth: typeof item?.iconStrokeWidth === 'number' && Number.isFinite(item.iconStrokeWidth)
       ? Math.max(0.5, item.iconStrokeWidth)
       : 1,
+    iconScale: typeof item?.iconScale === 'number' && Number.isFinite(item.iconScale)
+      ? Math.max(0.3, Math.min(1.5, item.iconScale))
+      : 1,
     backgroundColor: typeof item?.backgroundColor === 'string' && item.backgroundColor.trim().length > 0
       ? item.backgroundColor
       : 'rgba(255,255,255,0.94)',

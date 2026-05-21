@@ -7,6 +7,7 @@
     "packages/*"
   ],
   "scripts": {
+    "dev:local": "./scripts/dev-local.sh",
     "dev": "npm run dev --workspaces --if-present",
     "build": "npm run build --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",

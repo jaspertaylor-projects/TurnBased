@@ -80,10 +80,22 @@ export function InspectorAccordion({
 }: InspectorAccordionProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const contentRef = useRef<HTMLDivElement>(null);
-  const [contentHeight, setContentHeight] = useState<number | 'auto'>('auto');
+  const [contentHeight, setContentHeight] = useState<number | 'auto'>(defaultOpen ? 'auto' : 0);
+  const didMountRef = useRef(false);
 
   useEffect(() => {
     if (!contentRef.current) {
+      return;
+    }
+
+    // Skip the open/close animation on initial mount. Without this guard,
+    // each accordion briefly locks its height to a measured pixel value
+    // right after mount, and when all the inspector accordions do this in
+    // parallel the scroll area's scrollHeight flickers — which clamps the
+    // parent's scrollTop back to 0 for small scrolls.
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      setContentHeight(isOpen ? 'auto' : 0);
       return;
     }
 
@@ -103,17 +115,20 @@ export function InspectorAccordion({
   }, [isOpen]);
 
   return (
-    <div style={{ borderTop: '1px solid rgba(15,118,110,0.08)', alignSelf: 'start' }}>
+    <div style={{ borderTop: '1px solid rgba(15,118,110,0.10)', alignSelf: 'start' }}>
       <button
         type="button"
+        className="inspector-accordion-trigger"
         onClick={() => setIsOpen((current) => !current)}
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          width: '100%',
-          padding: compact && !isOpen ? '0.36rem 0' : '0.55rem 0',
+          width: 'calc(100% + 0.9rem)',
+          padding: compact && !isOpen ? '0.36rem 0.45rem' : '0.55rem 0.45rem',
+          margin: '0 -0.45rem',
           border: 'none',
+          borderRadius: '8px',
           background: 'none',
           cursor: 'pointer',
           color: '#0f766e',
@@ -123,13 +138,14 @@ export function InspectorAccordion({
           textTransform: 'uppercase',
           textAlign: 'left',
           lineHeight: 1.1,
+          transition: 'background 140ms ease',
         }}
       >
         {title}
         <ChevronDown
           size={compact && !isOpen ? 12 : 14}
           style={{
-            transition: 'transform 180ms ease',
+            transition: 'transform 180ms ease, color 140ms ease',
             transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)',
             color: '#0d9488',
           }}
@@ -143,6 +159,7 @@ export function InspectorAccordion({
           transition: 'height 200ms ease',
         }}
       >
+        <div style={{ height: 3, borderRadius: 2, background: 'rgba(15,118,110,0.12)', marginBottom: '0.35rem' }} />
         <div style={{ display: 'grid', gap: '0.6rem', paddingBottom: '0.5rem' }}>
           {children}
         </div>

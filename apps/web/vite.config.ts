@@ -12,4 +12,12 @@ export default defineConfig({
       'react-konva': path.resolve(__dirname, '../../packages/engine-ui/node_modules/react-konva'),
     },
   },
+  server: {
+    proxy: {
+      '/v1': {
+        target: 'http://localhost:3100',
+        changeOrigin: true,
+      },
+    },
+  },
 })

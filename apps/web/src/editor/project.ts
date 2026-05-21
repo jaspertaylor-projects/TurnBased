@@ -295,7 +295,7 @@ export function createBlankProject(name = 'Untitled Prototype'): EditorProject {
       targetScore: 3,
       maxTurns: 12,
       rulesText: 'Players alternate taking a turn. Each seat begins with 6 block resources in a linked personal view, and occupying public spaces increases score.',
-      designerNotes: 'This workspace can be generated from a lightweight setup form, then refined across the component editor, preview, versions, and app layout sections.',
+      designerNotes: 'This workspace can be generated from a lightweight setup form, then refined across the component editor, versions, and app layout sections.',
     },
     settings: createDefaultProjectSettings(),
     art: createDefaultProjectArtDirection(),
@@ -598,6 +598,110 @@ function collectDescendants(project: EditorProject, instanceId: string): string[
   }
 
   return instance.children.flatMap((childId) => [childId, ...collectDescendants(project, childId)]);
+}
+
+/**
+ * Clone an instance and all of its descendants into the same project, assigning
+ * fresh ids to every copied node and reparenting them correctly. If
+ * `targetParentId` is provided, the top-level clone is attached there;
+ * otherwise it is attached to the same parent as the source (or added as a
+ * new root if the source was a root).
+ *
+ * Returns the updated project and the id of the newly created top-level clone.
+ */
+export function duplicateComponentSubtree(
+  project: EditorProject,
+  sourceInstanceId: string,
+  options: {
+    targetParentId?: string | null;
+    displayNameSuffix?: string;
+  } = {},
+): { project: EditorProject; instanceId?: string; issue?: string } {
+  const source = project.instances[sourceInstanceId];
+  if (!source) {
+    return { project, issue: 'Component to duplicate was not found.' };
+  }
+
+  const resolvedTargetParentId = options.targetParentId !== undefined
+    ? options.targetParentId
+    : (source.parentId ? String(source.parentId) : null);
+
+  // Validate placement against the target parent's manifest so we don't paste
+  // a token under a board that doesn't accept it, etc.
+  const manifest = getBuiltInComponentManifest(source.componentType as BuiltInComponentType);
+  const parentManifest = resolvedTargetParentId
+    ? getBuiltInComponentManifest(project.instances[resolvedTargetParentId]?.componentType as BuiltInComponentType)
+    : null;
+  const placement = validateComponentPlacement(manifest, parentManifest);
+  if (!placement.valid) {
+    return { project, issue: placement.issues[0]?.message ?? 'That component cannot be pasted there.' };
+  }
+
+  // Build id remap for the entire subtree up front so we can rewire parent
+  // and children references in a single pass.
+  const idRemap = new Map<string, string>();
+  function assignId(id: string, type: string) {
+    idRemap.set(id, generateId(`component_${type}`));
+  }
+  assignId(sourceInstanceId, source.componentType);
+  for (const descendantId of collectDescendants(project, sourceInstanceId)) {
+    const descendant = project.instances[descendantId];
+    if (descendant) {
+      assignId(descendantId, descendant.componentType);
+    }
+  }
+
+  const nextInstances: EditorProject['instances'] = { ...project.instances };
+
+  // Clone each node with its remapped id, remapped parent, and remapped
+  // children. Keep other fields (properties, frame, bindings, etc.) identical.
+  for (const [oldId, newId] of idRemap.entries()) {
+    const original = project.instances[oldId];
+    if (!original) continue;
+
+    const clonedParentId = oldId === sourceInstanceId
+      ? (resolvedTargetParentId ? createComponentInstanceId(resolvedTargetParentId) : null)
+      : (original.parentId && idRemap.has(String(original.parentId))
+        ? createComponentInstanceId(idRemap.get(String(original.parentId)) as string)
+        : original.parentId);
+
+    nextInstances[newId] = {
+      ...original,
+      instanceId: createComponentInstanceId(newId),
+      parentId: clonedParentId,
+      children: original.children.map((childId) => createComponentInstanceId(
+        idRemap.get(String(childId)) ?? String(childId),
+      )),
+      // Append a suffix so outline and inspector labels don't collide.
+      displayName: oldId === sourceInstanceId && options.displayNameSuffix
+        ? `${original.displayName ?? ''}${options.displayNameSuffix}`
+        : original.displayName,
+    };
+  }
+
+  const newTopLevelId = idRemap.get(sourceInstanceId) as string;
+
+  // Attach the top-level clone into the target parent's children list, or
+  // append it to rootInstanceIds if it has no parent.
+  if (resolvedTargetParentId) {
+    const targetParent = nextInstances[resolvedTargetParentId];
+    if (targetParent) {
+      nextInstances[resolvedTargetParentId] = addChildReference(targetParent, newTopLevelId);
+    }
+  }
+
+  const nextRootInstanceIds = resolvedTargetParentId
+    ? project.rootInstanceIds
+    : [...project.rootInstanceIds, newTopLevelId];
+
+  return {
+    project: touchProject({
+      ...project,
+      rootInstanceIds: nextRootInstanceIds,
+      instances: nextInstances,
+    }),
+    instanceId: newTopLevelId,
+  };
 }
 
 export function removeComponentInstance(project: EditorProject, instanceId: string): EditorProject {

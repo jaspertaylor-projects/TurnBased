@@ -559,7 +559,6 @@ export const Play = () => {
       moveTree={moveTree}
       affordances={affordances}
       playSession={playSession}
-      members={members}
       moves={moves}
       currentUserId={currentUserId}
       moveNotice={moveNotice}

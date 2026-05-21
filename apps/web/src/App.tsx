@@ -110,9 +110,10 @@ function App() {
                     <a href="#/marketplace" style={{ color: 'var(--text-secondary)' }}>Marketplace</a>
                     <a href="#/lobby" style={{ color: 'var(--text-secondary)' }}>Rooms</a>
                     {!isGuest && <a href="#/dashboard" style={{ color: 'var(--text-secondary)' }}>Dashboard</a>}
-                    {!isGuest && <a href="#/settings" style={{ color: 'var(--text-secondary)' }}>Settings</a>}
-                    <button 
-                         onClick={handleSignOut} 
+                    {/* Settings hosts user-level preferences (units, etc.) — show to everyone, including guests. */}
+                    <a href="#/settings" style={{ color: 'var(--text-secondary)' }}>Settings</a>
+                    <button
+                         onClick={handleSignOut}
                          style={{ background: 'transparent', color: 'var(--error)', border: '1px solid var(--error)', padding: '0.4rem 1rem', borderRadius: '4px' }}
                     >
                          Sign Out
@@ -122,6 +123,7 @@ function App() {
                 <>
                     <a href="#/marketplace" style={{ color: 'var(--text-secondary)' }}>Marketplace</a>
                     <a href="#/lobby" style={{ color: 'var(--text-secondary)' }}>Rooms</a>
+                    <a href="#/settings" style={{ color: 'var(--text-secondary)' }}>Settings</a>
                     <a href="#/auth" style={{ background: 'var(--text-primary)', color: 'var(--bg-primary)', padding: '0.5rem 1.25rem', borderRadius: '4px', fontWeight: 'bold' }}>
                          Sign In
                     </a>

@@ -9,6 +9,7 @@ import { counterManifests } from './catalog-counters';
 // listAuthorableBuiltInComponents() output order (tested in index.test.ts).
 const manifests: Record<BuiltInComponentType, ComponentManifestDefinition> = {
   board: spatialManifests.board,
+  tile: spatialManifests.tile,
   card: entityManifests.card,
   space: spatialManifests.space,
   'hex-grid': spatialManifests['hex-grid'],

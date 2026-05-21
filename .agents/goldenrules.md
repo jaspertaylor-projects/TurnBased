@@ -1,3 +1,49 @@
+# TurnBased Project
+
+You are a expert coding agent tasked as the most badass coder here.  If you are gettign this prompt its because other frontier models (Gemini) has already failed and this is a difficult task.  We are working on an awesome product that will be  
+
+## For UI Projects Always Use Playwright MCP
+
+## Coding Golden Rules 
+
+
+2. Keep files under 800 lines.  Make more files whenever you need.  Ensure that files have a clear separation of concerns.
+3. Write code that is meant to be a base to grow from this project is still in its infancy and we need to make sure everything is good 
+4. Maintain a clear project organization 
+5. For react coding standards try to implement bullet proof react and adhere to DRY principals.
+6. Update the relevant docs after any change if you have anything worthy of updating docs.  Don't be shy about making more docs if necessary. 
+
+
+
+# The Golden Rules
+
+These are the golden rules that you absolutley must follow : 
+
+1. Use Playwright tools to simulate user experiences after you implement a change.   Keep in mind that the data load is through electron etc so you wont be able to actually load data through the web.
+
+2. Label every div so that we can communicate clearer
+
+3. After every time before you finish and with a prompt, update .gitignore if applicable, and then commit to the local branch you are working on with a detailed commit message.
+
+4. Keep the code base modular don't write code files longer than  600 lines long and refactor files you find that are longert than that.
+
+5.  Make the UI look nice.  Our overall theme is aiming to make a cozy magical forest / board game haven. 
+
+6. When fixing code be sure to always treat the cause not the symptom
+
+7. Make sure to make and keep logs in /logs  thsi can help us debug
+
+8. For react coding standards try to implement bullet proof react and adhere to DRY principals.
+
+9. Update the relevant docs after any change if you have anything worthy of updating docs.  Don't be shy about making more docs if necessary. 
+
+10. Write code that is meant to be a base to grow from this project is still in its infancy and we need to make sure everything is being written with future growth in mind 
+
+11. Have Fun! Lets make somethign that will bring joy to this world.
+
+---
+
+
 # UI Style Rules
 
 This file records shared UI rules for TurnBased. These are implementation rules for the app shell, editor, preview, and play surfaces.
@@ -24,17 +70,6 @@ Current implementation:
 - Treat non-landing routes like fixed desktop-app surfaces first, even if content gets clipped until we redesign that page properly.
 - If overflow is ever needed later, it should be an intentional smaller UI region such as a list, inspector, canvas rail, or modal body, not the page itself.
 
-Current implementation:
-- `apps/web/src/App.tsx`
-- `apps/web/src/components/AppPageFrame.tsx`
-- `apps/web/src/pages/Auth.tsx`
-- `apps/web/src/pages/Assets.tsx`
-- `apps/web/src/pages/CreateBlankProject.tsx`
-- `apps/web/src/pages/Dashboard.tsx`
-- `apps/web/src/pages/Lobby.tsx`
-- `apps/web/src/pages/Marketplace.tsx`
-- `apps/web/src/pages/Settings.tsx`
-
 ## Rule 3: Component Editor Workspace
 
 - The component editor should feel like a static desktop workbench rather than a page.
@@ -47,3 +82,8 @@ Current implementation:
 Current implementation:
 - `apps/web/src/editor/sections/VisualsSection.tsx`
 - `apps/web/src/editor/sections/visuals/TopLevelInspector.tsx`
+
+
+## Lessons Learned
+  Add any lessons you think would be useful for a future AI agent in .agents/lessons
+

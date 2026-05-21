@@ -15,6 +15,7 @@ import {
   LayoutPanelTop,
   Package,
   Rows3,
+  Square,
   Type,
   Trophy,
 } from 'lucide-react';
@@ -29,6 +30,7 @@ export const CATEGORY_LABELS: Record<string, string> = {
 const COMPONENT_ICONS: Record<string, LucideIcon> = {
   container: LayoutPanelTop,
   board: LayoutPanelTop,
+  tile: Square,
   card: CreditCard,
   grid: Grid2x2,
   space: Box,

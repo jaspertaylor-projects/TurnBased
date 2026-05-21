@@ -1,7 +1,9 @@
 import type { CSSProperties } from 'react';
 
+/** Root layout for editor pages — flex row that fills the main content area. */
 export const pageStyle: CSSProperties = {
   flex: '1 1 0',
+  height: '100%',
   minHeight: 0,
   display: 'flex',
   flexWrap: 'wrap',

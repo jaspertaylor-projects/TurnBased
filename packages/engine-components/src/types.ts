@@ -26,7 +26,8 @@ export type BuiltInComponentType =
   | 'piece'
   | 'token'
   | 'counter'
-  | 'score-track';
+  | 'score-track'
+  | 'tile';
 
 export type StructuralRole = 'top-level' | 'sub-component' | 'leaf';
 export type ComponentAuthoringDiscoverability = 'primary' | 'hidden';
@@ -188,6 +189,8 @@ export interface ComponentFrame {
   y: number;
   width: number;
   height: number;
+  /** Rotation in degrees (clockwise). Defaults to 0 when omitted. */
+  rotation?: number;
   background: string | null;
   textureId?: BoardSurfaceTextureId | null;
   textureOpacity?: number;

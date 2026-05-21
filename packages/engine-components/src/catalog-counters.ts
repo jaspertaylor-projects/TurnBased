@@ -244,8 +244,8 @@ export const counterManifests: Pick<Record<BuiltInComponentType, ComponentManife
       lineHeight: z.number().min(1).max(2.4).default(1.4),
       textColor: z.string().default('#064e3b'),
       textAlign: z.enum(['left', 'center', 'right', 'justify']).default('left'),
-      verticalAlign: z.enum(['start', 'center', 'end']).default('center'),
-      padding: z.number().nonnegative().max(64).default(18),
+      verticalAlign: z.enum(['start', 'center', 'end']).default('start'),
+      padding: z.number().nonnegative().max(64).default(4),
     }),
     defaultProperties: {
       label: 'Text Box',
@@ -255,8 +255,8 @@ export const counterManifests: Pick<Record<BuiltInComponentType, ComponentManife
       lineHeight: 1.4,
       textColor: '#064e3b',
       textAlign: 'left',
-      verticalAlign: 'center',
-      padding: 18,
+      verticalAlign: 'start',
+      padding: 4,
     },
     renderHints: {
       surface: 'board',

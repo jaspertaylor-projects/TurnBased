@@ -31,6 +31,7 @@ describe('engine-components catalog', () => {
     ]);
     expect(authorableComponents.map((component) => component.type)).toEqual([
       'board',
+      'tile',
       'card',
       'space',
       'hex-grid',

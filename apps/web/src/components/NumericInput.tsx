@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 
 function inferAllowsDecimal(step: number | undefined, allowDecimal: boolean | undefined): boolean {
@@ -63,12 +63,7 @@ export function NumericInput({
     () => (acceptsDecimal ? /^\d*(\.\d*)?$/ : /^\d*$/),
     [acceptsDecimal],
   );
-
-  useEffect(() => {
-    if (!isFocused) {
-      setDraft(formatNumericValue(value));
-    }
-  }, [isFocused, value]);
+  const displayedValue = isFocused ? draft : formatNumericValue(value);
 
   function commitDraft() {
     if (draft.trim().length === 0) {
@@ -91,9 +86,12 @@ export function NumericInput({
     <input
       type="text"
       inputMode={acceptsDecimal ? 'decimal' : 'numeric'}
-      value={draft}
+      value={displayedValue}
       placeholder={placeholder}
-      onFocus={() => setIsFocused(true)}
+      onFocus={() => {
+        setDraft(formatNumericValue(value));
+        setIsFocused(true);
+      }}
       onBlur={() => {
         setIsFocused(false);
         commitDraft();

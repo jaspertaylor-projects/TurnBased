@@ -125,6 +125,15 @@ export type ProjectPaletteColorId =
 
 export type ProjectColorPalette = Record<ProjectPaletteColorId, string>;
 
+/**
+ * Display unit preference for physical dimensions (board/tile/deck sizes,
+ * inspector read-outs, catalog size labels). Stored data stays in mm — this
+ * only affects presentation. Lives in user settings (see `userSettings.ts`),
+ * not project settings, because it's a personal UI preference that applies
+ * across every project the user opens.
+ */
+export type EditorLengthUnit = 'mm' | 'inches';
+
 export interface EditorSettings {
   timeControlMode: EditorTimeControlMode;
   timeControlSeconds: number;

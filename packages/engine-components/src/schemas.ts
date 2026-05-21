@@ -21,6 +21,7 @@ export const builtInComponentTypeSchema = z.enum([
   'token',
   'counter',
   'score-track',
+  'tile',
 ]);
 
 export const structuralRoleSchema = z.enum(['top-level', 'sub-component', 'leaf']);

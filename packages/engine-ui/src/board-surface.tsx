@@ -2,11 +2,26 @@ import type {
   CSSProperties,
   DragEventHandler,
   MouseEventHandler,
-  Ref,
   ReactNode,
 } from 'react';
 
 import { getBoardSurfaceTextureStyle, type BoardSurfaceAppearance } from './board-surface-style';
+
+type SurfaceElementRef =
+  | ((instance: HTMLDivElement | null) => void)
+  | { readonly current: HTMLDivElement | null }
+  | null;
+
+function assignSurfaceElementRef(surfaceRef: SurfaceElementRef | undefined, node: HTMLDivElement | null) {
+  if (typeof surfaceRef === 'function') {
+    surfaceRef(node);
+    return;
+  }
+
+  if (surfaceRef && typeof surfaceRef === 'object') {
+    (surfaceRef as { current: HTMLDivElement | null }).current = node;
+  }
+}
 
 export interface BoardSurfaceItem {
   id: string;
@@ -25,6 +40,8 @@ export interface BoardSurfaceItem {
   borderWidth?: number;
   borderRadius?: number;
   clipPath?: string | null;
+  /** Rotation in degrees (clockwise). */
+  rotation?: number;
   padding?: string | number;
   selected?: boolean;
   highlighted?: boolean;
@@ -52,7 +69,7 @@ export interface BoardSurfaceProps {
   showItemHeader?: boolean;
   showResizeHandle?: boolean;
   emptyState?: ReactNode;
-  surfaceRef?: Ref<HTMLDivElement>;
+  surfaceRef?: SurfaceElementRef;
   onSurfaceDragOver?: DragEventHandler<HTMLDivElement>;
   onSurfaceDrop?: DragEventHandler<HTMLDivElement>;
 }
@@ -116,7 +133,7 @@ function getItemStyle(
     // Use inset shadows so selection/highlight indicators don't extend
     // outside the item's box (which would be clipped when zoomed in).
     boxShadow: item.selected
-      ? 'inset 0 0 0 2px rgba(249,115,22,0.45), 0 16px 36px rgba(6,78,59,0.12)'
+      ? 'inset 0 0 0 2px rgba(249,115,22,0.45), 0 0 0 1px rgba(255,255,255,0.22), 0 0 18px rgba(255,255,255,0.12), 0 16px 36px rgba(6,78,59,0.12)'
       : item.highlighted
         ? 'inset 0 0 0 1px rgba(14,165,233,0.3), 0 16px 36px rgba(6,78,59,0.1)'
         : '0 14px 32px rgba(6,78,59,0.08)',
@@ -129,6 +146,7 @@ function getItemStyle(
     overflow: 'hidden',
     cursor: editable ? 'move' : item.onClick ? 'pointer' : 'default',
     transition: 'box-shadow 140ms ease, border-color 140ms ease, background 140ms ease',
+    ...(item.rotation ? { transform: `rotate(${item.rotation}deg)`, transformOrigin: 'center center' } : {}),
   };
 }
 
@@ -220,7 +238,7 @@ export function BoardSurface({
 
   return (
     <div
-      ref={surfaceRef}
+      ref={(node) => assignSurfaceElementRef(surfaceRef, node)}
       onDragOver={onSurfaceDragOver}
       onDrop={onSurfaceDrop}
       style={{

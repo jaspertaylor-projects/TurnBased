@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useUndoRedo, useUndoRedoKeyboard } from '../editor/useUndoRedo';
-import { createUIAffordanceState } from '@turnbased/engine-ui';
-import type { UISelectionState } from '@turnbased/engine-ui';
 import {
   addProjectComponent,
+  duplicateComponentSubtree,
   listValidParents,
   removeComponentInstance,
   renameProject,
@@ -18,20 +17,16 @@ import {
 } from '../editor/project';
 import { loadEditorProject, saveEditorProject } from '../editor/storage';
 import {
-  applyPreviewActions,
   buildPreviewRuntime,
-  createPreviewMoveTree,
-  normalizePreviewActions,
-  toPreviewZoneId,
 } from '../editor/runtime';
 import type { EditorProject } from '../editor/types';
-import { EMPTY_SELECTION, SECTION_OPTIONS } from '../editor/constants';
-import type { ComponentEditorMode, EditorSection } from '../editor/constants';
-import { createPreviewSignature, readProjectIdFromHash } from '../editor/helpers';
-import { pageStyle, panelStyle, sectionTitleStyle } from '../editor/styles';
+import { SECTION_OPTIONS } from '../editor/constants';
+import type { EditorSection } from '../editor/constants';
+import { readProjectIdFromHash } from '../editor/helpers';
+import { panelStyle, sectionTitleStyle } from '../editor/styles';
 import { EditorSidebar } from '../editor/components/EditorSidebar';
 import { VisualsSection } from '../editor/sections/VisualsSection';
-import { PreviewSection } from '../editor/sections/PreviewSection';
+import { ComponentGallery } from '../editor/sections/ComponentGallery';
 import { VersionsSection } from '../editor/sections/VersionsSection';
 import { AppLayoutSection } from '../editor/sections/AppLayoutSection';
 import { ArtSection, STUDIO_BG_VALUE } from '../editor/sections/ArtSection';
@@ -42,7 +37,7 @@ import { createWorkspaceFiles } from '../editor/shipping';
 import { saveProjectWorkspace } from '../editor/workspace';
 
 const PENDING_EDITOR_NOTICE_KEY = 'turnbased.creator.pendingEditorNotice';
-const PREVIEW_ZONE_COMPONENT_TYPES = new Set([
+const SUPPORT_ZONE_COMPONENT_TYPES = new Set([
   'space',
   'zone',
   'track',
@@ -54,10 +49,13 @@ const PREVIEW_ZONE_COMPONENT_TYPES = new Set([
 ]);
 
 // Component types that represent physical, designable game objects.
-// These appear in the Component Editor. Conceptual/functional types (zone, hand,
-// deck, discard, bag, counter, score-track, network, track) belong
-// in App Layout where the creator configures placement and game-structure concerns.
-const COMPONENT_EDITOR_TYPES = new Set(['board', 'piece', 'token', 'card']);
+// These appear in the Component Gallery. `tile` and `deck` are now authorable
+// top-level types (the gallery's "New component" menu lists them alongside
+// `board`), so they must also show up in the gallery listing. Conceptual
+// types (zone, hand, discard, bag, counter, score-track, network, track)
+// belong in App Layout where the creator configures placement and
+// game-structure concerns.
+const COMPONENT_EDITOR_TYPES = new Set(['board', 'tile', 'deck', 'piece', 'token', 'card']);
 
 function isMovableTemplateType(componentType: string): boolean {
   return componentType === 'piece' || componentType === 'token';
@@ -75,38 +73,18 @@ function listComponentOutlineIds(project: EditorProject): string[] {
   return Array.from(new Set([...designableRootIds, ...movableTemplateIds]));
 }
 
-function findComponentOutlineId(project: EditorProject, instanceId: string | null): string | null {
-  if (!instanceId) {
-    return null;
-  }
-
-  let currentId: string | null = instanceId;
-  while (currentId) {
-    const instance: EditorProject['instances'][string] | undefined = project.instances[currentId];
-    if (!instance) {
-      return null;
-    }
-
-    if (!instance.parentId || isMovableTemplateType(instance.componentType)) {
-      return currentId;
-    }
-
-    currentId = String(instance.parentId);
-  }
-
-  return null;
-}
-
 export const Editor = () => {
   const [projectId, setProjectId] = useState<string | null>(null);
   const projectHistory = useUndoRedo<EditorProject | null>(null);
-  const project = projectHistory.value;
-  const setProject = projectHistory.set;
-  const [activeSection, setActiveSection] = useState<EditorSection>('preview');
-  const [componentEditorMode, setComponentEditorMode] = useState<ComponentEditorMode>('edit');
+  const {
+    value: project,
+    set: setProject,
+    undo: undoProject,
+    redo: redoProject,
+    reset: resetProjectHistory,
+  } = projectHistory;
+  const [activeSection, setActiveSection] = useState<EditorSection>('component_editor');
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
-  const [selection, setSelection] = useState<UISelectionState>(EMPTY_SELECTION);
-  const [previewState, setPreviewState] = useState<ReturnType<typeof buildPreviewRuntime>['initialState'] | null>(null);
   const [paletteOwnerId] = useState<string | null>('player_one');
   const [editorNotice, setEditorNotice] = useState<string | null>(null);
   const [commitMessage, setCommitMessage] = useState('Checkpoint workspace');
@@ -119,12 +97,9 @@ export const Editor = () => {
       const pendingNotice = window.sessionStorage.getItem(PENDING_EDITOR_NOTICE_KEY);
 
       setProjectId(nextProjectId);
-      projectHistory.reset(nextProject);
-      setActiveSection('preview');
-      setComponentEditorMode('edit');
+      resetProjectHistory(nextProject);
+      setActiveSection('component_editor');
       setSelectedComponentId(null);
-      setSelection(EMPTY_SELECTION);
-      setPreviewState(nextProject ? buildPreviewRuntime(nextProject).initialState : null);
       setEditorNotice(pendingNotice);
       if (pendingNotice) {
         window.sessionStorage.removeItem(PENDING_EDITOR_NOTICE_KEY);
@@ -134,7 +109,7 @@ export const Editor = () => {
     syncRoute();
     window.addEventListener('hashchange', syncRoute);
     return () => window.removeEventListener('hashchange', syncRoute);
-  }, []);
+  }, [resetProjectHistory]);
 
   useEffect(() => {
     if (!project) {
@@ -153,11 +128,9 @@ export const Editor = () => {
     saveProjectWorkspace(project.id, createWorkspaceFiles(project, runtime));
   }, [project]);
 
-  useUndoRedoKeyboard(projectHistory.undo, projectHistory.redo);
+  useUndoRedoKeyboard(undoProject, redoProject);
 
   const runtime = project ? buildPreviewRuntime(project) : null;
-  const moveTree = previewState && runtime ? createPreviewMoveTree(previewState, runtime) : null;
-  const affordances = moveTree ? createUIAffordanceState(moveTree, { selection }) : null;
   const resolvedSelectedComponentId = project && selectedComponentId && project.instances[selectedComponentId]
     ? selectedComponentId
     : null;
@@ -193,21 +166,14 @@ export const Editor = () => {
   const boardInstances = currentProject.rootInstanceIds.filter((instanceId) => currentProject.instances[instanceId]?.componentType === 'board');
   const topLevelSupportZones = currentProject.rootInstanceIds.filter((instanceId) => {
     const componentType = currentProject.instances[instanceId]?.componentType;
-    return componentType ? PREVIEW_ZONE_COMPONENT_TYPES.has(componentType) : false;
+    return componentType ? SUPPORT_ZONE_COMPONENT_TYPES.has(componentType) : false;
   });
   const componentOutlineIds = listComponentOutlineIds(currentProject);
-  const selectedOutlineComponentId = findComponentOutlineId(currentProject, resolvedSelectedComponentId);
   const gitStatus = getProjectGitStatus(currentProject, currentRuntime);
   const gitHistory = listProjectGitCommits(currentProject.id);
 
   function commitProject(nextProject: EditorProject) {
-    const shouldResetPreview = createPreviewSignature(currentProject) !== createPreviewSignature(nextProject);
-
     setProject(nextProject);
-    if (shouldResetPreview) {
-      setPreviewState(buildPreviewRuntime(nextProject).initialState);
-      setSelection(EMPTY_SELECTION);
-    }
     setEditorNotice(null);
   }
 
@@ -245,7 +211,6 @@ export const Editor = () => {
 
     commitProject(nextProject);
     if (result.instanceId && focusNewComponent) {
-      setComponentEditorMode('edit');
       setSelectedComponentId(result.instanceId);
     }
     return result.instanceId ?? null;
@@ -266,107 +231,65 @@ export const Editor = () => {
     }
   }
 
-  function executeMove(actionId: string, overrides: Partial<UISelectionState> = {}) {
-    if (!moveTree || !previewState || !runtime) {
-      return;
+  function duplicateComponent(
+    instanceId: string,
+    options: {
+      targetParentId?: string | null;
+      focus?: boolean;
+      // Offset applied to the new clone's frame.x/y so a pasted copy doesn't
+      // sit exactly on top of the original. Applied inline so the duplicate
+      // and the frame nudge commit atomically in a single project update —
+      // otherwise a follow-up updateComponent call reads a stale
+      // currentProject (React state hasn't flushed yet) and clobbers the
+      // duplicate.
+      frameOffset?: { x: number; y: number };
+    } = {},
+  ): string | null {
+    const result = duplicateComponentSubtree(currentProject, instanceId, {
+      targetParentId: options.targetParentId,
+      displayNameSuffix: ' Copy',
+    });
+    if (result.issue) {
+      setEditorNotice(result.issue);
+      return null;
     }
-
-    const nextSelection = {
-      ...selection,
-      ...overrides,
-    };
-    const request = {
-      actionId,
-      selectedEntityId: nextSelection.selectedEntityId ?? undefined,
-      destinationZoneId: nextSelection.selectedZoneId ?? undefined,
-      targetEntityId: nextSelection.selectedTargetEntityId ?? undefined,
-      subChoiceSelections: nextSelection.subChoiceSelections,
-    };
-    const validation = moveTree.validate(request);
-    if (!validation.isValid) {
-      setEditorNotice(validation.errors.join(' '));
-      setSelection(nextSelection);
-      return;
+    let nextProject = result.project;
+    if (result.instanceId && options.frameOffset) {
+      nextProject = updateComponentInstance(nextProject, result.instanceId, (instance) => {
+        if (!instance.frame) return instance;
+        return {
+          ...instance,
+          frame: {
+            ...instance.frame,
+            x: (instance.frame.x ?? 0) + (options.frameOffset?.x ?? 0),
+            y: (instance.frame.y ?? 0) + (options.frameOffset?.y ?? 0),
+          },
+        };
+      });
     }
-
-    const canonicalActions = normalizePreviewActions(currentProject, previewState, moveTree.materialize(request));
-    const nextState = applyPreviewActions(
-      previewState,
-      runtime,
-      canonicalActions,
-      currentProject.rules.targetScore,
-      currentProject.rules.maxTurns,
-    );
-
-    setPreviewState(nextState);
-    setSelection(EMPTY_SELECTION);
-    setEditorNotice(null);
+    commitProject(nextProject);
+    if (result.instanceId && options.focus) {
+      setSelectedComponentId(result.instanceId);
+    }
+    return result.instanceId ?? null;
   }
 
   function openComponentEditor() {
+    // Clicking "component editor" in the sidebar always lands the user on the
+    // intermediate gallery view — `selectedComponentId = null` triggers the
+    // gallery in `renderActiveSection` (see the `component_editor` case).
     setActiveSection('component_editor');
-    setComponentEditorMode(componentOutlineIds.length === 0 ? 'create' : 'edit');
-
-    if (!selectedComponentId && componentOutlineIds.length > 0) {
-      setSelectedComponentId(componentOutlineIds[0]);
-    }
+    setSelectedComponentId(null);
   }
 
   function selectComponent(instanceId: string | null) {
     setActiveSection('component_editor');
-    setComponentEditorMode('edit');
     setSelectedComponentId(instanceId);
   }
 
   function createTopLevelComponent(type: BuiltInComponentType) {
     setActiveSection('component_editor');
     handleAddComponent(type, null, { focusNewComponent: true });
-  }
-
-  function handleEntityClick(entityId: string) {
-    if (!affordances) {
-      return;
-    }
-
-    const entityState = affordances.entityStates[entityId];
-    if (!entityState?.interactable && selection.selectedEntityId !== entityId) {
-      return;
-    }
-
-    setSelection({
-      ...EMPTY_SELECTION,
-      selectedEntityId: selection.selectedEntityId === entityId ? null : entityId,
-    });
-  }
-
-  function handleZoneClick(zoneId: string) {
-    if (!moveTree || !affordances) {
-      return;
-    }
-
-    const typedZoneId = toPreviewZoneId(zoneId);
-
-    if (selection.selectedEntityId) {
-      const matchingAction = moveTree.availableActions.find((action) => (
-        action.interactableEntities.includes(selection.selectedEntityId ?? '') &&
-        action.validDestinations.includes(typedZoneId)
-      ));
-
-      if (matchingAction) {
-        executeMove(matchingAction.id, {
-          selectedEntityId: selection.selectedEntityId,
-          selectedZoneId: typedZoneId,
-        });
-        return;
-      }
-    }
-
-    if (affordances.zoneStates[typedZoneId]?.interactable) {
-      setSelection({
-        ...selection,
-        selectedZoneId: typedZoneId,
-      });
-    }
   }
 
   function renderActiveSection() {
@@ -377,24 +300,6 @@ export const Editor = () => {
             project={currentProject}
             onUpdateBrief={(updater) => commitProject(updateProjectBrief(currentProject, updater))}
             onUpdateSettings={(updater) => commitProject(updateProjectSettings(currentProject, updater))}
-          />
-        );
-      case 'preview':
-        return (
-          <PreviewSection
-            key={`${currentProject.id}:${currentProject.views.defaultViewId}:${currentProject.views.selectedViewId}`}
-            project={currentProject}
-            boardInstances={boardInstances}
-            topLevelSupportZones={topLevelSupportZones}
-            previewState={previewState}
-            affordances={affordances}
-            moveTree={moveTree}
-            selection={selection}
-            onResetPreview={() => setPreviewState(currentRuntime.initialState)}
-            onExecuteMove={(actionId, overrides) => executeMove(actionId, overrides)}
-            onSetSelection={setSelection}
-            onEntityClick={handleEntityClick}
-            onZoneClick={handleZoneClick}
           />
         );
       case 'art':
@@ -450,10 +355,8 @@ export const Editor = () => {
             onRestoreCommit={(commitSha) => {
               try {
                 const restoredProject = restoreProjectFromCommit(currentProject.id, commitSha);
-                projectHistory.reset(restoredProject);
-                setPreviewState(buildPreviewRuntime(restoredProject).initialState);
+                resetProjectHistory(restoredProject);
                 setSelectedComponentId(null);
-                setSelection(EMPTY_SELECTION);
                 setEditorNotice(`Restored ${commitSha}.`);
               } catch (error) {
                 setEditorNotice(error instanceof Error ? error.message : 'Unable to restore that version.');
@@ -470,6 +373,20 @@ export const Editor = () => {
         );
       case 'component_editor':
       default:
+        // Intermediate gallery view: shown whenever no component is selected.
+        // Selecting a card (or creating a new component) calls back into
+        // `selectComponent` / `createTopLevelComponent`, which set
+        // `selectedComponentId` and drop us into the per-component editor.
+        if (!resolvedSelectedComponentId) {
+          return (
+            <ComponentGallery
+              project={currentProject}
+              componentOutlineIds={componentOutlineIds}
+              onSelectComponent={selectComponent}
+              onCreateComponent={createTopLevelComponent}
+            />
+          );
+        }
         return (
           <VisualsSection
             project={currentProject}
@@ -479,6 +396,8 @@ export const Editor = () => {
             onAddComponent={handleAddComponent}
             onUpdateComponent={updateComponent}
             onRemoveComponent={removeComponent}
+            onDuplicateComponent={duplicateComponent}
+            onReturnToGallery={() => setSelectedComponentId(null)}
             onAssignProjectPaletteColor={(paletteId, value) => commitProject(updateProjectSettings(currentProject, (settings) => ({
               ...settings,
               colorPalette: {
@@ -491,10 +410,18 @@ export const Editor = () => {
     }
   }
 
+  // For canvas-based sections (component editor, art), the page container must
+  // stretch children to fill the full viewport height and avoid wrapping.
+  const isCanvasSection = activeSection === 'component_editor' || activeSection === 'art';
+
   return (
     <div style={{
-      ...pageStyle,
-      ...(activeSection === 'art' ? { flex: '1 1 0', overflow: 'hidden', background: STUDIO_BG_VALUE, flexWrap: 'nowrap' as const, alignItems: 'stretch' } : {}),
+      display: 'grid',
+      gridTemplateColumns: '228px minmax(0, 1fr)',
+      height: '100%',
+      minHeight: 0,
+      overflow: 'hidden',
+      ...(activeSection === 'art' ? { background: STUDIO_BG_VALUE } : {}),
     }}>
       <EditorSidebar
         project={currentProject}
@@ -503,43 +430,73 @@ export const Editor = () => {
         boardCount={boardInstances.length}
         supportZoneCount={topLevelSupportZones.length}
         componentCount={Object.keys(currentProject.instances).length}
-        componentOutlineIds={componentOutlineIds}
-        selectedOutlineComponentId={selectedOutlineComponentId}
-        componentEditorMode={componentEditorMode}
         onOpenComponentEditor={openComponentEditor}
-        onCreateTopLevelComponent={createTopLevelComponent}
-        onSelectOutlineComponent={selectComponent}
         onRenameProject={(name) => commitProject(renameProject(currentProject, name))}
         onUpdateDescription={(description) => commitProject(updateProjectDescription(currentProject, description))}
       />
 
-      <section style={{
-        flex: '1 1 0',
-        minWidth: 0,
-        display: 'grid',
-        gridTemplateRows: activeSection === 'art' ? 'minmax(0, 1fr)' : 'auto auto minmax(0, 1fr)',
-        gap: activeSection === 'art' ? 0 : '0.85rem',
-        padding: activeSection === 'art' ? 0 : '0.75rem 1rem 1rem 1rem',
-        overflow: 'hidden',
-        ...(activeSection === 'art' ? { height: '100%' } : {}),
-      }}>
-        {activeSection !== 'component_editor' && activeSection !== 'art' ? (
-          <div style={{ padding: '0.2rem 0.15rem 0 0.15rem', color: '#0f766e', fontSize: '0.84rem', display: 'flex', gap: '0.7rem', alignItems: 'center', flexWrap: 'wrap' }}>
-            <span style={{ fontWeight: 700, color: '#064e3b' }}>
-              {currentSectionMeta.label.toLowerCase()}
-            </span>
-          </div>
-        ) : null}
+      {/* editorViewport — single container for ALL section content (canvas and non-canvas).
+          Everything that isn't the navbar or the sidebar renders inside this div. */}
+      <div
+        id="editor-viewport"
+        data-layout="editorViewport"
+        style={{
+          position: 'relative',
+          minWidth: 0,
+          height: '100%',
+          minHeight: 0,
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        {isCanvasSection ? (
+          <>
+            {renderActiveSection()}
+            {editorNotice && activeSection !== 'art' && (
+              <div style={{
+                position: 'absolute',
+                top: 12,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                ...panelStyle,
+                background: 'rgba(255,247,237,0.94)',
+                border: '1px solid rgba(249,115,22,0.18)',
+                zIndex: 100,
+                maxWidth: '60%',
+              }}>
+                <p style={{ ...sectionTitleStyle, marginBottom: '0.25rem', color: '#c2410c' }}>Notice</p>
+                <p style={{ margin: 0, color: '#9a3412' }}>{editorNotice}</p>
+              </div>
+            )}
+          </>
+        ) : (
+          <div style={{
+            display: 'grid',
+            gridTemplateRows: 'auto auto minmax(0, 1fr)',
+            gap: '0.85rem',
+            padding: '0.75rem 2.5rem 1rem 2.5rem',
+            height: '100%',
+            minHeight: 0,
+            overflow: 'hidden',
+          }}>
+            <div style={{ padding: '0.2rem 0.15rem 0 0.15rem', color: '#0f766e', fontSize: '0.84rem', display: 'flex', gap: '0.7rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <span style={{ fontWeight: 700, color: '#064e3b' }}>
+                {currentSectionMeta.label.toLowerCase()}
+              </span>
+            </div>
 
-        {editorNotice && activeSection !== 'art' && (
-          <div style={{ ...panelStyle, background: 'rgba(255,247,237,0.94)', border: '1px solid rgba(249,115,22,0.18)' }}>
-            <p style={{ ...sectionTitleStyle, marginBottom: '0.25rem', color: '#c2410c' }}>Notice</p>
-            <p style={{ margin: 0, color: '#9a3412' }}>{editorNotice}</p>
+            {editorNotice && (
+              <div style={{ ...panelStyle, background: 'rgba(255,247,237,0.94)', border: '1px solid rgba(249,115,22,0.18)' }}>
+                <p style={{ ...sectionTitleStyle, marginBottom: '0.25rem', color: '#c2410c' }}>Notice</p>
+                <p style={{ margin: 0, color: '#9a3412' }}>{editorNotice}</p>
+              </div>
+            )}
+
+            {renderActiveSection()}
           </div>
         )}
-
-        {renderActiveSection()}
-      </section>
+      </div>
     </div>
   );
 };

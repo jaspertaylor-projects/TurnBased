@@ -22,12 +22,20 @@ interface UndoRedoResult<T> {
 
 export function useUndoRedo<T>(initialValue: T): UndoRedoResult<T> {
   const [value, setValueRaw] = useState<T>(initialValue);
+  const [availability, setAvailability] = useState({ canUndo: false, canRedo: false });
   const undoStack = useRef<T[]>([]);
   const redoStack = useRef<T[]>([]);
 
   // Coalescing state: tracks the "before" snapshot for a burst of rapid sets.
   const burstSnapshot = useRef<T | null>(null);
   const burstTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const syncAvailability = useCallback(() => {
+    setAvailability({
+      canUndo: undoStack.current.length > 0 || burstSnapshot.current !== null,
+      canRedo: redoStack.current.length > 0,
+    });
+  }, []);
 
   const flushBurst = useCallback(() => {
     if (burstSnapshot.current !== null) {
@@ -38,17 +46,16 @@ export function useUndoRedo<T>(initialValue: T): UndoRedoResult<T> {
       clearTimeout(burstTimer.current);
       burstTimer.current = null;
     }
-  }, []);
+    syncAvailability();
+  }, [syncAvailability]);
 
   const set = useCallback((next: T) => {
-    setValueRaw((prev) => {
-      // First call in a burst: save the "before" snapshot
-      if (burstSnapshot.current === null) {
-        burstSnapshot.current = prev;
-      }
-      redoStack.current = [];
-      return next;
-    });
+    // First call in a burst: save the "before" snapshot
+    if (burstSnapshot.current === null) {
+      burstSnapshot.current = value;
+    }
+    redoStack.current = [];
+    setValueRaw(next);
 
     // Timer management must stay outside the state updater to avoid
     // side-effects that React StrictMode may double-invoke.
@@ -56,32 +63,37 @@ export function useUndoRedo<T>(initialValue: T): UndoRedoResult<T> {
       clearTimeout(burstTimer.current);
     }
     burstTimer.current = setTimeout(flushBurst, COALESCE_MS);
-  }, [flushBurst]);
+    syncAvailability();
+  }, [flushBurst, syncAvailability, value]);
 
   const undo = useCallback(() => {
     // If there's an in-flight burst, flush it first so we have something to undo
     flushBurst();
 
-    setValueRaw((prev) => {
-      if (undoStack.current.length === 0) return prev;
-      const previous = undoStack.current[undoStack.current.length - 1];
-      undoStack.current = undoStack.current.slice(0, -1);
-      redoStack.current = [...redoStack.current, prev];
-      return previous;
-    });
-  }, [flushBurst]);
+    if (undoStack.current.length === 0) {
+      return;
+    }
+
+    const previous = undoStack.current[undoStack.current.length - 1];
+    undoStack.current = undoStack.current.slice(0, -1);
+    redoStack.current = [...redoStack.current, value];
+    setValueRaw(previous);
+    syncAvailability();
+  }, [flushBurst, syncAvailability, value]);
 
   const redo = useCallback(() => {
     flushBurst();
 
-    setValueRaw((prev) => {
-      if (redoStack.current.length === 0) return prev;
-      const next = redoStack.current[redoStack.current.length - 1];
-      redoStack.current = redoStack.current.slice(0, -1);
-      undoStack.current = [...undoStack.current, prev];
-      return next;
-    });
-  }, [flushBurst]);
+    if (redoStack.current.length === 0) {
+      return;
+    }
+
+    const next = redoStack.current[redoStack.current.length - 1];
+    redoStack.current = redoStack.current.slice(0, -1);
+    undoStack.current = [...undoStack.current, value];
+    setValueRaw(next);
+    syncAvailability();
+  }, [flushBurst, syncAvailability, value]);
 
   const reset = useCallback((next: T) => {
     if (burstTimer.current !== null) {
@@ -92,12 +104,10 @@ export function useUndoRedo<T>(initialValue: T): UndoRedoResult<T> {
     undoStack.current = [];
     redoStack.current = [];
     setValueRaw(next);
+    setAvailability({ canUndo: false, canRedo: false });
   }, []);
 
-  const canUndo = undoStack.current.length > 0 || burstSnapshot.current !== null;
-  const canRedo = redoStack.current.length > 0;
-
-  return { value, set, undo, redo, canUndo, canRedo, reset };
+  return { value, set, undo, redo, canUndo: availability.canUndo, canRedo: availability.canRedo, reset };
 }
 
 export function useUndoRedoKeyboard(undo: () => void, redo: () => void) {

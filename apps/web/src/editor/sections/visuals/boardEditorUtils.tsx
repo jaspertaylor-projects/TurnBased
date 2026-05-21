@@ -1,14 +1,18 @@
-import type { MouseEvent as ReactMouseEvent } from 'react';
 import {
   getBuiltInComponentManifest,
+  getGridCoordinateKey,
 } from '@turnbased/engine-components';
 import type {
   BoardComponentPresetFamily,
   BuiltInComponentType,
+  ComponentInstanceModel,
+  GridCellCoordinate,
 } from '@turnbased/engine-components';
 
 import { inputStyle } from '../../styles';
 import type { EditorProject } from '../../types';
+
+type GridComponentType = 'hex-grid' | 'square-grid' | 'checkerboard-grid';
 
 export function getComponentLabel(project: EditorProject, instanceId: string): string {
   const instance = project.instances[instanceId];
@@ -18,6 +22,72 @@ export function getComponentLabel(project: EditorProject, instanceId: string): s
 
   const manifest = getBuiltInComponentManifest(instance.componentType as BuiltInComponentType);
   return String(instance.properties.label ?? instance.displayName ?? manifest.displayName);
+}
+
+function getResolvedGridCellPrefix(kind: GridComponentType, prefix?: string): string {
+  const trimmedPrefix = prefix?.trim();
+  if (trimmedPrefix) {
+    if (kind === 'hex-grid' && trimmedPrefix.toLowerCase() === 'hex') {
+      return 'Hex Cell';
+    }
+    return trimmedPrefix;
+  }
+
+  return kind === 'hex-grid' ? 'Hex Cell' : 'Cell';
+}
+
+export function getGridCellDisplayLabel(
+  kind: GridComponentType,
+  coordinate: GridCellCoordinate,
+  prefix?: string,
+): string {
+  const resolvedPrefix = getResolvedGridCellPrefix(kind, prefix);
+  return `${resolvedPrefix} ${coordinate.x},${coordinate.y}`;
+}
+
+export function getGridCellSelectionLabel(
+  project: EditorProject,
+  gridInstance: ComponentInstanceModel,
+  coordinate: GridCellCoordinate,
+): string {
+  const resolvedDefaultLabel = getGridCellDisplayLabel(
+    gridInstance.componentType as GridComponentType,
+    coordinate,
+    typeof gridInstance.properties.cellLabelPrefix === 'string'
+      ? gridInstance.properties.cellLabelPrefix
+      : undefined,
+  );
+  const coordinateKey = getGridCoordinateKey(coordinate);
+  const matchingChild = gridInstance.children
+    .map(String)
+    .map((childId) => project.instances[childId])
+    .find((child) => {
+      if (!child || child.componentType !== 'space') {
+        return false;
+      }
+
+      return getGridCoordinateKey({
+        x: typeof child.placement?.coordinates?.x === 'number' ? Math.trunc(child.placement.coordinates.x) : 0,
+        y: typeof child.placement?.coordinates?.y === 'number' ? Math.trunc(child.placement.coordinates.y) : 0,
+      }) === coordinateKey;
+    });
+
+  if (!matchingChild) {
+    return resolvedDefaultLabel;
+  }
+
+  const storedLabel = String(matchingChild.properties.label ?? matchingChild.displayName ?? '').trim();
+  if (!storedLabel) {
+    return resolvedDefaultLabel;
+  }
+
+  const legacyGeneratedLabel = `${typeof gridInstance.properties.cellLabelPrefix === 'string' && gridInstance.properties.cellLabelPrefix.trim().length > 0
+    ? gridInstance.properties.cellLabelPrefix.trim()
+    : gridInstance.componentType === 'hex-grid'
+      ? 'Hex'
+      : 'Cell'} ${coordinate.x},${coordinate.y}`;
+
+  return storedLabel === legacyGeneratedLabel ? resolvedDefaultLabel : storedLabel;
 }
 
 export function renderImageAreaContent(properties: Record<string, unknown>) {
@@ -48,7 +118,7 @@ export function renderImageAreaContent(properties: Record<string, unknown>) {
 export type BoardInteractionState =
   | null
   | {
-    kind: 'move' | 'resize';
+    kind: 'move' | 'resize' | 'rotate';
     instanceId: string;
     pointerX: number;
     pointerY: number;
@@ -63,19 +133,60 @@ export type BoardInteractionState =
       top: boolean;
       bottom: boolean;
     };
+    /** Sibling items in the same parent, used for PowerPoint-style
+     *  alignment snapping while dragging. Coordinates are in the parent's
+     *  local board-unit space. */
+    siblings?: readonly {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+    }[];
+    /** Parent instance id — used to place alignment guide overlays in
+     *  screen space during a drag. */
+    parentId?: string | null;
+    /** Centre of the item in screen pixels — used for angle calculation
+     *  during rotate interactions. */
+    rotateCenterScreenX?: number;
+    rotateCenterScreenY?: number;
+    /** The angle (degrees) at the moment the rotate drag started. */
+    startAngleDeg?: number;
+    /** The item's rotation (degrees) when the rotate drag started. */
+    startRotation?: number;
   };
 
-export function getResizeEdgesForPointer(event: ReactMouseEvent<HTMLDivElement>) {
-  const rect = event.currentTarget.getBoundingClientRect();
-  const inset = 12;
-  const localX = event.clientX - rect.left;
-  const localY = event.clientY - rect.top;
+/** An active alignment guide to visualize while dragging. Coordinates are
+ *  parent-local board units; the renderer converts to screen px. */
+export type AlignmentGuide =
+  | { axis: 'x'; at: number; from: number; to: number }
+  | { axis: 'y'; at: number; from: number; to: number };
+
+export function getResizeEdgesForRect(
+  clientX: number,
+  clientY: number,
+  rect: Pick<DOMRect, 'left' | 'top' | 'width' | 'height'>,
+) {
+  return getResizeEdgesForBox(
+    clientX - rect.left,
+    clientY - rect.top,
+    rect.width,
+    rect.height,
+  );
+}
+
+export function getResizeEdgesForBox(
+  localX: number,
+  localY: number,
+  width: number,
+  height: number,
+) {
+  const inset = Math.max(8, Math.min(16, Math.min(width, height) * 0.16));
 
   return {
     left: localX <= inset,
-    right: localX >= rect.width - inset,
+    right: localX >= width - inset,
     top: localY <= inset,
-    bottom: localY >= rect.height - inset,
+    bottom: localY >= height - inset,
   };
 }
 
@@ -116,10 +227,6 @@ export function getPresetFamily(componentType: BuiltInComponentType): BoardCompo
     return 'card';
   }
 
-  if (componentType === 'network') {
-    return 'network';
-  }
-
   if (componentType === 'hex-grid' || componentType === 'square-grid' || componentType === 'checkerboard-grid') {
     return 'grid';
   }
@@ -137,14 +244,14 @@ export const compactInputStyle = {
   fontSize: '0.86rem',
 };
 
-export const BOARD_PRESET_FAMILY_ORDER: BoardComponentPresetFamily[] = ['space', 'track', 'grid', 'card', 'network', 'text', 'image'];
+export const BOARD_PRESET_FAMILY_ORDER: BoardComponentPresetFamily[] = ['space', 'track', 'grid', 'card', 'text', 'image'];
 
 export const BOARD_PRESET_ICON_KEYS: Record<BoardComponentPresetFamily, string> = {
+  network: 'network',
   space: 'space',
   track: 'track',
   grid: 'grid',
   card: 'card',
-  network: 'network',
   text: 'text-box',
   image: 'image-area',
 };

@@ -18,14 +18,26 @@ export const collectionManifests: Pick<Record<BuiltInComponentType, ComponentMan
     propertyDefinitions: {
       label: { kind: 'string', label: 'Label' },
       maxCards: { kind: 'number', label: 'Capacity' },
+      physicalWidthMm: { kind: 'number', label: 'Card Width (mm)', description: 'Physical card width in millimeters.' },
+      physicalHeightMm: { kind: 'number', label: 'Card Height (mm)', description: 'Physical card height in millimeters.' },
+      catalogSlug: { kind: 'string', label: 'Catalog Product', description: 'Supplier catalog product slug.' },
+      catalogVariantId: { kind: 'string', label: 'Catalog Variant', description: 'Supplier catalog variant ID.' },
     },
     propertiesSchema: z.object({
       label: z.string().default('Deck of Cards'),
       maxCards: countSchema,
+      physicalWidthMm: z.number().positive().nullable().default(null),
+      physicalHeightMm: z.number().positive().nullable().default(null),
+      catalogSlug: z.string().default(''),
+      catalogVariantId: z.string().default(''),
     }),
     defaultProperties: {
       label: 'Deck of Cards',
       maxCards: null,
+      physicalWidthMm: null,
+      physicalHeightMm: null,
+      catalogSlug: '',
+      catalogVariantId: '',
     },
     renderHints: {
       surface: 'collection',

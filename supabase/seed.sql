@@ -1,0 +1,2 @@
+-- Local seed data goes here.
+-- This file exists because supabase/config.toml runs it during `supabase db reset`.

@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { MouseEvent as ReactMouseEvent } from 'react';
-import { Trash2 } from 'lucide-react';
+import { ArrowRightLeft } from 'lucide-react';
 import {
-  BOARD_BORDER_STYLE_OPTIONS,
   getBuiltInComponentManifest,
   getGridCoordinateKey,
   listBoardComponentPresets,
@@ -19,130 +17,50 @@ import type {
   ComponentInstanceModel,
   GridCellCoordinate,
 } from '@turnbased/engine-components';
-import { KonvaBoardSurface, GameSurfacePopup, BoardGrid } from '@turnbased/engine-ui';
+import { KonvaBoardSurface, resolveBoardGridLayout } from '@turnbased/engine-ui';
 import { renderComponentIcon } from '../componentMeta';
-import { InspectorAccordion, InspectorAppearanceControls } from '../components/InspectorControls';
-import { FONT_FAMILY_MAP, TextBoxContent, resolveTextBoxProperties } from '../components/TextBoxContent';
 import { listProjectPaletteOptions, resolveProjectPaletteColorValue } from '../projectPalette';
 import {
   BOARD_SURFACE_HEIGHT,
   BOARD_SURFACE_WIDTH,
   clampItemFrame,
   computeCanonicalGeometries,
-  computeZoomRect,
-  defaultBoardItemFrame,
   getBoardGridCells,
-  getGridCellAppearance,
   getResolvedBoardItemFrame,
   getResolvedChildItemFrame,
   isBoardGridComponentType,
-  isLeafComponentType,
   isMovableComponentType,
-  resizeBoardItemFrame,
-  scaleDefaultFrame,
 } from '../boardLayout';
-import type { ZoomRect } from '../boardLayout';
-import { mutedTextStyle, panelStyle, sectionTitleStyle } from '../styles';
 import type { EditorProject } from '../types';
 
 import {
-  boardBorderWidthOptions,
-  compactInputStyle,
   BOARD_PRESET_FAMILY_ORDER,
-  BOARD_PRESET_ICON_KEYS,
   getComponentLabel,
-  getResizeCursor,
-  getResizeEdgesForPointer,
-  hasResizeEdge,
-  renderImageAreaContent,
 } from './visuals/boardEditorUtils';
-import type { BoardInteractionState } from './visuals/boardEditorUtils';
-import { BoardItemInspector } from './visuals/BoardItemInspector';
-import { TopLevelInspector } from './visuals/TopLevelInspector';
-
-
-function InlineTextBoxEditor({
-  project,
-  properties,
-  onSave,
-  onBlur,
-}: {
-  project: EditorProject;
-  properties: Record<string, unknown>;
-  onSave: (html: string) => void;
-  onBlur: (html: string) => void;
-}) {
-  const editorRef = useRef<HTMLDivElement | null>(null);
-  const resolved = resolveTextBoxProperties(properties);
-  const resolvedColor = resolveProjectPaletteColorValue(project.settings.colorPalette, resolved.textColor) ?? resolved.textColor;
-
-  useEffect(() => {
-    const el = editorRef.current;
-    if (!el) return;
-    el.innerHTML = resolved.contentHtml;
-    // Place cursor at end
-    const range = document.createRange();
-    range.selectNodeContents(el);
-    range.collapse(false);
-    const sel = window.getSelection();
-    sel?.removeAllRanges();
-    sel?.addRange(range);
-    el.focus();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  return (
-    <div
-      ref={editorRef}
-      contentEditable
-      suppressContentEditableWarning
-      onBlur={() => onBlur(editorRef.current?.innerHTML ?? '')}
-      onKeyDown={(e) => {
-        // Escape to commit and exit
-        if (e.key === 'Escape') {
-          e.preventDefault();
-          e.stopPropagation();
-          onSave(editorRef.current?.innerHTML ?? '');
-        }
-        // Prevent move/delete shortcuts from bubbling to the board
-        e.stopPropagation();
-      }}
-      onMouseDown={(e) => e.stopPropagation()}
-      onClick={(e) => e.stopPropagation()}
-      style={{
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: resolved.verticalAlign === 'start'
-          ? 'flex-start'
-          : resolved.verticalAlign === 'end'
-            ? 'flex-end'
-            : 'center',
-        padding: `${resolved.paddingTop}px ${resolved.paddingRight}px ${resolved.paddingBottom}px ${resolved.paddingLeft}px`,
-        boxSizing: 'border-box',
-        color: resolvedColor,
-        fontFamily: FONT_FAMILY_MAP[resolved.fontFamily],
-        fontSize: `${resolved.fontSize}px`,
-        lineHeight: resolved.lineHeight,
-        textAlign: resolved.textAlign,
-        overflow: 'hidden',
-        overflowWrap: 'anywhere',
-        outline: 'none',
-        cursor: 'text',
-      }}
-    />
-  );
-}
+import { VisualInspectorColumn } from './visuals/VisualInspectorColumn';
+import {
+  getEffectiveScale,
+  computeCenteredPan,
+  computeActiveSurfaceFrames,
+  getSurfaceDimensions,
+  getSurfaceViewportRect,
+} from './visuals/boardViewportHelpers';
+import type { ViewportMetrics } from './visuals/boardViewportHelpers';
+import { useBoardInteraction } from './visuals/useBoardInteraction';
+import { applyPresetToInstance, getComponentDesignBounds, renderPieceShape } from './visuals/boardPresetHelpers';
+import { collectSurfaceItems } from './visuals/BoardCanvasContent';
+import type { BuildSurfaceItemParams } from './visuals/BoardCanvasContent';
 
 
 export function VisualsSection({
   project,
   selectedComponentId,
   selectedComponent,
-  onSelectComponent: _onSelectComponent,
   onAddComponent,
   onUpdateComponent,
   onRemoveComponent,
+  onDuplicateComponent,
+  onReturnToGallery,
   onAssignProjectPaletteColor,
 }: {
   project: EditorProject;
@@ -159,16 +77,28 @@ export function VisualsSection({
   ) => string | null;
   onUpdateComponent: (instanceId: string, updater: (instance: ComponentInstanceModel) => ComponentInstanceModel) => void;
   onRemoveComponent: (instanceId: string) => void;
+  onDuplicateComponent: (
+    instanceId: string,
+    options?: {
+      targetParentId?: string | null;
+      focus?: boolean;
+      frameOffset?: { x: number; y: number };
+    },
+  ) => string | null;
+  /** Navigate back to the component gallery (called by the header back button). */
+  onReturnToGallery?: () => void;
   onAssignProjectPaletteColor: (paletteId: string, value: string) => void;
 }) {
   const canvasRef = useRef<HTMLDivElement | null>(null);
-  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const [viewportMetrics, setViewportMetrics] = useState<ViewportMetrics | null>(null);
 
-  // Design area tracks the selected component. For boards, this activates the full
-  // board editor canvas. For other physical types, the design area shows a proportional
-  // bounds preview. No fallback to boardIds[0] — the design area always reflects what
-  // the creator has explicitly selected in the Component Editor outline.
-  const activeBoardId = selectedComponent?.componentType === 'board'
+  // Zoom/pan state — zoom=1 fits the entire board in the viewport.
+  const [zoom, setZoom] = useState(1);
+  const [panX, setPanX] = useState(0);
+  const [panY, setPanY] = useState(0);
+
+  // Design area tracks the selected component.
+  const activeBoardId = selectedComponent?.componentType === 'board' || selectedComponent?.componentType === 'tile'
     ? selectedComponentId
     : null;
   const activeBoard = activeBoardId ? project.instances[activeBoardId] ?? null : null;
@@ -181,29 +111,14 @@ export function VisualsSection({
     ? project.instances[selectedTopLevelComponentId] ?? null
     : null;
 
-  // drillPath: instance IDs of non-board components we have drilled into within the board.
-  // [] = at the board level; ['spaceA'] = editing inside spaceA; ['spaceA','spaceB'] = nested deeper.
-  const [drillPath, setDrillPath] = useState<string[]>([]);
-  const [selectedBoardChildId, setSelectedBoardChildId] = useState<string | null>(null);
-  const [selectedGridCellKey, setSelectedGridCellKey] = useState<string | null>(null);
-  const [boardInteraction, setBoardInteraction] = useState<BoardInteractionState>(null);
   const [selectedPresetIds, setSelectedPresetIds] = useState<Partial<Record<BoardComponentPresetFamily, string>>>({});
   const [showEditorGrid, setShowEditorGrid] = useState<boolean>(true);
-  const [editingTextBoxId, setEditingTextBoxId] = useState<string | null>(null);
+  const [showBleedArea, setShowBleedArea] = useState<boolean>(true);
+  const [showUnits, setShowUnits] = useState<boolean>(false);
 
-  // The surface we are currently editing. At drill depth 0 this is the board itself;
-  // deeper levels are nested non-leaf components.
-  const currentSurfaceId = activeBoardId
-    ? (drillPath.length > 0 ? drillPath[drillPath.length - 1] : activeBoardId)
-    : null;
+  // The editing surface is always the board itself.
+  const currentSurfaceId = activeBoardId;
   const currentSurface = currentSurfaceId ? (project.instances[currentSurfaceId] ?? null) : null;
-  const isAtBoardLevel = drillPath.length === 0;
-
-  // Coordinate system for the current editing surface (local space for data ops).
-  const currentSurfaceFrame = !isAtBoardLevel && currentSurface?.frame ? currentSurface.frame : null;
-  const currentSurfaceWidth = currentSurfaceFrame?.width ?? BOARD_SURFACE_WIDTH;
-  const currentSurfaceHeight = currentSurfaceFrame?.height ?? BOARD_SURFACE_HEIGHT;
-  // Non-movable children of the current surface (items shown on the canvas).
   const boardChildIds = currentSurface
     ? currentSurface.children.map(String).filter((childId) => {
       const child = project.instances[childId];
@@ -211,22 +126,137 @@ export function VisualsSection({
     })
     : [];
 
-  // Allow selecting any descendant of the current surface, not just direct children.
-  const resolvedSelectedBoardChildId = (() => {
-    if (!selectedBoardChildId || !currentSurfaceId) return null;
-    if (boardChildIds.includes(selectedBoardChildId)) return selectedBoardChildId;
-    // Walk up from the selected item to see if it's a descendant of the current surface.
-    let ancestorId: string | null = selectedBoardChildId;
-    while (ancestorId) {
-      const ancestorModel: any = project.instances[ancestorId as string];
-      if (!ancestorModel) return null;
-      if (String(ancestorModel.parentId) === currentSurfaceId || ancestorId === currentSurfaceId) {
-        return selectedBoardChildId;
-      }
-      ancestorId = ancestorModel.parentId ? String(ancestorModel.parentId) : null;
+  const boardAppearance = activeBoard
+    ? resolveBoardAppearanceProperties(activeBoard.properties)
+    : null;
+  const boardRenderWidth = activeBoard && typeof activeBoard.properties.physicalWidthMm === 'number'
+    ? Math.max(1, activeBoard.properties.physicalWidthMm as number)
+    : BOARD_SURFACE_WIDTH;
+  const boardRenderHeight = activeBoard && typeof activeBoard.properties.physicalHeightMm === 'number'
+    ? Math.max(1, activeBoard.properties.physicalHeightMm as number)
+    : BOARD_SURFACE_HEIGHT;
+
+  // Computed global CanonicalGeometry mapping.
+  const canonicalGeometries = useMemo(() => {
+    return activeBoardId ? computeCanonicalGeometries(project.instances, activeBoardId, boardRenderWidth, boardRenderHeight) : {};
+  }, [project.instances, activeBoardId, boardRenderWidth, boardRenderHeight]);
+
+  // All items in board mm space — maps each descendant to board-level rendered coordinates.
+  const activeSurfaceFrames = useMemo(
+    () => computeActiveSurfaceFrames(currentSurface, canonicalGeometries, project.instances),
+    [currentSurface, canonicalGeometries, project.instances],
+  );
+
+  // Effective scale for coordinate transforms.
+  const eff = useMemo(
+    () => getEffectiveScale(viewportMetrics, boardRenderWidth, boardRenderHeight, zoom, panX, panY),
+    [viewportMetrics, boardRenderWidth, boardRenderHeight, zoom, panX, panY],
+  );
+
+  // Board interaction hook — handles drag/move/resize, keyboard shortcuts, selection state.
+  const interaction = useBoardInteraction({
+    activeBoardId,
+    currentSurfaceId,
+    viewportMetrics,
+    boardRenderWidth,
+    boardRenderHeight,
+    canonicalGeometries,
+    activeSurfaceFrames,
+    eff,
+    instances: project.instances,
+    boardChildIds,
+    onUpdateComponent,
+    onRemoveComponent,
+    onDuplicateComponent,
+  });
+
+  const {
+    boardInteraction,
+    alignmentGuides,
+    viewportCursor,
+    snapAlignment,
+    setSnapAlignment,
+    selectedBoardChildId,
+    setSelectedBoardChildId,
+    resolvedSelectedBoardChildId,
+    selectedGridCellKey,
+    setSelectedGridCellKey,
+    editingTextBoxId,
+    setEditingTextBoxId,
+    clearBoardSelection,
+    handleBoardItemPointerDown,
+    handleBoardItemPointerMove,
+  } = interaction;
+
+  useEffect(() => {
+    if (!activeBoardId || boardInteraction) {
+      return;
     }
-    return null;
-  })();
+
+    const gridIds = Object.values(project.instances)
+      .filter((instance) => isBoardGridComponentType(instance.componentType))
+      .map((instance) => String(instance.instanceId))
+      .filter((instanceId) => {
+        let walkId: string | null = instanceId;
+        while (walkId) {
+          if (walkId === activeBoardId) {
+            return true;
+          }
+          const parentInstanceId: string | null = project.instances[walkId]?.parentId
+            ? String(project.instances[walkId]?.parentId)
+            : null;
+          walkId = parentInstanceId;
+        }
+        return false;
+      });
+
+    for (const gridId of gridIds) {
+      const instance = project.instances[gridId];
+      if (!instance || !instance.frame) {
+        continue;
+      }
+
+      const cells = getBoardGridCells(instance);
+      const metrics = resolveBoardGridLayout(
+        instance.componentType as 'hex-grid' | 'square-grid' | 'checkerboard-grid',
+        cells.map((cell) => ({ row: cell.y, column: cell.x })),
+      );
+      const parentId: string | null = instance.parentId ? String(instance.parentId) : null;
+      const parentSurfaceDimensions = getSurfaceDimensions(parentId, activeBoardId, canonicalGeometries, project.instances);
+      const clampW = parentSurfaceDimensions.width;
+      const clampH = parentSurfaceDimensions.height;
+      const parentRenderedWidth = !parentId || parentId === activeBoardId
+        ? boardRenderWidth
+        : canonicalGeometries[parentId]?.renderedWidth ?? parentSurfaceDimensions.width;
+      const parentRenderedHeight = !parentId || parentId === activeBoardId
+        ? boardRenderHeight
+        : canonicalGeometries[parentId]?.renderedHeight ?? parentSurfaceDimensions.height;
+      const scaleX = parentRenderedWidth / Math.max(parentSurfaceDimensions.width, 1);
+      const scaleY = parentRenderedHeight / Math.max(parentSurfaceDimensions.height, 1);
+      const cellWidth = Math.max(8, Math.round(instance.frame.width / Math.max(metrics.totalWidth, 1)));
+      const expectedWidth = Math.round(cellWidth * metrics.totalWidth);
+      const expectedHeight = Math.round(cellWidth * metrics.totalHeight * (scaleX / Math.max(scaleY, 0.0001)));
+
+      if (Math.abs(instance.frame.width - expectedWidth) <= 1 && Math.abs(instance.frame.height - expectedHeight) <= 1) {
+        continue;
+      }
+
+      onUpdateComponent(gridId, (current) => ({
+        ...current,
+        frame: (() => {
+          const baseFrame = (current.frame ?? instance.frame) as ComponentFrame;
+          return clampItemFrame({
+            ...baseFrame,
+            x: baseFrame.x,
+            y: baseFrame.y,
+            width: expectedWidth,
+            height: expectedHeight,
+          }, clampW, clampH);
+        })(),
+      }));
+    }
+  }, [activeBoardId, boardInteraction, canonicalGeometries, onUpdateComponent, project.instances]);
+
   const selectedBoardChild = resolvedSelectedBoardChildId
     ? project.instances[resolvedSelectedBoardChildId] ?? null
     : null;
@@ -237,7 +267,7 @@ export function VisualsSection({
     ? (selectedGridCells.find((cell) => getGridCoordinateKey(cell) === selectedGridCellKey) ?? null)
     : null;
 
-  const activeTargetManifest = useMemo(() => {
+  const activeTargetManifest = (() => {
     if (resolvedSelectedGridCell) {
       return getBuiltInComponentManifest('space');
     }
@@ -248,7 +278,7 @@ export function VisualsSection({
       return getBuiltInComponentManifest(currentSurface.componentType as BuiltInComponentType);
     }
     return null;
-  }, [resolvedSelectedGridCell, selectedBoardChild, currentSurface]);
+  })();
 
   const boardPresetGroups = useMemo(() => {
     if (!activeTargetManifest) {
@@ -280,47 +310,43 @@ export function VisualsSection({
   const resolvePaletteColor = (value: string | null | undefined) => (
     resolveProjectPaletteColorValue(project.settings.colorPalette, value) ?? value ?? null
   );
-  const boardAppearance = activeBoard
-    ? resolveBoardAppearanceProperties(activeBoard.properties)
-    : null;
-  const boardRenderWidth = activeBoard && typeof activeBoard.properties.physicalWidthMm === 'number'
-    ? Math.max(1, activeBoard.properties.physicalWidthMm as number)
-    : BOARD_SURFACE_WIDTH;
-  const boardRenderHeight = activeBoard && typeof activeBoard.properties.physicalHeightMm === 'number'
-    ? Math.max(1, activeBoard.properties.physicalHeightMm as number)
-    : BOARD_SURFACE_HEIGHT;
-  const boardRenderScaleX = boardRenderWidth / BOARD_SURFACE_WIDTH;
-  const boardRenderScaleY = boardRenderHeight / BOARD_SURFACE_HEIGHT;
 
-  // Computed global CanonicalGeometry mapping
-  const canonicalGeometries = useMemo(() => {
-    return activeBoardId ? computeCanonicalGeometries(project.instances, activeBoardId, boardRenderWidth, boardRenderHeight) : {};
-  }, [project.instances, activeBoardId, boardRenderWidth, boardRenderHeight]);
+  // Track viewport metrics from the canvas container.
+  useEffect(() => {
+    const node = canvasRef.current;
+    if (!node) return;
+    const update = () => {
+      const rect = node.getBoundingClientRect();
+      setViewportMetrics({ left: rect.left, top: rect.top, width: rect.width, height: rect.height });
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(node);
+    window.addEventListener('resize', update);
+    window.addEventListener('scroll', update, true);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', update);
+      window.removeEventListener('scroll', update, true);
+    };
+  }, [activeBoardId]);
 
-  // The zoom rect in board-level coordinates — the region we're "zoomed into".
-  const zoomRect: ZoomRect = useMemo(
-    () => computeZoomRect(drillPath, canonicalGeometries),
-    [drillPath, canonicalGeometries],
-  );
+  useEffect(() => {
+    if (canvasRef.current) {
+      canvasRef.current.style.cursor = viewportCursor;
+    }
+  }, [viewportCursor]);
 
-  const renderedZoomRect = {
-    x: zoomRect.x * boardRenderScaleX,
-    y: zoomRect.y * boardRenderScaleY,
-    width: zoomRect.width * boardRenderScaleX,
-    height: zoomRect.height * boardRenderScaleY,
-  };
-
-  function clearBoardSelection() {
-    setDrillPath([]);
-    setSelectedBoardChildId(null);
-    setSelectedGridCellKey(null);
-    setEditingTextBoxId(null);
-  }
-
-  function navigateToDrillLevel(level: number) {
-    setDrillPath((path) => path.slice(0, level));
-    setSelectedBoardChildId(null);
-    setSelectedGridCellKey(null);
+  function resetZoom() {
+    setZoom(1);
+    if (viewportMetrics && viewportMetrics.width > 0 && viewportMetrics.height > 0) {
+      const centered = computeCenteredPan(viewportMetrics, boardRenderWidth, boardRenderHeight);
+      setPanX(centered.panX);
+      setPanY(centered.panY);
+    } else {
+      setPanX(0);
+      setPanY(0);
+    }
   }
 
   useEffect(() => {
@@ -328,76 +354,33 @@ export function VisualsSection({
       return;
     }
 
-    clearBoardSelection();
+    const timeoutId = window.setTimeout(() => {
+      clearBoardSelection();
+      resetZoom();
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
   }, [selectedTopLevelComponentId]);
 
+  // Auto-fit the board to the canvas viewport once metrics are measured.
+  const didFitBoardRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!boardInteraction) {
-      return undefined;
-    }
-
-    const interaction = boardInteraction;
-
-    function handlePointerMove(event: globalThis.MouseEvent) {
-      const dx = (event.clientX - interaction.pointerX) * interaction.boardUnitsPerPixelX;
-      const dy = (event.clientY - interaction.pointerY) * interaction.boardUnitsPerPixelY;
-
-      onUpdateComponent(interaction.instanceId, (instance) => {
-        const nextFrame = interaction.kind === 'move'
-          ? {
-            ...interaction.startFrame,
-            x: Math.max(0, Math.min(interaction.startFrame.x + dx, interaction.surfaceWidth - interaction.startFrame.width)),
-            y: Math.max(0, Math.min(interaction.startFrame.y + dy, interaction.surfaceHeight - interaction.startFrame.height)),
-          }
-          : resizeBoardItemFrame(interaction.startFrame, dx, dy, interaction.resizeEdges ?? {
-            left: false,
-            right: true,
-            top: false,
-            bottom: true,
-          }, interaction.surfaceWidth, interaction.surfaceHeight);
-
-        return {
-          ...instance,
-          frame: clampItemFrame(nextFrame, interaction.surfaceWidth, interaction.surfaceHeight),
-        };
-      });
-    }
-
-    function handlePointerUp() {
-      setBoardInteraction(null);
-    }
-
-    window.addEventListener('mousemove', handlePointerMove);
-    window.addEventListener('mouseup', handlePointerUp);
-
+    if (!activeBoardId) return;
+    if (!viewportMetrics || viewportMetrics.width <= 0 || viewportMetrics.height <= 0) return;
+    if (didFitBoardRef.current === activeBoardId) return;
+    didFitBoardRef.current = activeBoardId;
+    let raf2: number | null = null;
+    const raf1 = window.requestAnimationFrame(() => {
+      raf2 = window.requestAnimationFrame(() => resetZoom());
+      didFitBoardRef.current = activeBoardId;
+    });
     return () => {
-      window.removeEventListener('mousemove', handlePointerMove);
-      window.removeEventListener('mouseup', handlePointerUp);
-    };
-  }, [boardInteraction, onUpdateComponent]);
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      const activeElement = document.activeElement as HTMLElement | null;
-      if (
-        activeElement?.tagName === 'INPUT'
-        || activeElement?.tagName === 'TEXTAREA'
-        || activeElement?.tagName === 'SELECT'
-        || activeElement?.isContentEditable
-      ) {
-        return;
-      }
-
-      if ((event.key === 'Delete' || event.key === 'Backspace') && resolvedSelectedBoardChildId) {
-        event.preventDefault();
-        onRemoveComponent(resolvedSelectedBoardChildId);
-        setSelectedBoardChildId(null);
+      window.cancelAnimationFrame(raf1);
+      if (raf2 !== null) {
+        window.cancelAnimationFrame(raf2);
       }
     };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [resolvedSelectedBoardChildId, onRemoveComponent]);
+  }, [activeBoardId, viewportMetrics, boardRenderWidth, boardRenderHeight]);
 
   function updateBoardChildFrame(instanceId: string, updater: (frame: ComponentFrame) => ComponentFrame) {
     const instance = project.instances[instanceId];
@@ -406,15 +389,10 @@ export function VisualsSection({
     }
 
     const childIndex = boardChildIds.indexOf(instanceId);
-    // For nested items, clamp to the parent's frame dimensions.
-    const parentInstance = instance.parentId ? project.instances[String(instance.parentId)] : null;
-    const isDirectChild = !parentInstance || String(instance.parentId) === currentSurfaceId;
-    const clampW = isDirectChild
-      ? currentSurfaceWidth
-      : (parentInstance.frame?.width ?? currentSurfaceWidth);
-    const clampH = isDirectChild
-      ? currentSurfaceHeight
-      : (parentInstance.frame?.height ?? currentSurfaceHeight);
+    const parentId = instance.parentId ? String(instance.parentId) : null;
+    const parentSurfaceDimensions = getSurfaceDimensions(parentId, activeBoardId, canonicalGeometries, project.instances);
+    const clampW = parentSurfaceDimensions.width;
+    const clampH = parentSurfaceDimensions.height;
     const currentFrame = getResolvedChildItemFrame(instance, Math.max(childIndex, 0), clampW, clampH);
     onUpdateComponent(instanceId, (current) => ({
       ...current,
@@ -439,57 +417,7 @@ export function VisualsSection({
     }));
   }
 
-  function applyPresetToInstance(
-    instance: ComponentInstanceModel,
-    preset: BoardComponentPreset,
-    childIndex: number,
-    options: {
-      x?: number;
-      y?: number;
-      preservePosition?: boolean;
-      targetSurfaceWidth?: number;
-      targetSurfaceHeight?: number;
-    } = {},
-  ): ComponentInstanceModel {
-    const sw = options.targetSurfaceWidth ?? currentSurfaceWidth;
-    const sh = options.targetSurfaceHeight ?? currentSurfaceHeight;
-    const baseFrame = getResolvedBoardItemFrame(instance, childIndex);
-    const nextManifest = getBuiltInComponentManifest(preset.componentType);
-    // Scale the default frame to fit proportionally within smaller-than-board surfaces.
-    const rawDefault = defaultBoardItemFrame(preset.componentType, childIndex);
-    const scaledDefault = scaleDefaultFrame(rawDefault, sw, sh);
-    const presetFrame = clampItemFrame({
-      ...scaledDefault,
-      ...preset.frame,
-      // Re-scale preset.frame dimensions if they were specified at board-scale
-      ...(preset.frame.width != null || preset.frame.height != null
-        ? scaleDefaultFrame({ ...rawDefault, ...preset.frame } as typeof rawDefault, sw, sh)
-        : {}),
-      x: options.preservePosition === false
-        ? (typeof options.x === 'number' ? options.x : scaledDefault.x)
-        : (typeof options.x === 'number' ? options.x : baseFrame.x),
-      y: options.preservePosition === false
-        ? (typeof options.y === 'number' ? options.y : scaledDefault.y)
-        : (typeof options.y === 'number' ? options.y : baseFrame.y),
-    }, sw, sh);
-
-    return {
-      ...instance,
-      componentType: preset.componentType,
-      category: nextManifest.category,
-      displayName: String(preset.properties.label ?? preset.label),
-      properties: {
-        ...instance.properties,
-        ...preset.properties,
-      },
-      frame: presetFrame,
-    };
-  }
-
   function addBoardItem(preset: BoardComponentPreset, x?: number, y?: number) {
-    // When a board child is selected, add inside it; otherwise add to the current surface.
-    const addingToChild = resolvedSelectedBoardChildId !== null
-      && resolvedSelectedBoardChildId !== currentSurfaceId;
     const targetParentId = resolvedSelectedBoardChildId || currentSurfaceId;
     if (!targetParentId) {
       return;
@@ -499,12 +427,9 @@ export function VisualsSection({
       return;
     }
 
-    // Use the target parent's own frame dimensions for clamping so the preset fits within it.
-    const targetFrame = addingToChild
-      ? getResolvedBoardItemFrame(targetParent, 0)
-      : null;
-    const targetSurfaceWidth = targetFrame?.width ?? currentSurfaceWidth;
-    const targetSurfaceHeight = targetFrame?.height ?? currentSurfaceHeight;
+    const targetSurfaceDimensions = getSurfaceDimensions(targetParentId, activeBoardId, canonicalGeometries, project.instances);
+    const targetSurfaceWidth = targetSurfaceDimensions.width;
+    const targetSurfaceHeight = targetSurfaceDimensions.height;
 
     const childIndex = targetParent.children.length;
 
@@ -523,244 +448,49 @@ export function VisualsSection({
     }
   }
 
-  // Build surface items recursively so all descendants are visible, with canonical absolute coordinates.
-  function buildSurfaceItem(
-    childId: string,
-    depth: number,
-  ) {
-    const child = project.instances[childId];
-    if (!child) return null;
-    const geom = canonicalGeometries[childId];
-    if (!geom) return null;
-
-    const isDirect = depth === 0;
-    const isSelected = childId === resolvedSelectedBoardChildId;
-
-    return {
-      id: childId,
-      label: getComponentLabel(project, childId),
-      typeLabel: '',
-      localWidth: geom.localWidth,
-      localHeight: geom.localHeight,
-      icon: renderComponentIcon(child.componentType, { size: 16, style: { color: '#064e3b' } }),
-      x: geom.renderedX,
-      y: geom.renderedY,
-      width: geom.renderedWidth,
-      height: geom.renderedHeight,
-      background: resolvePaletteColor(geom.background),
-      textureId: geom.textureId ?? null,
-      textureOpacity: geom.textureOpacity ?? 0.3,
-      borderColor: resolvePaletteColor(geom.borderColor),
-      borderWidth: geom.borderWidth,
-      borderRadius: typeof geom.borderRadius === 'number'
-        ? geom.borderRadius * Math.min(boardRenderScaleX, boardRenderScaleY)
-        : geom.borderRadius,
-      clipPath: geom.clipPath ?? null,
-      padding: child.componentType === 'text-box' ? 0 : undefined,
-      selected: isSelected,
-      onClick: () => {
-        if (selectedBoardChildId !== childId) {
-          setEditingTextBoxId(null);
-        }
-        setSelectedBoardChildId(childId);
-        if (!isBoardGridComponentType(child.componentType)) {
-          setSelectedGridCellKey(null);
-        }
-      },
-      onMouseDown: (event: ReactMouseEvent<HTMLDivElement>) => {
-          event.preventDefault();
-          event.stopPropagation();
-          setSelectedBoardChildId(childId);
-          if (!isBoardGridComponentType(child.componentType)) {
-            setSelectedGridCellKey(null);
-          }
-          const resizeEdges = getResizeEdgesForPointer(event);
-          const vpRect = viewportRef.current?.getBoundingClientRect();
-
-          const parentId = isDirect ? currentSurfaceId : String(child.parentId);
-          const parentGeom = parentId && canonicalGeometries[parentId] ? canonicalGeometries[parentId] : null;
-          const parentLocalW = parentGeom ? parentGeom.localWidth : BOARD_SURFACE_WIDTH;
-          const parentLocalH = parentGeom ? parentGeom.localHeight : BOARD_SURFACE_HEIGHT;
-          const parentAbsW = parentGeom ? parentGeom.absW : BOARD_SURFACE_WIDTH;
-          const parentAbsH = parentGeom ? parentGeom.absH : BOARD_SURFACE_HEIGHT;
-
-          const interactionClampW = parentLocalW;
-          const interactionClampH = parentLocalH;
-
-          // Screen size of the viewport (the zoomed region)
-          const vpW = vpRect?.width ?? 1;
-          const vpH = vpRect?.height ?? 1;
-
-          // Scale from absolute board logical units to screen pixels:
-          const scaleLogicalToScreenX = zoomRect.width > 0 ? vpW / zoomRect.width : 1;
-          const scaleLogicalToScreenY = zoomRect.height > 0 ? vpH / zoomRect.height : 1;
-
-          // The screen pixels occupied by the parent:
-          const parentScreenW = parentAbsW * scaleLogicalToScreenX;
-          const parentScreenH = parentAbsH * scaleLogicalToScreenY;
-
-          setBoardInteraction({
-            kind: hasResizeEdge(resizeEdges) ? 'resize' : 'move',
-            instanceId: childId,
-            pointerX: event.clientX,
-            pointerY: event.clientY,
-            boardUnitsPerPixelX: parentScreenW > 0 ? interactionClampW / parentScreenW : 1,
-            boardUnitsPerPixelY: parentScreenH > 0 ? interactionClampH / parentScreenH : 1,
-            surfaceWidth: interactionClampW,
-            surfaceHeight: interactionClampH,
-            startFrame: {
-              ...child.frame,
-              x: geom.localX,
-              y: geom.localY,
-              width: geom.localWidth,
-              height: geom.localHeight,
-              background: geom.background ?? 'transparent',
-              borderColor: geom.borderColor ?? 'transparent',
-              borderWidth: geom.borderWidth ?? 0,
-              borderRadius: geom.borderRadius ?? 0,
-            } as ComponentFrame,
-            resizeEdges,
-          });
-        },
-      onMouseMove: (event: ReactMouseEvent<HTMLDivElement>) => {
-          event.currentTarget.style.cursor = getResizeCursor(getResizeEdgesForPointer(event));
-        },
-      // Double-clicking a non-leaf, non-grid child drills into it.
-      // Double-clicking a text-box enters inline editing mode.
-      onDoubleClick: child.componentType === 'text-box'
-        ? () => { setEditingTextBoxId(childId); }
-        : !isLeafComponentType(child.componentType) && !isBoardGridComponentType(child.componentType)
-        ? () => {
-          // Build the full drill path from board root to this component's parent.
-          const newDrillPath: string[] = [];
-          let ancestorId = String(child.parentId);
-          while (ancestorId && ancestorId !== activeBoardId) {
-            newDrillPath.unshift(ancestorId);
-            const ancestor = project.instances[ancestorId];
-            ancestorId = ancestor?.parentId ? String(ancestor.parentId) : '';
-          }
-          newDrillPath.push(childId);
-          setDrillPath(newDrillPath);
-          setSelectedBoardChildId(null);
-          setSelectedGridCellKey(null);
-        }
-        : undefined,
-      showHeader: false,
-      content: child.componentType === 'text-box'
-        ? (editingTextBoxId === childId
-          ? (
-            <InlineTextBoxEditor
-              project={project}
-              properties={child.properties}
-              onSave={(html) => {
-                onUpdateComponent(childId, (current) => ({
-                  ...current,
-                  properties: { ...current.properties, contentHtml: html },
-                }));
-                setEditingTextBoxId(null);
-              }}
-              onBlur={(html) => {
-                onUpdateComponent(childId, (current) => ({
-                  ...current,
-                  properties: { ...current.properties, contentHtml: html },
-                }));
-                setEditingTextBoxId(null);
-              }}
-            />
-          )
-          : (
-            <TextBoxContent
-              project={project}
-              properties={child.properties}
-              emptyPlaceholder="Double-click to edit"
-            />
-          )
-        )
-        : child.componentType === 'image-area'
-        ? renderImageAreaContent(child.properties)
-        : child.componentType === 'card'
-        ? (
-          <div style={{ display: 'grid', gap: '0.45rem', color: '#064e3b' }}>
-            <strong style={{ fontSize: '0.92rem' }}>{String(child.properties.title ?? child.properties.label ?? 'Card')}</strong>
-            <span style={{ fontSize: '0.8rem', color: '#0f766e', lineHeight: 1.5 }}>
-              {String(child.properties.subtitle ?? '')}
-            </span>
-          </div>
-        )
-        : isBoardGridComponentType(child.componentType)
-        ? (() => {
-          const cellIds = child.children.map(String).filter((cellId) => project.instances[cellId]?.componentType === 'space');
-
-          return (
-            <BoardGrid
-              kind={child.componentType as 'hex-grid' | 'square-grid' | 'checkerboard-grid'}
-              editable={isDirect}
-              cells={cellIds.map((cellId, cellIndex) => {
-                const cell = project.instances[cellId];
-                const row = typeof cell?.placement?.coordinates?.y === 'number'
-                  ? Math.trunc(cell.placement.coordinates.y)
-                  : cellIndex;
-                const column = typeof cell?.placement?.coordinates?.x === 'number'
-                  ? Math.trunc(cell.placement.coordinates.x)
-                  : 0;
-                const cellKey = getGridCoordinateKey({ x: column, y: row });
-                const gridCellAppearance = getGridCellAppearance(child);
-
-                return {
-                  id: cellId,
-                  row,
-                  column,
-                  label: String(cell?.properties.label ?? cell?.displayName ?? `Cell ${cellIndex + 1}`),
-                  background: resolvePaletteColor(gridCellAppearance.background) ?? gridCellAppearance.background,
-                  textureId: gridCellAppearance.textureId,
-                  textureOpacity: gridCellAppearance.textureOpacity,
-                  borderColor: resolvePaletteColor(gridCellAppearance.borderColor) ?? (child.componentType === 'hex-grid' ? undefined : 'rgba(15,118,110,0.18)'),
-                  borderWidth: gridCellAppearance.borderWidth,
-                  borderRadius: gridCellAppearance.borderRadius,
-                  selected: isSelected && cellKey === (resolvedSelectedGridCell ? getGridCoordinateKey(resolvedSelectedGridCell) : null),
-                  onMouseDown: isDirect ? ((event: { stopPropagation: () => void }) => {
-                    event.stopPropagation();
-                  }) : undefined,
-                  onClick: isDirect ? (() => {
-                    setSelectedBoardChildId(childId);
-                    setSelectedGridCellKey((current) => (current === cellKey ? null : cellKey));
-                  }) : undefined,
-                };
-              })}
-            />
-          );
-        })()
-        : null,
-    };
-  }
-
-  function collectSurfaceItems(
-    childIds: string[],
-    depth: number,
-  ): any[] {
-    const items: any[] = [];
-    for (let i = 0; i < childIds.length; i++) {
-      const childId = childIds[i];
-      const item = buildSurfaceItem(childId, depth);
-      if (!item) continue;
-      items.push(item);
-
-      // Recurse into non-leaf, non-grid children to render their descendants too.
-      const child = project.instances[childId];
-      if (child && !isLeafComponentType(child.componentType) && !isBoardGridComponentType(child.componentType)) {
-        const grandchildIds = child.children.map(String).filter((gcId) => {
-          const gc = project.instances[gcId];
-          return gc && !isMovableComponentType(gc.componentType);
-        });
-        if (grandchildIds.length > 0) {
-          items.push(...collectSurfaceItems(grandchildIds, depth + 1));
-        }
-      }
+  function updateBoardAppearanceProperty(key: string, value: string | number) {
+    if (!activeBoardId) {
+      return;
     }
-    return items;
+
+    onUpdateComponent(activeBoardId, (instance) => ({
+      ...instance,
+      properties: {
+        ...instance.properties,
+        [key]: value,
+      },
+    }));
   }
 
-  const renderedBoardSurfaceItems = collectSurfaceItems(boardChildIds, 0);
+  // Build surface items for the canvas.
+  const surfaceItemParams: BuildSurfaceItemParams = {
+    project,
+    canonicalGeometries,
+    activeSurfaceFrames,
+    resolvedSelectedBoardChildId,
+    selectedBoardChildId,
+    editingTextBoxId,
+    resolvedSelectedGridCell,
+    selectedGridCells,
+    viewportMetrics,
+    boardRenderWidth,
+    boardRenderHeight,
+    zoom,
+    panX,
+    panY,
+    resolvePaletteColor,
+    setSelectedBoardChildId,
+    setSelectedGridCellKey,
+    setEditingTextBoxId,
+    setZoom,
+    setPanX,
+    setPanY,
+    onUpdateComponent,
+    handleBoardItemPointerDown,
+    handleBoardItemPointerMove,
+  };
+
+  const renderedBoardSurfaceItems = collectSurfaceItems(boardChildIds, 0, surfaceItemParams);
 
   const selectedBoardChildFrame = selectedBoardChild && resolvedSelectedBoardChildId
     ? getResolvedBoardItemFrame(selectedBoardChild, Math.max(boardChildIds.indexOf(resolvedSelectedBoardChildId), 0))
@@ -785,365 +515,228 @@ export function VisualsSection({
     ? resolvedSelectedBoardChildId
     : null;
 
-  function updateBoardAppearanceProperty(key: string, value: string | number) {
-    if (!activeBoardId) {
-      return;
+  // Build the ancestor path from the selected board child up to the board root.
+  const componentPath = (() => {
+    type PathEntry = { id: string; label: string; componentType: string };
+    const path: PathEntry[] = [];
+
+    if (activeBoard && activeBoardId) {
+      path.push({ id: activeBoardId, label: getComponentLabel(project, activeBoardId), componentType: activeBoard.componentType });
     }
 
-    onUpdateComponent(activeBoardId, (instance) => ({
-      ...instance,
-      properties: {
-        ...instance.properties,
-        [key]: value,
-      },
-    }));
-  }
-
-  // Renders the piece shape as an SVG so all shapes (including triangle, hexagon, meeple)
-  // get consistent border handling. Size is in px; the viewBox is always 100×100.
-  function renderPieceShape(
-    shape: string,
-    bgColor: string,
-    strokeColor: string,
-    strokeWidth: number,
-    sizePx: number,
-    innerContent?: React.ReactNode,
-  ) {
-    // Normalize stroke width to the 0-100 viewBox scale.
-    const sw = Math.max(0, strokeWidth) * (100 / sizePx);
-    const half = sw / 2;
-
-    let pathEl: React.ReactNode;
-    switch (shape) {
-      case 'square':
-        pathEl = (
-          <rect
-            x={half} y={half}
-            width={100 - sw} height={100 - sw}
-            rx={6} ry={6}
-            fill={bgColor} stroke={strokeColor} strokeWidth={sw}
-          />
-        );
-        break;
-      case 'triangle':
-        pathEl = (
-          <polygon
-            points={`50,${half + 2} ${100 - half},${100 - half} ${half},${100 - half}`}
-            fill={bgColor} stroke={strokeColor} strokeWidth={sw}
-          />
-        );
-        break;
-      case 'hexagon': {
-        const r = 50 - half - 1;
-        const cx = 50;
-        const cy = 50;
-        const pts = [0, 1, 2, 3, 4, 5].map((i) => {
-          const angle = (Math.PI / 180) * (60 * i - 30);
-          return `${cx + r * Math.cos(angle)},${cy + r * Math.sin(angle)}`;
-        }).join(' ');
-        pathEl = (
-          <polygon
-            points={pts}
-            fill={bgColor} stroke={strokeColor} strokeWidth={sw}
-          />
-        );
-        break;
+    if (resolvedSelectedBoardChildId && activeBoardId) {
+      const ancestors: PathEntry[] = [];
+      let walkId: string | null = resolvedSelectedBoardChildId;
+      while (walkId && walkId !== activeBoardId) {
+        const inst: ComponentInstanceModel | undefined = project.instances[walkId];
+        if (!inst) break;
+        ancestors.unshift({ id: walkId, label: getComponentLabel(project, walkId), componentType: inst.componentType });
+        walkId = inst.parentId ? String(inst.parentId) : null;
       }
-      case 'meeple':
-        // Stylized meeple silhouette within a 0–100 viewBox.
-        pathEl = (
-          <path
-            d="M50 4 C59 4 65 13 61 22 L73 27 C82 29 82 46 73 49 L64 49 L67 96 L33 96 L36 49 L27 49 C18 46 18 29 27 27 L39 22 C35 13 41 4 50 4 Z"
-            fill={bgColor} stroke={strokeColor} strokeWidth={sw}
-          />
-        );
-        break;
-      default: // circle
-        pathEl = (
-          <circle
-            cx={50} cy={50} r={50 - half - 1}
-            fill={bgColor} stroke={strokeColor} strokeWidth={sw}
-          />
-        );
+      path.push(...ancestors);
     }
 
-    return (
-      <div style={{ position: 'relative', width: sizePx, height: sizePx, flexShrink: 0 }}>
-        <svg
-          width={sizePx}
-          height={sizePx}
-          viewBox="0 0 100 100"
-          style={{ display: 'block' }}
-        >
-          {pathEl}
-        </svg>
-        {innerContent ? (
-          <div style={{
-            position: 'absolute',
-            inset: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            pointerEvents: 'none',
-            overflow: 'hidden',
-          }}>
-            {innerContent}
-          </div>
-        ) : null}
-      </div>
-    );
-  }
-
-  // Compute proportional bounds for the design area when a non-board component is selected.
-  // The outer container stays the same visual footprint; the component asset fills the
-  // correct h/w ratio inside that region so creators see accurate proportions.
-  function getComponentDesignBounds(componentType: string): { width: number; height: number; borderRadius: string } {
-    switch (componentType) {
-      case 'card':
-        // Standard poker card 2.5 : 3.5 in. Scale to fit comfortably in the design area.
-        return { width: 286, height: 400, borderRadius: '18px' };
-      case 'piece':
-        // Pieces use the SVG renderer; these bounds frame the outer container only.
-        return { width: 300, height: 300, borderRadius: '999px' };
-      case 'token':
-        return { width: 220, height: 220, borderRadius: '999px' };
-      default:
-        return { width: 380, height: 280, borderRadius: '18px' };
-    }
-  }
+    return path;
+  })();
 
   return (
-    <div style={{ display: 'grid', gap: '1rem', height: '100%', minHeight: 0, overflow: 'hidden' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 280px)', gap: '1rem', alignItems: 'stretch', height: '100%', minHeight: 0, overflow: 'hidden' }}>
-        <div style={{ ...panelStyle, display: 'grid', gridTemplateRows: 'auto minmax(0, 1fr)', gap: '0.85rem', minHeight: 0, overflow: 'hidden' }}>
-          <div style={{ display: 'grid', gap: '0.45rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <p style={{ ...sectionTitleStyle, marginBottom: 0, flex: 1 }}>Selected Design Area</p>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.38rem', cursor: 'pointer', fontSize: '0.76rem', color: '#064e3b', fontWeight: 600, flexShrink: 0 }}>
-                <input
-                  type="checkbox"
-                  checked={showEditorGrid}
-                  onChange={(event) => setShowEditorGrid(event.target.checked)}
-                  style={{ accentColor: '#0f766e' }}
-                />
-                Grid
-              </label>
+    // visualsSectionRoot — top bar + two-column grid (canvas + inspector)
+    <div data-layout="visualsSectionRoot" style={{ display: 'grid', gridTemplateRows: 'auto minmax(0, 1fr)', gap: 10, height: '100%', minHeight: 0, overflow: 'hidden', padding: '10px 16px 14px 14px', boxSizing: 'border-box' }}>
+      {/* componentEditorTopBar — label on left, view toggles on right */}
+      <div data-layout="componentEditorTopBar" style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 12,
+        padding: '6px 10px',
+        background: 'rgba(255,255,255,0.92)',
+        border: '1px solid rgba(16,185,129,0.14)',
+        boxShadow: '0 6px 18px rgba(6,78,59,0.06)',
+        minHeight: 36,
+      }}>
+        <div data-layout="componentEditorTopBarLeft" /* back-to-gallery button + heading */ style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {onReturnToGallery ? (
+            <button
+              type="button"
+              data-layout="backToGalleryButton"
+              /* returns to the intermediate component gallery view */
+              onClick={onReturnToGallery}
+              title="Back to all components"
+              aria-label="Back to all components"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                padding: '4px 9px 4px 7px',
+                borderRadius: 10,
+                border: '1px solid rgba(15,118,110,0.18)',
+                background: 'rgba(236,253,245,0.9)',
+                color: '#064e3b',
+                fontSize: '0.74rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(209,250,229,0.95)'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(236,253,245,0.9)'; }}
+            >
+              <span aria-hidden style={{ fontSize: '0.9rem', lineHeight: 1, marginTop: -1 }}>‹</span>
+              All components
+            </button>
+          ) : null}
+          <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#064e3b', letterSpacing: '0.02em' }}>Component Editor</div>
+        </div>
+        {/* viewToggleGroup — checkbox controls for grid, bleed, units, snap */}
+        <div data-layout="viewToggleGroup" style={{ display: 'flex', alignItems: 'center', gap: 14, fontSize: '0.72rem', color: '#0f766e', fontWeight: 600 }}>
+          {([
+            { id: 'grid', label: 'Show grid', value: showEditorGrid, onChange: setShowEditorGrid },
+            { id: 'bleed', label: 'Show bleed area', value: showBleedArea, onChange: setShowBleedArea },
+            { id: 'units', label: 'Show units', value: showUnits, onChange: setShowUnits },
+            { id: 'snap', label: 'Snap alignment', value: snapAlignment, onChange: setSnapAlignment },
+          ] as const).map((opt) => (
+            <label key={opt.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, cursor: 'pointer', userSelect: 'none' }}>
+              <input type="checkbox" checked={opt.value} onChange={(e) => opt.onChange(e.currentTarget.checked)} style={{ accentColor: '#10b981', cursor: 'pointer' }} />
+              {opt.label}
+            </label>
+          ))}
+          {/* orientationToggle — swap board width/height between landscape and portrait */}
+          {activeBoardId && boardRenderWidth !== boardRenderHeight ? (
+            <button
+              type="button"
+              data-layout="orientationToggle"
+              title={boardRenderWidth >= boardRenderHeight ? 'Switch to portrait' : 'Switch to landscape'}
+              onClick={() => {
+                if (!activeBoardId) return;
+                onUpdateComponent(activeBoardId, (instance) => ({
+                  ...instance,
+                  properties: {
+                    ...instance.properties,
+                    physicalWidthMm: instance.properties.physicalHeightMm,
+                    physicalHeightMm: instance.properties.physicalWidthMm,
+                  },
+                }));
+              }}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                marginLeft: 4, borderLeft: '1px solid rgba(15,118,110,0.15)', paddingLeft: 10,
+                height: 26, borderRadius: 6, paddingRight: 8,
+                border: '1px solid rgba(15,118,110,0.15)',
+                background: 'rgba(240,253,250,0.9)',
+                color: '#0f766e', cursor: 'pointer',
+                fontSize: '0.72rem', fontWeight: 600,
+              }}
+            >
+              <ArrowRightLeft size={13} />
+              {boardRenderWidth >= boardRenderHeight ? 'Portrait' : 'Landscape'}
+            </button>
+          ) : null}
+        </div>
+      </div>
+      {/* visualsSectionBody — canvas + inspector */}
+      <div data-layout="visualsSectionBody" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 340px)', gap: 14, minHeight: 0, overflow: 'hidden' }}>
+        {/* canvasColumn — breadcrumb path bar + canvas, fills left column */}
+        <div data-layout="canvasColumn" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, height: '100%', overflow: 'hidden', gap: 6 }}>
+
+          {/* componentPathBar — shows Board > Parent > ... > Selected; click to select ancestor */}
+          {activeBoard && (
+            <div data-layout="componentPathBar" style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 0,
+              padding: '6px 14px',
+              background: '#064e3b',
+              minHeight: 38,
+              flexShrink: 0,
+              overflow: 'hidden',
+              borderRadius: 14,
+            }}>
+              {componentPath.map((entry, i) => {
+                const isLast = i === componentPath.length - 1;
+                const isBoard = entry.componentType === 'board' || entry.componentType === 'tile';
+                return (
+                  /* pathSegment — single breadcrumb entry */
+                  <div data-layout="pathSegment" key={entry.id} style={{ display: 'contents' }}>
+                    {i > 0 && (
+                      <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12, margin: '0 6px', flexShrink: 0, userSelect: 'none' }}>/</span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (isBoard) {
+                          clearBoardSelection();
+                          resetZoom();
+                        } else {
+                          setSelectedBoardChildId(entry.id);
+                        }
+                      }}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 5,
+                        border: 'none',
+                        borderRadius: 5,
+                        padding: '4px 8px',
+                        cursor: 'pointer',
+                        fontSize: 12,
+                        fontWeight: isLast ? 700 : 500,
+                        color: isLast ? '#ffffff' : 'rgba(255,255,255,0.6)',
+                        background: isLast ? 'rgba(16,185,129,0.25)' : 'transparent',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        maxWidth: isLast ? 'none' : 140,
+                        flexShrink: isLast ? 0 : 1,
+                        minWidth: 0,
+                        transition: 'background 0.15s',
+                      }}
+                      onMouseEnter={(e) => { if (!isLast) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)'; }}
+                      onMouseLeave={(e) => { if (!isLast) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                    >
+                      {renderComponentIcon(entry.componentType, { size: 13, style: { color: 'currentColor', flexShrink: 0 } })}
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{entry.label}</span>
+                    </button>
+                  </div>
+                );
+              })}
             </div>
-            {(activeBoard || (selectedTopLevelComponent && selectedTopLevelComponentId)) ? (() => {
-              // Build the full nested path: root → board child → grid cell.
-              type PathSegment = {
-                id: string;
-                icon: React.ReactNode;
-                label: string;
-                typeLabel: string;
-                onClick: (() => void) | null;
-              };
-              const segments: PathSegment[] = [];
+          )}
 
-              if (activeBoard && activeBoardId) {
-                const hasDeeper = drillPath.length > 0 || selectedBoardChild || resolvedSelectedGridCell;
-                segments.push({
-                  id: 'root',
-                  icon: renderComponentIcon('board', { size: 13, style: { color: 'currentColor' } }),
-                  label: getComponentLabel(project, activeBoardId),
-                  typeLabel: 'Board',
-                  onClick: hasDeeper ? clearBoardSelection : null,
-                });
-                // Drill path levels
-                drillPath.forEach((drillId, di) => {
-                  const drillInst = project.instances[drillId];
-                  if (!drillInst) return;
-                  const drillM = getBuiltInComponentManifest(drillInst.componentType as BuiltInComponentType);
-                  const isLastDrill = di === drillPath.length - 1;
-                  segments.push({
-                    id: `drill-${di}`,
-                    icon: renderComponentIcon(drillInst.componentType, { size: 13, style: { color: 'currentColor' } }),
-                    label: getComponentLabel(project, drillId),
-                    typeLabel: drillM.displayName,
-                    onClick: (!isLastDrill || selectedBoardChild || resolvedSelectedGridCell)
-                      ? () => navigateToDrillLevel(di + 1)
-                      : null,
-                  });
-                });
-                if (selectedBoardChild && resolvedSelectedBoardChildId) {
-                  const cm = getBuiltInComponentManifest(selectedBoardChild.componentType as BuiltInComponentType);
-                  segments.push({
-                    id: 'child',
-                    icon: renderComponentIcon(selectedBoardChild.componentType, { size: 13, style: { color: 'currentColor' } }),
-                    label: getComponentLabel(project, resolvedSelectedBoardChildId),
-                    typeLabel: cm.displayName,
-                    onClick: resolvedSelectedGridCell ? () => setSelectedGridCellKey(null) : null,
-                  });
-                  if (resolvedSelectedGridCell) {
-                    segments.push({
-                      id: 'cell',
-                      icon: renderComponentIcon('space', { size: 13, style: { color: 'currentColor' } }),
-                      label: `Cell (${resolvedSelectedGridCell.x}, ${resolvedSelectedGridCell.y})`,
-                      typeLabel: 'Space',
-                      onClick: null,
-                    });
-                  }
-                }
-              } else if (selectedTopLevelComponent && selectedTopLevelComponentId) {
-                const m = getBuiltInComponentManifest(selectedTopLevelComponent.componentType as BuiltInComponentType);
-                segments.push({
-                  id: 'root',
-                  icon: renderComponentIcon(selectedTopLevelComponent.componentType, { size: 13, style: { color: 'currentColor' } }),
-                  label: getComponentLabel(project, selectedTopLevelComponentId),
-                  typeLabel: m.displayName,
-                  onClick: null,
-                });
-              }
-
-              return (
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  borderRadius: '14px',
-                  border: '1px solid rgba(15,118,110,0.12)',
-                  background: 'rgba(248,250,252,0.88)',
-                  padding: '0.3rem 0.55rem',
-                  minHeight: '48px',
-                  gap: 0,
-                  overflow: 'hidden',
-                }}>
-                  {segments.map((seg, i) => {
-                    const isLast = i === segments.length - 1;
-                    return (
-                      <div key={seg.id} style={{ display: 'contents' }}>
-                        {i > 0 && (
-                          <span style={{ color: '#94a3b8', fontSize: '0.95rem', margin: '0 0.18rem', flexShrink: 0, userSelect: 'none' }}>›</span>
-                        )}
-                        <div
-                          role={seg.onClick ? 'button' : undefined}
-                          tabIndex={seg.onClick ? 0 : undefined}
-                          onClick={seg.onClick ?? undefined}
-                          onKeyDown={seg.onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') seg.onClick!(); } : undefined}
-                          style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '0.06rem',
-                            padding: '0.2rem 0.38rem',
-                            borderRadius: '8px',
-                            cursor: seg.onClick ? 'pointer' : 'default',
-                            background: isLast ? 'rgba(16,185,129,0.1)' : 'transparent',
-                            color: isLast ? '#065f46' : '#0f766e',
-                            flexShrink: isLast ? 0 : 10,
-                            minWidth: 0,
-                            maxWidth: isLast ? 'unset' : '160px',
-                          }}
-                        >
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontWeight: isLast ? 800 : 600, fontSize: '0.84rem', minWidth: 0 }}>
-                            {seg.icon}
-                            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{seg.label}</span>
-                          </div>
-                          <div style={{ fontSize: '0.62rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: isLast ? 'rgba(6,95,70,0.6)' : 'rgba(15,118,110,0.5)', fontWeight: 700 }}>
-                            {seg.typeLabel}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  {!activeBoard && selectedTopLevelComponent ? (
-                    <span style={{ marginLeft: 'auto', fontSize: '0.66rem', color: '#94a3b8', paddingLeft: '0.5rem', flexShrink: 0 }}>
-                      proportional bounds
-                    </span>
-                  ) : null}
-                </div>
-              );
-            })() : null}
-          </div>
-          {/* Fixed-size oak tabletop working surface */}
-          <div style={{
-            position: 'relative',
-            background: 'linear-gradient(145deg, #8b5a2b 0%, #7a4a24 34%, #9c6a36 100%)',
-            borderRadius: '8px',
-            height: '600px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '24px',
-            overflow: 'hidden',
-            boxShadow: 'inset 0 0 0 1px rgba(67, 38, 17, 0.22), inset 0 18px 28px rgba(255,255,255,0.05), inset 0 -18px 32px rgba(40, 20, 9, 0.2)',
-          }}>
+          {/* canvasArea — fills remaining space below the path bar */}
+          <div data-layout="canvasArea" style={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden', borderRadius: 10 }}>
             {activeBoard ? (() => {
-              const surfaceClipPath = !isAtBoardLevel && currentSurfaceFrame?.clipPath
-                ? currentSurfaceFrame.clipPath
+              const surfaceAppearance = boardAppearance ? {
+                background: resolvePaletteColor(boardAppearance.surfaceColor) ?? boardAppearance.surfaceColor,
+                textureId: boardAppearance.surfaceTexture,
+                textureOpacity: boardAppearance.surfaceTextureOpacity,
+                borderColor: resolvePaletteColor(boardAppearance.surfaceBorderColor) ?? boardAppearance.surfaceBorderColor,
+                borderWidth: boardAppearance.surfaceBorderWidth,
+                borderStyle: boardAppearance.surfaceBorderStyle,
+              } : undefined;
+
+              const tileShape = activeBoard.componentType === 'tile' && typeof activeBoard.properties.shape === 'string'
+                ? activeBoard.properties.shape as 'square' | 'rectangle' | 'circle' | 'hexagon' | 'triangle'
                 : undefined;
 
-              // CSS-transform zoom: always render using the full board
-              // coordinate system. When drilled in, we scale and translate
-              // so the drilled region fills the viewport — a true zoom.
-              const zoomScale = boardRenderWidth / renderedZoomRect.width;
-              const boardAspect = boardRenderWidth / boardRenderHeight;
-
-              // Viewport clip container: matches the drilled region's aspect ratio.
-              // At board level, zoomRect = full board so this is just the board ratio.
-              const vpAspect = renderedZoomRect.width / renderedZoomRect.height;
-
-              // The chalkboard is 600px tall with 24px padding each side → 552px available.
-              // Fit the viewport into this budget, respecting the zoomed region's aspect ratio.
-              // We also cap the width at what the board-level view would occupy so we don't
-              // exceed the chalkboard's horizontal bounds.
-              const chalkH = 600 - 72;
-              const maxW = chalkH * boardAspect; // leave a small comfort margin inside the tabletop
-              const fitByHeight = chalkH * vpAspect;
-              const fitByWidth = maxW;
-              const vpW = Math.min(fitByHeight, fitByWidth);
-              const vpH = vpW / vpAspect;
-
               return (
-                <div
-                  ref={viewportRef}
-                  style={{
-                    position: 'relative',
-                    width: `${vpW}px`,
-                    height: `${vpH}px`,
-                    maxWidth: '100%',
-                    maxHeight: '100%',
-                    overflow: 'hidden',
-                    clipPath: surfaceClipPath,
-                    borderRadius: surfaceClipPath ? 0 : undefined,
-                  }}
-                >
-                  {/* Inner wrapper: full board surface, zoomed via CSS transform */}
-                  <div style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    aspectRatio: `${boardRenderWidth} / ${boardRenderHeight}`,
-                    transformOrigin: '0 0',
-                    transform: `scale(${zoomScale}) translate(${-(renderedZoomRect.x / boardRenderWidth) * 100}%, ${-(renderedZoomRect.y / boardRenderHeight) * 100}%)`,
-                  }}>
-                    <KonvaBoardSurface
-                      items={renderedBoardSurfaceItems}
-                      width={boardRenderWidth}
-                      height={boardRenderHeight}
-                      minHeight={0}
-                      surfaceAppearance={boardAppearance ? {
-                        background: resolvePaletteColor(boardAppearance.surfaceColor) ?? boardAppearance.surfaceColor,
-                        textureId: boardAppearance.surfaceTexture,
-                        textureOpacity: boardAppearance.surfaceTextureOpacity,
-                        borderColor: resolvePaletteColor(boardAppearance.surfaceBorderColor) ?? boardAppearance.surfaceBorderColor,
-                        borderWidth: boardAppearance.surfaceBorderWidth,
-                        borderStyle: boardAppearance.surfaceBorderStyle,
-                      } : undefined}
-                      showGrid={showEditorGrid}
-                      editable
-                      showItemHeader={false}
-                      showResizeHandle={false}
-                      surfaceRef={canvasRef}
-                      emptyState={(
-                        <div style={{ maxWidth: '320px', display: 'grid', gap: '0.55rem', color: '#0f766e' }}>
-                          <strong style={{ color: '#064e3b' }}>Add subcomponents from the inspector panel</strong>
-                          <span>Everything placed on this surface uses the same framing and styling rules as preview.</span>
-                        </div>
-                      )}
-                    />
-                  </div>
-                </div>
+                <KonvaBoardSurface
+                  items={renderedBoardSurfaceItems}
+                  boardWidth={boardRenderWidth}
+                  boardHeight={boardRenderHeight}
+                  zoom={zoom}
+                  panX={panX}
+                  panY={panY}
+                  onViewChange={(z, px, py) => { setZoom(z); setPanX(px); setPanY(py); }}
+                  surfaceAppearance={surfaceAppearance}
+                  surfaceBorderRadius={8}
+                  surfaceShape={tileShape}
+                  showGrid={showEditorGrid}
+                  showBleed={showBleedArea}
+                  showUnits={showUnits}
+                  editable
+                  showItemHeader={false}
+                  showResizeHandle={false}
+                  surfaceRef={canvasRef}
+                  onBackgroundClick={clearBoardSelection}
+                />
               );
             })()
              : selectedTopLevelComponent && selectedTopLevelComponentId ? (() => {
@@ -1180,7 +773,8 @@ export function VisualsSection({
               }
 
               return (
-                <div style={{
+                /* componentDesignBoundsPreview — proportional preview for non-board top-level components */
+                <div data-layout="componentDesignBoundsPreview" style={{
                   width: bounds.width,
                   height: bounds.height,
                   maxWidth: '100%',
@@ -1203,7 +797,8 @@ export function VisualsSection({
                 </div>
               );
             })() : (
-              <div style={{ display: 'grid', gap: '0.9rem', textAlign: 'center', color: '#94a3b8' }}>
+              /* emptyDesignAreaPrompt — shown when no component is selected */
+              <div data-layout="emptyDesignAreaPrompt" style={{ display: 'grid', gap: '0.9rem', textAlign: 'center', color: '#94a3b8' }}>
                 <div style={{ fontWeight: 800, fontSize: '1.08rem' }}>Select a component or add a board</div>
                 <p style={{ fontSize: '0.82rem', lineHeight: 1.5, maxWidth: '320px', margin: '0 auto' }}>Select a component from the outline to edit it here.</p>
                 <div>
@@ -1224,255 +819,84 @@ export function VisualsSection({
                 </div>
               </div>
             )}
-          </div>
-        </div>
+          </div>{/* /canvasArea */}
+        </div>{/* /canvasColumn */}
 
-        <div style={{ ...panelStyle, borderRadius: '0 0 20px 20px', display: 'grid', gridTemplateRows: 'auto minmax(0, 1fr)', minHeight: 0, overflow: 'hidden' }}>
-          <div style={{
-            margin: '-1rem -1rem 0 -1rem',
-            padding: '0.55rem 0.85rem',
-            background: 'linear-gradient(135deg, #064e3b 0%, #0f766e 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-          }}>
-            <span style={{ fontSize: '0.68rem', fontWeight: 900, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Selected</span>
-            {(() => {
-              const comp = selectedBoardChild ?? selectedTopLevelComponent;
-              const compId = resolvedSelectedBoardChildId ?? selectedTopLevelComponentId;
-              if (!comp || !compId) return null;
-              return (
-                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#ffffff', marginLeft: 'auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {getComponentLabel(project, compId)}
-                </span>
-              );
-            })()}
-            {resolvedSelectedBoardChildId ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedBoardChildId(null);
-                  onRemoveComponent(resolvedSelectedBoardChildId);
-                }}
-                aria-label="Delete component"
-                title="Delete component"
-                style={{
-                  flex: '0 0 auto',
-                  display: 'inline-grid',
-                  placeItems: 'center',
-                  width: '28px',
-                  height: '28px',
-                  borderRadius: '6px',
-                  border: '1px solid rgba(255,255,255,0.15)',
-                  background: 'rgba(255,255,255,0.1)',
-                  color: 'rgba(255,255,255,0.7)',
-                  cursor: 'pointer',
-                  marginLeft: resolvedSelectedBoardChildId === (resolvedSelectedBoardChildId ?? selectedTopLevelComponentId) ? '0' : 'auto',
-                }}
-              >
-                <Trash2 size={14} />
-              </button>
-            ) : null}
-          </div>
+        {/* alignmentGuidesOverlay — fixed-position SVG overlay drawn during
+            drag interactions. Guide coordinates are parent-local board units,
+            converted to page-absolute pixels via the parent's viewport rect. */}
+        {alignmentGuides.length > 0 && boardInteraction ? (() => {
+          const parentId = boardInteraction.parentId ?? null;
+          const parentRect = getSurfaceViewportRect(
+            parentId, activeBoardId, viewportMetrics,
+            boardRenderWidth, boardRenderHeight, activeSurfaceFrames, eff,
+          );
+          const parentDims = getSurfaceDimensions(parentId, activeBoardId, canonicalGeometries, project.instances);
+          if (!parentRect || !parentDims.width || !parentDims.height) return null;
+          const sx = parentRect.width / parentDims.width;
+          const sy = parentRect.height / parentDims.height;
+          return (
+            <svg
+              data-layout="alignmentGuidesOverlay"
+              style={{
+                position: 'fixed',
+                inset: 0,
+                width: '100vw',
+                height: '100vh',
+                pointerEvents: 'none',
+                zIndex: 9999,
+              }}
+            >
+              {alignmentGuides.map((g, i) => {
+                if (g.axis === 'x') {
+                  const x = parentRect.left + g.at * sx;
+                  const y1 = parentRect.top + g.from * sy;
+                  const y2 = parentRect.top + g.to * sy;
+                  return <line key={i} x1={x} y1={y1} x2={x} y2={y2} stroke="#ec4899" strokeWidth={1} strokeDasharray="3,3" />;
+                }
+                const y = parentRect.top + g.at * sy;
+                const x1 = parentRect.left + g.from * sx;
+                const x2 = parentRect.left + g.to * sx;
+                return <line key={i} x1={x1} y1={y} x2={x2} y2={y} stroke="#ec4899" strokeWidth={1} strokeDasharray="3,3" />;
+              })}
+            </svg>
+          );
+        })() : null}
 
-          <div style={{ minHeight: 0, overflowY: 'auto', overflowX: 'hidden', paddingRight: '0.2rem', display: 'grid', gap: '0.75rem', alignContent: 'start' }}>
-
-          {selectedBoardChild && resolvedSelectedBoardChildId ? (() => {
-            const selectedParent = selectedBoardChild.parentId ? project.instances[String(selectedBoardChild.parentId)] : null;
-            const selectedIsDirectChild = !selectedParent || String(selectedBoardChild.parentId) === currentSurfaceId;
-            const selectedParentW = selectedIsDirectChild ? currentSurfaceWidth : (selectedParent?.frame?.width ?? currentSurfaceWidth);
-            const selectedParentH = selectedIsDirectChild ? currentSurfaceHeight : (selectedParent?.frame?.height ?? currentSurfaceHeight);
-            return (
-              <BoardItemInspector
-                project={project}
-                selectedBoardChild={selectedBoardChild}
-                resolvedSelectedBoardChildId={resolvedSelectedBoardChildId}
-                currentSurfaceChildIds={boardChildIds}
-                boardPresetGroups={boardPresetGroups}
-                selectedPresetIds={selectedPresetIds}
-                resolvedSelectedGridCell={resolvedSelectedGridCell}
-                selectedGridCells={selectedGridCells}
-                showGridShapePopup={showGridShapePopup}
-                gridPopupComponentId={gridPopupComponentId}
-                gridAllNeighborOptions={gridAllNeighborOptions}
-                paletteOptions={paletteOptions}
-                onSetSelectedPresetIds={setSelectedPresetIds}
-                onSetSelectedGridCellKey={setSelectedGridCellKey}
-                onSetSelectedBoardChildId={setSelectedBoardChildId}
-                onRemoveComponent={onRemoveComponent}
-                onUpdateComponent={onUpdateComponent}
-                onAssignProjectPaletteColor={onAssignProjectPaletteColor}
-                applyPresetToInstance={(instance, preset, childIndex) => applyPresetToInstance(instance, preset, childIndex)}
-                updateBoardChildFrame={updateBoardChildFrame}
-                updateGridCells={updateGridCells}
-                parentSurfaceWidth={selectedParentW}
-                parentSurfaceHeight={selectedParentH}
-              />
-            );
-          })() : selectedTopLevelComponent && selectedTopLevelComponentId ? (
-            <TopLevelInspector
-              project={project}
-              selectedTopLevelComponent={selectedTopLevelComponent}
-              selectedTopLevelComponentId={selectedTopLevelComponentId}
-              boardAppearance={boardAppearance}
-              activeBoardId={activeBoardId}
-              paletteOptions={paletteOptions}
-              onUpdateComponent={onUpdateComponent}
-              onAssignProjectPaletteColor={onAssignProjectPaletteColor}
-              updateBoardAppearanceProperty={updateBoardAppearanceProperty}
-            />
-          ) : (
-            boardAppearance && activeBoardId ? (
-              <InspectorAppearanceControls
-                scopeLabel="Surface"
-                backgroundValue={boardAppearance.surfaceColor}
-                onBackgroundChange={(value) => updateBoardAppearanceProperty('surfaceColor', value)}
-                palette={paletteOptions}
-                onAssignPaletteColor={onAssignProjectPaletteColor}
-                texture={{
-                  value: boardAppearance.surfaceTexture,
-                  onChange: (value) => updateBoardAppearanceProperty('surfaceTexture', value),
-                  opacity: boardAppearance.surfaceTextureOpacity,
-                  onOpacityChange: (value) => updateBoardAppearanceProperty('surfaceTextureOpacity', value),
-                  previewBackground: boardAppearance.surfaceColor,
-                }}
-                border={{
-                  colorLabel: 'Border Color',
-                  colorValue: boardAppearance.surfaceBorderColor,
-                  onColorChange: (value) => updateBoardAppearanceProperty('surfaceBorderColor', value),
-                  controls: (
-                    <div style={{ display: 'grid', gap: '0.6rem' }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 112px', gap: '0.6rem' }}>
-                        <label style={{ display: 'grid', gap: '0.35rem', fontSize: '0.86rem', color: '#064e3b', fontWeight: 600 }}>
-                          Border Style
-                          <select
-                            value={boardAppearance.surfaceBorderStyle}
-                            onChange={(event) => updateBoardAppearanceProperty('surfaceBorderStyle', event.target.value)}
-                            style={compactInputStyle}
-                          >
-                            {BOARD_BORDER_STYLE_OPTIONS.map((option) => (
-                              <option key={option} value={option}>
-                                {option[0].toUpperCase() + option.slice(1)}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        <label style={{ display: 'grid', gap: '0.35rem', fontSize: '0.86rem', color: '#064e3b', fontWeight: 600 }}>
-                          Thickness
-                          <select
-                            value={String(boardAppearance.surfaceBorderWidth)}
-                            onChange={(event) => updateBoardAppearanceProperty('surfaceBorderWidth', Number(event.target.value))}
-                            style={compactInputStyle}
-                          >
-                            {boardBorderWidthOptions.map((option) => (
-                              <option key={option} value={option}>
-                                {option}px
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                      </div>
-                    </div>
-                  ),
-                }}
-              />
-            ) : (
-              <p style={mutedTextStyle}>Select a top-level component or board item to edit its properties.</p>
-            )
-          )}
-
-          {boardPresetGroups.length > 0 ? (
-            <InspectorAccordion title="Add Subcomponent" defaultOpen>
-              <div style={{ display: 'grid', gap: '0.35rem' }}>
-                {boardPresetGroups.map((group) => {
-                  const iconKey = BOARD_PRESET_ICON_KEYS[group.family];
-                  if (group.presets.length === 1) {
-                    const preset = group.presets[0];
-                    return (
-                      <button
-                        key={group.family}
-                        type="button"
-                        title={preset.description}
-                        onClick={() => addBoardItem(preset)}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.4rem',
-                          background: 'rgba(248,250,252,0.85)',
-                          border: '1px solid rgba(15,118,110,0.14)',
-                          borderRadius: '8px',
-                          padding: '0.4rem 0.55rem',
-                          color: '#0f766e',
-                          fontWeight: 600,
-                          fontSize: '0.78rem',
-                          cursor: 'pointer',
-                          width: '100%',
-                          textAlign: 'left',
-                        }}
-                      >
-                        {renderComponentIcon(iconKey, { size: 14, style: { color: 'currentColor', flexShrink: 0 } })}
-                        {group.familyLabel}
-                      </button>
-                    );
-                  }
-                  return (
-                    <div
-                      key={group.family}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.4rem',
-                        background: 'rgba(248,250,252,0.85)',
-                        border: '1px solid rgba(15,118,110,0.14)',
-                        borderRadius: '8px',
-                        padding: '0.4rem 0.55rem',
-                        color: '#0f766e',
-                        fontWeight: 600,
-                        fontSize: '0.78rem',
-                      }}
-                    >
-                      {renderComponentIcon(iconKey, { size: 14, style: { color: 'currentColor', flexShrink: 0 } })}
-                      <select
-                        value=""
-                        onChange={(event) => {
-                          const preset = group.presets.find((p) => p.id === event.target.value);
-                          if (preset) {
-                            addBoardItem(preset);
-                          }
-                        }}
-                        style={{
-                          flex: 1,
-                          minWidth: 0,
-                          background: 'none',
-                          border: 'none',
-                          outline: 'none',
-                          color: '#0f766e',
-                          fontWeight: 600,
-                          fontSize: '0.78rem',
-                          cursor: 'pointer',
-                          WebkitAppearance: 'none',
-                          appearance: 'none',
-                          padding: 0,
-                          backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%230f766e' opacity='0.5'/%3E%3C/svg%3E")`,
-                          backgroundRepeat: 'no-repeat',
-                          backgroundPosition: 'right 0 center',
-                          paddingRight: '14px',
-                        }}
-                      >
-                        <option value="" disabled>{group.familyLabel}</option>
-                        {group.presets.map((preset) => (
-                          <option key={preset.id} value={preset.id}>{preset.label}</option>
-                        ))}
-                      </select>
-                    </div>
-                  );
-                })}
-              </div>
-            </InspectorAccordion>
-          ) : null}
-          </div>
-        </div>
-      </div>
+        <VisualInspectorColumn
+          project={project}
+          activeBoardId={activeBoardId}
+          currentSurfaceId={currentSurfaceId}
+          boardRenderWidth={boardRenderWidth}
+          boardRenderHeight={boardRenderHeight}
+          boardAppearance={boardAppearance}
+          canonicalGeometries={canonicalGeometries}
+          boardChildIds={boardChildIds}
+          selectedBoardChild={selectedBoardChild}
+          resolvedSelectedBoardChildId={resolvedSelectedBoardChildId}
+          selectedTopLevelComponent={selectedTopLevelComponent}
+          selectedTopLevelComponentId={selectedTopLevelComponentId}
+          resolvedSelectedGridCell={resolvedSelectedGridCell}
+          selectedGridCells={selectedGridCells}
+          showGridShapePopup={showGridShapePopup}
+          gridPopupComponentId={gridPopupComponentId}
+          gridAllNeighborOptions={gridAllNeighborOptions}
+          boardPresetGroups={boardPresetGroups}
+          selectedPresetIds={selectedPresetIds}
+          paletteOptions={paletteOptions}
+          onSetSelectedPresetIds={setSelectedPresetIds}
+          onSetSelectedGridCellKey={setSelectedGridCellKey}
+          setSelectedBoardChildId={setSelectedBoardChildId}
+          onUpdateComponent={onUpdateComponent}
+          onRemoveComponent={onRemoveComponent}
+          onDuplicateComponent={onDuplicateComponent}
+          onAssignProjectPaletteColor={onAssignProjectPaletteColor}
+          updateBoardAppearanceProperty={updateBoardAppearanceProperty}
+          updateBoardChildFrame={updateBoardChildFrame}
+          updateGridCells={updateGridCells}
+          addBoardItem={addBoardItem}
+        />
+      </div>{/* /visualsSectionBody */}
     </div>
   );
 }
