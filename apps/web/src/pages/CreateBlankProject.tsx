@@ -278,17 +278,19 @@ export const CreateBlankProject = () => {
       >
         <div
           data-layout="newGameHero"
-          /* pinned header: title + intro paragraph */
-          style={{ padding: '1.5rem 1.5rem 0 1.5rem', flex: '0 0 auto' }}
+          /* pinned header: tinted background + bottom border so the scrollable
+             body below reads as a distinct region the user is working inside. */
+          style={{
+            flex: '0 0 auto',
+            padding: '1.4rem 1.5rem 1.1rem 1.5rem',
+            background: 'linear-gradient(180deg, rgba(236,253,245,0.9) 0%, rgba(220,252,231,0.7) 100%)',
+            borderBottom: '1px solid rgba(16,185,129,0.18)',
+          }}
         >
-          <p style={{ textTransform: 'uppercase', letterSpacing: '0.08em', color: '#0f766e', fontSize: '0.82rem', marginBottom: '0.45rem' }}>
+          <p style={{ textTransform: 'uppercase', letterSpacing: '0.08em', color: '#0f766e', fontSize: '0.82rem', marginBottom: '0.35rem' }}>
             New Game
           </p>
-          <h1 style={{ margin: '0 0 0.6rem 0' }}>Create a game</h1>
-          <p style={{ color: '#0f766e', lineHeight: 1.7, margin: 0 }}>
-            Give your game a name, pick a few themes and art styles that excite you, and we will open a fresh
-            workspace on the Rules tab.
-          </p>
+          <h1 style={{ margin: 0 }}>Create a game</h1>
         </div>
 
         <div
