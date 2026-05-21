@@ -327,6 +327,10 @@ export const Editor = () => {
                 [paletteId]: value,
               },
             })))}
+            onSavePalette={(palette) => commitProject(updateProjectSettings(currentProject, (settings) => ({
+              ...settings,
+              colorPalette: palette,
+            })))}
           />
         );
       case 'versions':
