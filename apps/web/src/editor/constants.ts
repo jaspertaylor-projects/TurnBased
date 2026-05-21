@@ -17,8 +17,8 @@ export const SECTION_OPTIONS: EditorSectionOption[] = [
   },
   {
     id: 'art',
-    label: 'Art Studio',
-    description: 'Manage theme, art styles, recurring visual assets, and first-class icon tokens.',
+    label: 'Art',
+    description: 'Palette, theme, art styles, recurring visual assets, and first-class icon tokens.',
   },
   {
     id: 'component_editor',

@@ -59,7 +59,7 @@ function SubPageShell({
             fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer',
             boxShadow: '0 2px 8px rgba(6,78,59,0.06)',
           }}>
-            <ArrowLeft size={14} /> Studio
+            <ArrowLeft size={14} /> Art
           </button>
           <div style={{ flex: 1 }} />
           {actions}
@@ -296,7 +296,7 @@ export function ArtSection({
           <span style={{
             fontSize: '1.1rem', fontWeight: 800, color: '#064e3b',
             letterSpacing: '-0.01em',
-          }}>Art Studio</span>
+          }}>Art</span>
         </div>
 
         <div style={{
@@ -411,24 +411,48 @@ export function ArtSection({
       <SubPageShell title="Palette" icon={<Palette size={22} />} onBack={() => setPage('home')}>
         <div
           data-layout="palettePanel"
-          /* card holding the project palette swatches; AI + human color choices read from these slots */
+          /* Card holding the project palette. Three regions per Rule 4:
+             pinned header (helper text), scrollable body (swatch grid),
+             pinned footer (legend). The footer stays visible while the
+             grid scrolls, so the user always has a small reminder of
+             how palette slots feed the rest of the app. */
           style={{
-            padding: '1rem',
             borderRadius: '18px',
             background: 'rgba(255,255,255,0.6)',
             backdropFilter: 'blur(8px)',
             border: '1px solid rgba(15,118,110,0.06)',
-            display: 'grid',
-            gap: '0.6rem',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
           }}
         >
-          <div style={{ color: '#0f766e', fontSize: '0.82rem' }}>
+          <div
+            data-layout="paletteHeader"
+            /* pinned helper copy at top */
+            style={{
+              padding: '0.9rem 1rem 0.75rem 1rem',
+              color: '#0f766e',
+              fontSize: '0.82rem',
+              borderBottom: '1px solid rgba(15,118,110,0.08)',
+              background: 'linear-gradient(180deg, rgba(236,253,245,0.7) 0%, rgba(255,255,255,0) 100%)',
+            }}
+          >
             AI and human color choices both pull from these slots — pick once here, reuse everywhere.
           </div>
+
           <div
             data-layout="paletteSwatchGrid"
-            /* 3-up grid of palette swatches */
-            style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '0.65rem' }}
+            /* 3-up grid of palette swatches; this is the only region that scrolls */
+            style={{
+              flex: '1 1 auto',
+              minHeight: 0,
+              overflowY: 'auto',
+              padding: '0.9rem 1rem',
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+              gap: '0.65rem',
+              alignContent: 'start',
+            }}
           >
             {PROJECT_PALETTE_ORDER.map((paletteId) => (
               <div
@@ -455,6 +479,46 @@ export function ArtSection({
                 </div>
               </div>
             ))}
+          </div>
+
+          <div
+            data-layout="paletteFooter"
+            /* pinned footer: dedicated breathing room + legend, plus a small
+               swatch preview so the user always sees the current palette
+               at a glance even when the grid is scrolled. */
+            style={{
+              flex: '0 0 auto',
+              padding: '0.85rem 1rem',
+              borderTop: '1px solid rgba(15,118,110,0.08)',
+              background: 'linear-gradient(0deg, rgba(236,253,245,0.6) 0%, rgba(255,255,255,0) 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              flexWrap: 'wrap',
+            }}
+          >
+            <span style={{ color: '#0f766e', fontSize: '0.78rem', fontWeight: 600 }}>
+              Current palette
+            </span>
+            <div data-layout="paletteFooterSwatchRow" /* compact swatch preview, mirrors the home-tile preview */ style={{ display: 'flex', gap: '0.3rem', flex: '1 1 auto' }}>
+              {PROJECT_PALETTE_ORDER.map((paletteId) => (
+                <span
+                  key={paletteId}
+                  title={PROJECT_PALETTE_LABELS[paletteId]}
+                  style={{
+                    width: '18px',
+                    height: '18px',
+                    borderRadius: '999px',
+                    background: project.settings.colorPalette[paletteId] || 'rgba(15,118,110,0.15)',
+                    border: '2px solid rgba(255,255,255,0.7)',
+                    boxShadow: '0 1px 3px rgba(6,78,59,0.12)',
+                  }}
+                />
+              ))}
+            </div>
+            <span style={{ color: 'rgba(15,118,110,0.6)', fontSize: '0.72rem', fontStyle: 'italic' }}>
+              9 slots · used by AI prompts and inspector color pickers
+            </span>
           </div>
         </div>
       </SubPageShell>
