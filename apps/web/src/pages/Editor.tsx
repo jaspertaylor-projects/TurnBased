@@ -32,7 +32,6 @@ import { VersionsSection } from '../editor/sections/VersionsSection';
 import { AppLayoutSection } from '../editor/sections/AppLayoutSection';
 import { ArtSection, STUDIO_BG_VALUE } from '../editor/sections/ArtSection';
 import { RulesSection } from '../editor/sections/RulesSection';
-import { SettingsSection } from '../editor/sections/SettingsSection';
 import type { BuiltInComponentType, ComponentInstanceModel } from '@turnbased/engine-components';
 import { commitProjectVersion, getProjectGitStatus, listProjectGitCommits, restoreProjectFromCommit } from '../editor/git';
 import { createWorkspaceFiles } from '../editor/shipping';
@@ -301,14 +300,6 @@ export const Editor = () => {
           <RulesSection
             project={currentProject}
             onUpdateRules={(updater) => commitProject(updateProjectRules(currentProject, updater))}
-          />
-        );
-      case 'settings':
-        return (
-          <SettingsSection
-            project={currentProject}
-            onUpdateBrief={(updater) => commitProject(updateProjectBrief(currentProject, updater))}
-            onUpdateSettings={(updater) => commitProject(updateProjectSettings(currentProject, updater))}
           />
         );
       case 'art':

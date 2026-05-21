@@ -1,6 +1,8 @@
 import { useRef, useState, type ReactNode } from 'react';
-import { Sparkles, BookImage, Hexagon, ImagePlus, Upload, Wand2, X, Plus, ArrowLeft } from 'lucide-react';
+import { Sparkles, BookImage, Hexagon, ImagePlus, Palette, Upload, Wand2, X, Plus, ArrowLeft } from 'lucide-react';
+import { ProjectColorPicker } from '@turnbased/engine-ui';
 import { inputStyle } from '../styles';
+import { listProjectPaletteOptions, PROJECT_PALETTE_LABELS, PROJECT_PALETTE_ORDER } from '../projectPalette';
 import type { EditorImageAsset, EditorProject } from '../types';
 import { addIconAsset, addReferenceAsset } from './art/artUtils';
 import { ArtReferenceCard } from './art/ArtReferenceCard';
@@ -256,7 +258,7 @@ function ImagesContent({
 
 // ── Main component ─────────────────────────────────────────────────
 
-type StudioPage = 'home' | 'themes' | 'assets' | 'icons' | 'images';
+type StudioPage = 'home' | 'palette' | 'themes' | 'assets' | 'icons' | 'images';
 
 export function ArtSection({
   project,
@@ -305,9 +307,28 @@ export function ArtSection({
           boxSizing: 'border-box',
           display: 'grid',
           gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-          gridTemplateRows: 'repeat(2, minmax(0, 1fr))',
+          gridTemplateRows: 'repeat(3, minmax(0, 1fr))',
           gap: '0.75rem',
+          overflow: 'auto',
         }}>
+            {/* Palette */}
+            <StudioTile icon={<Palette size={22} />} label="Palette" onClick={() => setPage('palette')}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', justifyContent: 'center', padding: '0.5rem' }}>
+                {PROJECT_PALETTE_ORDER.map((paletteId) => (
+                  <span
+                    key={paletteId}
+                    title={PROJECT_PALETTE_LABELS[paletteId]}
+                    style={{
+                      width: '26px', height: '26px', borderRadius: '999px',
+                      background: project.settings.colorPalette[paletteId] || 'rgba(15,118,110,0.15)',
+                      border: '2px solid rgba(255,255,255,0.7)',
+                      boxShadow: '0 1px 4px rgba(6,78,59,0.12)',
+                    }}
+                  />
+                ))}
+              </div>
+            </StudioTile>
+
             {/* Themes & Styles */}
             <StudioTile icon={<Sparkles size={22} />} label="Themes & Styles" count={styleCount || undefined} onClick={() => setPage('themes')}>
               {styleCount > 0 ? (
@@ -380,6 +401,63 @@ export function ArtSection({
             </StudioTile>
         </div>
       </div>
+    );
+  }
+
+  // ── Palette ──
+  if (page === 'palette') {
+    const paletteOptions = listProjectPaletteOptions(project);
+    return (
+      <SubPageShell title="Palette" icon={<Palette size={22} />} onBack={() => setPage('home')}>
+        <div
+          data-layout="palettePanel"
+          /* card holding the project palette swatches; AI + human color choices read from these slots */
+          style={{
+            padding: '1rem',
+            borderRadius: '18px',
+            background: 'rgba(255,255,255,0.6)',
+            backdropFilter: 'blur(8px)',
+            border: '1px solid rgba(15,118,110,0.06)',
+            display: 'grid',
+            gap: '0.6rem',
+          }}
+        >
+          <div style={{ color: '#0f766e', fontSize: '0.82rem' }}>
+            AI and human color choices both pull from these slots — pick once here, reuse everywhere.
+          </div>
+          <div
+            data-layout="paletteSwatchGrid"
+            /* 3-up grid of palette swatches */
+            style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '0.65rem' }}
+          >
+            {PROJECT_PALETTE_ORDER.map((paletteId) => (
+              <div
+                key={paletteId}
+                style={{
+                  borderRadius: '18px',
+                  border: '1px solid rgba(15,118,110,0.1)',
+                  background: 'rgba(248,250,252,0.82)',
+                  padding: '0.55rem',
+                  display: 'grid',
+                  gap: '0.4rem',
+                }}
+              >
+                <ProjectColorPicker
+                  label={PROJECT_PALETTE_LABELS[paletteId]}
+                  value={project.settings.colorPalette[paletteId]}
+                  compact
+                  palette={paletteOptions}
+                  onChange={(value) => onAssignPaletteColor(paletteId, value)}
+                  onAssignPaletteColor={(targetId, value) => onAssignPaletteColor(targetId, value)}
+                />
+                <div style={{ color: '#0f766e', fontSize: '0.72rem', fontWeight: 700, textAlign: 'center' }}>
+                  {PROJECT_PALETTE_LABELS[paletteId]}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </SubPageShell>
     );
   }
 

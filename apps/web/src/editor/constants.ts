@@ -1,4 +1,4 @@
-export type EditorSection = 'rules' | 'settings' | 'art' | 'component_editor' | 'versions' | 'app_layout';
+export type EditorSection = 'rules' | 'art' | 'component_editor' | 'versions' | 'app_layout';
 export type ComponentEditorMode = 'edit' | 'create';
 
 export interface EditorSectionOption {
@@ -14,11 +14,6 @@ export const SECTION_OPTIONS: EditorSectionOption[] = [
     id: 'rules',
     label: 'Rules',
     description: 'Author the game rules, designer notes, phases, and scoring structure.',
-  },
-  {
-    id: 'settings',
-    label: 'Settings',
-    description: 'Edit the game setup, player range, and project palette.',
   },
   {
     id: 'art',
