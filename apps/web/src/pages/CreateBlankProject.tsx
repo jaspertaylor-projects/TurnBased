@@ -1,9 +1,8 @@
-import { useEffect, useState } from 'react';
-import { Brush, Flag, Users } from 'lucide-react';
+import { useState, type KeyboardEvent } from 'react';
+import { Brush, Plus, Sparkles, X } from 'lucide-react';
 
 import { AppPageFrame } from '../components/AppPageFrame';
-import { NumericInput } from '../components/NumericInput';
-import { buildProjectWithAI, getCreatorEnvironmentStatus } from '../editor/aiBuildService';
+import { buildProjectWithAI } from '../editor/aiBuildService';
 import { commitProjectVersion } from '../editor/git';
 import { buildPreviewRuntime } from '../editor/runtime';
 import { createDefaultRulesBrief, normalizeRulesBuilderBrief } from '../editor/project';
@@ -14,56 +13,223 @@ import type { RulesBuilderBrief } from '../editor/types';
 
 const PENDING_EDITOR_NOTICE_KEY = 'turnbased.creator.pendingEditorNotice';
 
-function updatePlayerRange(
-  current: RulesBuilderBrief,
-  patch: Partial<Pick<RulesBuilderBrief, 'minPlayers' | 'maxPlayers'>>,
-): RulesBuilderBrief {
-  const minPlayers = Math.max(1, Math.min(6, patch.minPlayers ?? current.minPlayers));
-  const maxPlayers = Math.max(1, Math.min(6, patch.maxPlayers ?? current.maxPlayers));
-  return {
-    ...current,
-    minPlayers: Math.min(minPlayers, maxPlayers),
-    maxPlayers: Math.max(minPlayers, maxPlayers),
-  };
+const THEME_PRESETS = [
+  'Cozy forest',
+  'Magical garden',
+  'Pirate adventure',
+  'Space exploration',
+  'Medieval kingdom',
+  'Underwater',
+  'Dungeon crawl',
+  'Wild west',
+  'Steampunk',
+  'Cyberpunk',
+  'Mythology',
+  'Cute animals',
+  'Haunted house',
+  'Cooking',
+  'Sports',
+  'Post-apocalyptic',
+  'Fairy tale',
+  'Detective mystery',
+];
+
+const ART_STYLE_PRESETS = [
+  'Watercolor',
+  'Pixel art',
+  'Hand-drawn ink',
+  'Cartoon',
+  'Storybook',
+  '3D rendered',
+  'Minimalist',
+  'Anime',
+  'Comic',
+  'Vintage poster',
+  'Geometric',
+  'Photorealistic',
+  'Folk art',
+  'Chalkboard sketch',
+];
+
+function splitBriefField(value: string): string[] {
+  return value
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+}
+
+function joinBriefField(values: string[]): string {
+  return values.join(', ');
+}
+
+function addUniqueChip(current: string[], value: string): string[] {
+  const trimmed = value.trim();
+  if (!trimmed) return current;
+  if (current.some((entry) => entry.toLowerCase() === trimmed.toLowerCase())) {
+    return current;
+  }
+  return [...current, trimmed];
+}
+
+function removeChip(current: string[], value: string): string[] {
+  return current.filter((entry) => entry.toLowerCase() !== value.toLowerCase());
+}
+
+const chipBase = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '0.4rem',
+  padding: '0.4rem 0.7rem',
+  borderRadius: '999px',
+  fontSize: '0.82rem',
+  cursor: 'pointer',
+  border: '1px solid rgba(15,118,110,0.18)',
+  background: 'rgba(255,255,255,0.85)',
+  color: '#0f766e',
+  lineHeight: 1.2,
+  transition: 'background 120ms ease, transform 120ms ease',
+} as const;
+
+function ChipPicker({
+  legendIcon,
+  legend,
+  helperText,
+  selected,
+  presets,
+  customPlaceholder,
+  onChange,
+}: {
+  legendIcon: React.ReactNode;
+  legend: string;
+  helperText: string;
+  selected: string[];
+  presets: string[];
+  customPlaceholder: string;
+  onChange: (next: string[]) => void;
+}) {
+  const [draft, setDraft] = useState('');
+
+  function commitDraft() {
+    const next = addUniqueChip(selected, draft);
+    if (next !== selected) {
+      onChange(next);
+    }
+    setDraft('');
+  }
+
+  function handleDraftKey(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === 'Enter' || event.key === ',') {
+      event.preventDefault();
+      commitDraft();
+    }
+  }
+
+  function togglePreset(preset: string) {
+    const isSelected = selected.some((entry) => entry.toLowerCase() === preset.toLowerCase());
+    onChange(isSelected ? removeChip(selected, preset) : addUniqueChip(selected, preset));
+  }
+
+  const presetsRemaining = presets.filter(
+    (preset) => !selected.some((entry) => entry.toLowerCase() === preset.toLowerCase()),
+  );
+
+  return (
+    <div data-layout="chipPickerRoot" /* container for one chip-picker section (theme or art style) */ style={{ display: 'grid', gap: '0.65rem', padding: '1rem', borderRadius: '20px', background: 'rgba(240,253,244,0.55)', border: '1px solid rgba(16,185,129,0.16)' }}>
+      <div data-layout="chipPickerHeader" /* legend + helper text row */ style={{ display: 'flex', alignItems: 'baseline', gap: '0.6rem', flexWrap: 'wrap' }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', color: '#064e3b', fontWeight: 700, fontSize: '0.95rem' }}>
+          {legendIcon}
+          {legend}
+        </span>
+        <span style={{ color: '#0f766e', fontSize: '0.82rem' }}>{helperText}</span>
+      </div>
+
+      <div data-layout="chipPickerSelectedRow" /* selected chips with × remove buttons */ style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', minHeight: '2rem' }}>
+        {selected.length === 0 ? (
+          <span style={{ color: 'rgba(15,118,110,0.55)', fontSize: '0.82rem', fontStyle: 'italic', alignSelf: 'center' }}>
+            Pick a preset below or type your own.
+          </span>
+        ) : (
+          selected.map((entry) => (
+            <span
+              key={entry}
+              style={{ ...chipBase, background: 'linear-gradient(135deg, #064e3b, #10b981)', color: 'white', borderColor: 'transparent', cursor: 'default' }}
+            >
+              {entry}
+              <button
+                type="button"
+                onClick={() => onChange(removeChip(selected, entry))}
+                aria-label={`Remove ${entry}`}
+                style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '1.1rem', height: '1.1rem', borderRadius: '999px', border: 'none', background: 'rgba(255,255,255,0.25)', color: 'white', cursor: 'pointer', padding: 0 }}
+              >
+                <X size={12} />
+              </button>
+            </span>
+          ))
+        )}
+      </div>
+
+      {presetsRemaining.length > 0 && (
+        <div data-layout="chipPickerPresetsRow" /* preset chips that can be tapped to add */ style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
+          {presetsRemaining.map((preset) => (
+            <button
+              key={preset}
+              type="button"
+              onClick={() => togglePreset(preset)}
+              style={{ ...chipBase, border: '1px dashed rgba(15,118,110,0.4)' }}
+              onMouseEnter={(event) => {
+                (event.currentTarget as HTMLButtonElement).style.background = 'rgba(16,185,129,0.12)';
+              }}
+              onMouseLeave={(event) => {
+                (event.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.85)';
+              }}
+            >
+              <Plus size={12} />
+              {preset}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div data-layout="chipPickerCustomRow" /* free-text input to add a custom chip */ style={{ display: 'flex', gap: '0.5rem', alignItems: 'stretch' }}>
+        <input
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={handleDraftKey}
+          placeholder={customPlaceholder}
+          style={{ flex: '1 1 auto', padding: '0.6rem 0.85rem', borderRadius: '12px', border: '1px solid rgba(15,118,110,0.16)', boxSizing: 'border-box', fontSize: '0.88rem', color: '#064e3b', background: 'white' }}
+        />
+        <button
+          type="button"
+          onClick={commitDraft}
+          disabled={draft.trim().length === 0}
+          style={{ padding: '0.55rem 1rem', borderRadius: '12px', border: 'none', background: draft.trim().length === 0 ? 'rgba(15,118,110,0.25)' : 'linear-gradient(135deg, #064e3b, #10b981)', color: 'white', cursor: draft.trim().length === 0 ? 'not-allowed' : 'pointer', fontWeight: 600, fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+        >
+          <Plus size={14} />
+          Add
+        </button>
+      </div>
+    </div>
+  );
 }
 
 export const CreateBlankProject = () => {
   const [brief, setBrief] = useState<RulesBuilderBrief>(() => createDefaultRulesBrief());
+  const [themes, setThemes] = useState<string[]>([]);
+  const [artStyles, setArtStyles] = useState<string[]>([]);
   const [isBuilding, setIsBuilding] = useState(false);
   const [buildError, setBuildError] = useState<string | null>(null);
-  const [environmentStatus, setEnvironmentStatus] = useState<{
-    aiBuildLabel: string;
-    versionControlLabel: string;
-  }>({
-    aiBuildLabel: 'Checking AI build availability...',
-    versionControlLabel: 'Checking backup mode...',
-  });
-
-  useEffect(() => {
-    let cancelled = false;
-
-    getCreatorEnvironmentStatus().then((status) => {
-      if (cancelled) {
-        return;
-      }
-
-      setEnvironmentStatus({
-        aiBuildLabel: status.aiBuildLabel,
-        versionControlLabel: status.versionControlLabel,
-      });
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   async function handleBuildWithAI() {
     setIsBuilding(true);
     setBuildError(null);
 
     try {
-      const normalizedBrief = normalizeRulesBuilderBrief(brief);
+      const merged: RulesBuilderBrief = {
+        ...brief,
+        theme: joinBriefField(themes),
+        artStyle: joinBriefField(artStyles),
+      };
+      const normalizedBrief = normalizeRulesBuilderBrief(merged);
       const buildResult = await buildProjectWithAI(normalizedBrief);
       const runtime = buildPreviewRuntime(buildResult.project);
       const files = createWorkspaceFiles(buildResult.project, runtime);
@@ -78,20 +244,10 @@ export const CreateBlankProject = () => {
       );
 
       saveEditorProject(commitResult.project);
-      const buildSummary = [
-        buildResult.usedAI
-          ? `AI build complete${buildResult.model ? ` via ${buildResult.model}` : ''}.`
-          : `Local scaffold created${buildResult.fallbackReason ? `: ${buildResult.fallbackReason}` : '.'}`,
-        buildResult.cost
-          ? buildResult.cost.pricingKnown
-            ? `Estimated AI call cost: $${(buildResult.cost.estimatedCostUsd ?? (buildResult.cost.totalChargedCents / 100)).toFixed(4)}.`
-            : 'AI call cost is not configured for this model yet.'
-          : 'No hosted AI cost was recorded for this build.',
-        commitResult.remoteCommitted
-          ? 'Version history is backed up to Supabase.'
-          : 'Version history currently lives in this browser.',
-      ].join(' ');
-      window.sessionStorage.setItem(PENDING_EDITOR_NOTICE_KEY, buildSummary);
+      window.sessionStorage.setItem(
+        PENDING_EDITOR_NOTICE_KEY,
+        buildResult.usedAI ? 'AI build complete — Rules tab is open and ready to edit.' : 'Workspace ready — Rules tab is open and ready to edit.',
+      );
       window.location.hash = `#/editor/${commitResult.project.id}`;
     } catch (error) {
       setBuildError(error instanceof Error ? error.message : 'The game could not be created right now.');
@@ -100,127 +256,64 @@ export const CreateBlankProject = () => {
     }
   }
 
+  const canBuild = !isBuilding && brief.name.trim().length > 0;
+
   return (
-    <AppPageFrame contentStyle={{ maxWidth: '880px', margin: '0 auto' }}>
-      <div style={{ padding: '1.5rem', borderRadius: '28px', background: 'rgba(255,255,255,0.92)', border: '1px solid rgba(16,185,129,0.14)', boxShadow: '0 18px 48px rgba(6,78,59,0.08)', display: 'grid', gap: '1rem' }}>
-        <div>
+    <AppPageFrame contentStyle={{ maxWidth: '760px', margin: '0 auto' }}>
+      <div data-layout="newGameCard" /* primary new-game form card */ style={{ padding: '1.5rem', borderRadius: '28px', background: 'rgba(255,255,255,0.92)', border: '1px solid rgba(16,185,129,0.14)', boxShadow: '0 18px 48px rgba(6,78,59,0.08)', display: 'grid', gap: '1.1rem' }}>
+        <div data-layout="newGameHero" /* title + intro paragraph */>
           <p style={{ textTransform: 'uppercase', letterSpacing: '0.08em', color: '#0f766e', fontSize: '0.82rem', marginBottom: '0.45rem' }}>
             New Game
           </p>
           <h1 style={{ margin: '0 0 0.6rem 0' }}>Create a game</h1>
           <p style={{ color: '#0f766e', lineHeight: 1.7, margin: 0 }}>
-            Start with the basics. After the first build, these settings stay editable in the editor&apos;s Settings tab.
+            Give your game a name, pick a few themes and art styles that excite you, and we will open a fresh
+            workspace on the Rules tab.
           </p>
         </div>
 
-        <div style={{ display: 'grid', gap: '0.85rem', gridTemplateColumns: 'minmax(0, 1.5fr) minmax(120px, 0.8fr) minmax(120px, 0.8fr)' }}>
-          <label style={{ display: 'grid', gap: '0.35rem', color: '#0f766e', fontSize: '0.85rem' }}>
-            Game name
-            <input
-              value={brief.name}
-              onChange={(event) => setBrief((current) => ({ ...current, name: event.target.value }))}
-              placeholder="New game"
-              style={{ padding: '0.75rem 0.85rem', borderRadius: '12px', border: '1px solid rgba(15,118,110,0.12)' }}
-            />
-          </label>
+        <label data-layout="newGameNameField" /* game name input wrapper */ style={{ display: 'grid', gap: '0.35rem', color: '#0f766e', fontSize: '0.85rem' }}>
+          Game name
+          <input
+            value={brief.name}
+            onChange={(event) => setBrief((current) => ({ ...current, name: event.target.value }))}
+            placeholder="New game"
+            style={{ padding: '0.8rem 0.95rem', borderRadius: '12px', border: '1px solid rgba(15,118,110,0.16)', fontSize: '1rem', color: '#064e3b' }}
+          />
+        </label>
 
-          <label style={{ display: 'grid', gap: '0.35rem', color: '#0f766e', fontSize: '0.85rem' }}>
-            Min players
-            <NumericInput
-              min={1}
-              max={6}
-              value={brief.minPlayers}
-              onValueChange={(value) => setBrief((current) => updatePlayerRange(current, { minPlayers: value }))}
-              style={{ padding: '0.75rem 0.85rem', borderRadius: '12px', border: '1px solid rgba(15,118,110,0.12)' }}
-            />
-          </label>
+        <ChipPicker
+          legendIcon={<Sparkles size={16} />}
+          legend="Themes"
+          helperText="Pick presets or type your own — mix as many as you want."
+          selected={themes}
+          presets={THEME_PRESETS}
+          customPlaceholder="Add your own theme..."
+          onChange={setThemes}
+        />
 
-          <label style={{ display: 'grid', gap: '0.35rem', color: '#0f766e', fontSize: '0.85rem' }}>
-            Max players
-            <NumericInput
-              min={1}
-              max={6}
-              value={brief.maxPlayers}
-              onValueChange={(value) => setBrief((current) => updatePlayerRange(current, { maxPlayers: value }))}
-              style={{ padding: '0.75rem 0.85rem', borderRadius: '12px', border: '1px solid rgba(15,118,110,0.12)' }}
-            />
-          </label>
-        </div>
+        <ChipPicker
+          legendIcon={<Brush size={16} />}
+          legend="Art styles"
+          helperText="Pick presets or type your own — these guide AI art and the visual feel."
+          selected={artStyles}
+          presets={ART_STYLE_PRESETS}
+          customPlaceholder="Add your own art style..."
+          onChange={setArtStyles}
+        />
 
-        <div style={{ display: 'grid', gap: '0.85rem', gridTemplateColumns: '1fr 1fr' }}>
-          <label style={{ display: 'grid', gap: '0.35rem', color: '#0f766e', fontSize: '0.85rem' }}>
-            Theme
-            <div style={{ position: 'relative' }}>
-              <Users size={16} style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)', color: '#0f766e' }} />
-              <input
-                value={brief.theme}
-                onChange={(event) => setBrief((current) => ({ ...current, theme: event.target.value }))}
-                placeholder="none"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '0.75rem 0.85rem 0.75rem 2.5rem', borderRadius: '12px', border: '1px solid rgba(15,118,110,0.12)' }}
-              />
-            </div>
-          </label>
-
-          <label style={{ display: 'grid', gap: '0.35rem', color: '#0f766e', fontSize: '0.85rem' }}>
-            Art style
-            <div style={{ position: 'relative' }}>
-              <Brush size={16} style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)', color: '#0f766e' }} />
-              <input
-                value={brief.artStyle}
-                onChange={(event) => setBrief((current) => ({ ...current, artStyle: event.target.value }))}
-                placeholder="none"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '0.75rem 0.85rem 0.75rem 2.5rem', borderRadius: '12px', border: '1px solid rgba(15,118,110,0.12)' }}
-              />
-            </div>
-          </label>
-        </div>
-
-        <div style={{ display: 'grid', gap: '0.75rem', gridTemplateColumns: '1fr 1fr' }}>
-          <label style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start', padding: '0.9rem 1rem', borderRadius: '18px', background: 'rgba(240,253,244,0.9)', color: '#065f46' }}>
-            <input
-              type="checkbox"
-              checked={brief.hasDistinctSoloMode}
-              onChange={(event) => setBrief((current) => ({ ...current, hasDistinctSoloMode: event.target.checked }))}
-              style={{ marginTop: '0.2rem' }}
-            />
-            <span>Distinct solo mode</span>
-          </label>
-
-          <label style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start', padding: '0.9rem 1rem', borderRadius: '18px', background: 'rgba(255,247,237,0.92)', color: '#9a3412' }}>
-            <input
-              type="checkbox"
-              checked={brief.isCampaignGame}
-              onChange={(event) => setBrief((current) => ({ ...current, isCampaignGame: event.target.checked }))}
-              style={{ marginTop: '0.2rem' }}
-            />
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
-              <Flag size={16} />
-              Campaign game
-            </span>
-          </label>
-        </div>
-
-        <div style={{ display: 'grid', gap: '0.65rem', gridTemplateColumns: '1fr 1fr' }}>
-          <div style={{ padding: '0.95rem', borderRadius: '18px', background: 'rgba(239,246,255,0.92)', color: '#155e75', lineHeight: 1.6 }}>
-            {environmentStatus.aiBuildLabel}
-          </div>
-          <div style={{ padding: '0.95rem', borderRadius: '18px', background: 'rgba(255,247,237,0.92)', color: '#9a3412', lineHeight: 1.6 }}>
-            {environmentStatus.versionControlLabel}
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <div data-layout="newGameSubmitRow" /* submit-button row */ style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <button
             onClick={handleBuildWithAI}
-            disabled={isBuilding || brief.name.trim().length === 0}
-            style={{ borderRadius: '999px', border: 'none', background: isBuilding ? 'rgba(16,185,129,0.45)' : 'linear-gradient(135deg, #064e3b, #10b981)', color: 'white', padding: '0.8rem 1.15rem', cursor: isBuilding ? 'wait' : 'pointer' }}
+            disabled={!canBuild}
+            style={{ borderRadius: '999px', border: 'none', background: canBuild ? 'linear-gradient(135deg, #064e3b, #10b981)' : 'rgba(16,185,129,0.35)', color: 'white', padding: '0.85rem 1.4rem', fontSize: '0.95rem', fontWeight: 600, cursor: canBuild ? 'pointer' : 'not-allowed' }}
           >
             {isBuilding ? 'Making game...' : 'Make Game'}
           </button>
         </div>
 
         {buildError && (
-          <div style={{ padding: '0.95rem', borderRadius: '18px', background: 'rgba(254,226,226,0.9)', color: '#991b1b', lineHeight: 1.6 }}>
+          <div data-layout="newGameErrorBanner" /* error feedback after a failed build */ style={{ padding: '0.95rem', borderRadius: '18px', background: 'rgba(254,226,226,0.9)', color: '#991b1b', lineHeight: 1.6 }}>
             {buildError}
           </div>
         )}
