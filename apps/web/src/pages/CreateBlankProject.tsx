@@ -259,9 +259,28 @@ export const CreateBlankProject = () => {
   const canBuild = !isBuilding && brief.name.trim().length > 0;
 
   return (
-    <AppPageFrame contentStyle={{ maxWidth: '760px', margin: '0 auto' }}>
-      <div data-layout="newGameCard" /* primary new-game form card */ style={{ padding: '1.5rem', borderRadius: '28px', background: 'rgba(255,255,255,0.92)', border: '1px solid rgba(16,185,129,0.14)', boxShadow: '0 18px 48px rgba(6,78,59,0.08)', display: 'grid', gap: '1.1rem' }}>
-        <div data-layout="newGameHero" /* title + intro paragraph */>
+    <AppPageFrame contentStyle={{ maxWidth: '760px', margin: '0 auto', height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+      <div
+        data-layout="newGameCard"
+        /* primary new-game card: bounded desktop-app surface — header and footer
+           stay pinned while the body scrolls internally if presets overflow. */
+        style={{
+          flex: '1 1 auto',
+          minHeight: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          borderRadius: '28px',
+          background: 'rgba(255,255,255,0.92)',
+          border: '1px solid rgba(16,185,129,0.14)',
+          boxShadow: '0 18px 48px rgba(6,78,59,0.08)',
+          overflow: 'hidden',
+        }}
+      >
+        <div
+          data-layout="newGameHero"
+          /* pinned header: title + intro paragraph */
+          style={{ padding: '1.5rem 1.5rem 0 1.5rem', flex: '0 0 auto' }}
+        >
           <p style={{ textTransform: 'uppercase', letterSpacing: '0.08em', color: '#0f766e', fontSize: '0.82rem', marginBottom: '0.45rem' }}>
             New Game
           </p>
@@ -272,37 +291,68 @@ export const CreateBlankProject = () => {
           </p>
         </div>
 
-        <label data-layout="newGameNameField" /* game name input wrapper */ style={{ display: 'grid', gap: '0.35rem', color: '#0f766e', fontSize: '0.85rem' }}>
-          Game name
-          <input
-            value={brief.name}
-            onChange={(event) => setBrief((current) => ({ ...current, name: event.target.value }))}
-            placeholder="New game"
-            style={{ padding: '0.8rem 0.95rem', borderRadius: '12px', border: '1px solid rgba(15,118,110,0.16)', fontSize: '1rem', color: '#064e3b' }}
+        <div
+          data-layout="newGameScrollBody"
+          /* scrollable body: the only region that grows or scrolls. Anything that
+             can become long (chip presets, future fields) lives here. */
+          style={{
+            flex: '1 1 auto',
+            minHeight: 0,
+            overflowY: 'auto',
+            padding: '1rem 1.5rem',
+            display: 'grid',
+            gap: '1.1rem',
+          }}
+        >
+          <label data-layout="newGameNameField" /* game name input wrapper */ style={{ display: 'grid', gap: '0.35rem', color: '#0f766e', fontSize: '0.85rem' }}>
+            Game name
+            <input
+              value={brief.name}
+              onChange={(event) => setBrief((current) => ({ ...current, name: event.target.value }))}
+              placeholder="New game"
+              style={{ padding: '0.8rem 0.95rem', borderRadius: '12px', border: '1px solid rgba(15,118,110,0.16)', fontSize: '1rem', color: '#064e3b' }}
+            />
+          </label>
+
+          <ChipPicker
+            legendIcon={<Sparkles size={16} />}
+            legend="Themes"
+            helperText="Pick presets or type your own — mix as many as you want."
+            selected={themes}
+            presets={THEME_PRESETS}
+            customPlaceholder="Add your own theme..."
+            onChange={setThemes}
           />
-        </label>
 
-        <ChipPicker
-          legendIcon={<Sparkles size={16} />}
-          legend="Themes"
-          helperText="Pick presets or type your own — mix as many as you want."
-          selected={themes}
-          presets={THEME_PRESETS}
-          customPlaceholder="Add your own theme..."
-          onChange={setThemes}
-        />
+          <ChipPicker
+            legendIcon={<Brush size={16} />}
+            legend="Art styles"
+            helperText="Pick presets or type your own — these guide AI art and the visual feel."
+            selected={artStyles}
+            presets={ART_STYLE_PRESETS}
+            customPlaceholder="Add your own art style..."
+            onChange={setArtStyles}
+          />
 
-        <ChipPicker
-          legendIcon={<Brush size={16} />}
-          legend="Art styles"
-          helperText="Pick presets or type your own — these guide AI art and the visual feel."
-          selected={artStyles}
-          presets={ART_STYLE_PRESETS}
-          customPlaceholder="Add your own art style..."
-          onChange={setArtStyles}
-        />
+          {buildError && (
+            <div data-layout="newGameErrorBanner" /* error feedback after a failed build */ style={{ padding: '0.95rem', borderRadius: '18px', background: 'rgba(254,226,226,0.9)', color: '#991b1b', lineHeight: 1.6 }}>
+              {buildError}
+            </div>
+          )}
+        </div>
 
-        <div data-layout="newGameSubmitRow" /* submit-button row */ style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <div
+          data-layout="newGameSubmitFooter"
+          /* pinned footer: submit-button row */
+          style={{
+            flex: '0 0 auto',
+            padding: '1rem 1.5rem 1.5rem 1.5rem',
+            borderTop: '1px solid rgba(16,185,129,0.08)',
+            display: 'flex',
+            justifyContent: 'flex-end',
+            background: 'rgba(255,255,255,0.92)',
+          }}
+        >
           <button
             onClick={handleBuildWithAI}
             disabled={!canBuild}
@@ -311,12 +361,6 @@ export const CreateBlankProject = () => {
             {isBuilding ? 'Making game...' : 'Make Game'}
           </button>
         </div>
-
-        {buildError && (
-          <div data-layout="newGameErrorBanner" /* error feedback after a failed build */ style={{ padding: '0.95rem', borderRadius: '18px', background: 'rgba(254,226,226,0.9)', color: '#991b1b', lineHeight: 1.6 }}>
-            {buildError}
-          </div>
-        )}
       </div>
     </AppPageFrame>
   );

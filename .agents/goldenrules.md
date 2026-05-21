@@ -83,6 +83,43 @@ Current implementation:
 - `apps/web/src/editor/sections/VisualsSection.tsx`
 - `apps/web/src/editor/sections/visuals/TopLevelInspector.tsx`
 
+## Rule 4: Cards and Form Surfaces Are Bounded
+
+We are building a desktop app, not a webpage. Every primary content surface
+(cards, forms, dialogs, inspectors, panels) should be **bounded by the
+viewport**, not by the natural flow of its content. If content can grow
+beyond the surface, the surface scrolls internally — the page never does.
+
+- A card or form should not extend to the bottom of the page by stretching.
+  It should occupy a fixed region of the viewport with `flex: 1 1 auto`
+  inside an `AppPageFrame`-style container.
+- When content might overflow (chip lists, long forms, dynamic field counts,
+  generated previews), give the card three regions:
+  1. **Pinned header** — title, intro, primary identity. `flex: 0 0 auto`.
+  2. **Scrollable body** — the only region that grows or scrolls.
+     `flex: 1 1 auto; minHeight: 0; overflowY: auto`.
+  3. **Pinned footer** — submit, cancel, or status actions. `flex: 0 0 auto`.
+  The pinned regions stay visible while the body scrolls; the body never
+  pushes the footer off-screen.
+- Prefer fixed-size desktop affordances over web patterns: bounded cards
+  with internal scroll instead of pages that scroll, modal dialogs with
+  scroll bodies instead of expanding flows, side-rail inspectors with their
+  own overflow instead of growing the page.
+- This generalizes Rule 2: *page-wide scrolling is the failure mode*. If
+  you find yourself reaching for `body { overflow: auto }`, you are
+  building a webpage — restructure the surface into header/body/footer
+  flex regions instead.
+
+Why: a designer using this app on a laptop should be able to scan the
+whole UI in one glance, the way they would in Figma or a native creator
+tool. Stretching content past the fold turns those surfaces into web
+forms, which is the opposite of the feel we want.
+
+Current implementations of this pattern:
+- `apps/web/src/pages/CreateBlankProject.tsx`
+- `apps/web/src/pages/Editor.tsx` (sidebar + viewport split)
+- `apps/web/src/components/AppPageFrame.tsx` (frame primitive)
+
 
 ## Lessons Learned
   Add any lessons you think would be useful for a future AI agent in .agents/lessons
