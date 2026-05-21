@@ -36,19 +36,31 @@ function SubPageShell({
   icon,
   onBack,
   actions,
+  footer,
   children,
 }: {
   title: string;
   icon: ReactNode;
   onBack: () => void;
   actions?: ReactNode;
+  /* Optional persistent footer slot. Anchored to the viewport bottom of the
+     shell — does NOT scroll with the body. See Rule 4 in
+     .agents/goldenrules.md. */
+  footer?: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: 0, overflow: 'auto' }}>
+    /* Shell root: fills the viewport slot the section was given, scrolls
+       nothing itself. The three children (header / body / footer) divide
+       that height — only the body scrolls. */
+    <div data-layout="subPageShellRoot" /* bounded shell — see goldenrules Rule 4 */ style={{ position: 'relative', width: '100%', height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <div style={STUDIO_BG} />
-      <div style={{ position: 'relative', zIndex: 1, maxWidth: '780px', margin: '0 auto', padding: '0.5rem 0.5rem 2rem 0.5rem' }}>
-        {/* Back bar */}
+
+      <div
+        data-layout="subPageShellHeader"
+        /* pinned top: back-bar + title; stays visible while the body scrolls */
+        style={{ position: 'relative', zIndex: 1, flex: '0 0 auto', maxWidth: '780px', width: '100%', margin: '0 auto', padding: '0.5rem 0.5rem 0 0.5rem', boxSizing: 'border-box' }}
+      >
         <div style={{
           display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.5rem 0 1rem 0',
         }}>
@@ -65,14 +77,31 @@ function SubPageShell({
           {actions}
         </div>
 
-        {/* Title */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.5rem' }}>
           <span style={{ color: '#0d9488' }}>{icon}</span>
           <span style={{ color: '#064e3b', fontWeight: 800, fontSize: '1.15rem' }}>{title}</span>
         </div>
+      </div>
 
+      <div
+        data-layout="subPageShellBody"
+        /* the only region that scrolls — children render here */
+        style={{ position: 'relative', zIndex: 1, flex: '1 1 auto', minHeight: 0, overflow: 'auto', maxWidth: '780px', width: '100%', margin: '0 auto', padding: '0.5rem 0.5rem 1rem 0.5rem', boxSizing: 'border-box' }}
+      >
         {children}
       </div>
+
+      {footer ? (
+        <div
+          data-layout="subPageShellFooter"
+          /* pinned bottom: persistent space anchored to the viewport, never
+             scrolls. Width matches the body's centered column so the footer
+             reads as part of the same surface. */
+          style={{ position: 'relative', zIndex: 1, flex: '0 0 auto', maxWidth: '780px', width: '100%', margin: '0 auto', padding: '0 0.5rem 0.5rem 0.5rem', boxSizing: 'border-box' }}
+        >
+          {footer}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -407,119 +436,84 @@ export function ArtSection({
   // ── Palette ──
   if (page === 'palette') {
     const paletteOptions = listProjectPaletteOptions(project);
+    const paletteFooter = (
+      <div
+        data-layout="paletteFooter"
+        /* persistent footer anchored to the viewport — passed into the
+           SubPageShell footer slot so the shell pins it, not the swatch
+           card. Always visible no matter how far the swatch grid scrolls. */
+        style={{
+          padding: '0.85rem 1rem',
+          borderRadius: '16px',
+          border: '1px solid rgba(15,118,110,0.1)',
+          background: 'linear-gradient(180deg, rgba(255,255,255,0.85) 0%, rgba(236,253,245,0.75) 100%)',
+          backdropFilter: 'blur(8px)',
+          boxShadow: '0 -4px 18px rgba(6,78,59,0.05)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.75rem',
+          flexWrap: 'wrap',
+        }}
+      >
+        <span style={{ color: '#0f766e', fontSize: '0.78rem', fontWeight: 700 }}>Current palette</span>
+        <div data-layout="paletteFooterSwatchRow" /* compact swatch preview mirroring the home-tile preview */ style={{ display: 'flex', gap: '0.3rem', flex: '1 1 auto' }}>
+          {PROJECT_PALETTE_ORDER.map((paletteId) => (
+            <span
+              key={paletteId}
+              title={PROJECT_PALETTE_LABELS[paletteId]}
+              style={{
+                width: '18px', height: '18px', borderRadius: '999px',
+                background: project.settings.colorPalette[paletteId] || 'rgba(15,118,110,0.15)',
+                border: '2px solid rgba(255,255,255,0.7)',
+                boxShadow: '0 1px 3px rgba(6,78,59,0.12)',
+              }}
+            />
+          ))}
+        </div>
+        <span style={{ color: 'rgba(15,118,110,0.6)', fontSize: '0.72rem', fontStyle: 'italic' }}>
+          9 slots · used by AI prompts and inspector color pickers
+        </span>
+      </div>
+    );
+
     return (
-      <SubPageShell title="Palette" icon={<Palette size={22} />} onBack={() => setPage('home')}>
+      <SubPageShell title="Palette" icon={<Palette size={22} />} onBack={() => setPage('home')} footer={paletteFooter}>
+        <div data-layout="paletteHelperCopy" /* helper text introducing the swatch grid */ style={{ color: '#0f766e', fontSize: '0.82rem', marginBottom: '0.75rem' }}>
+          AI and human color choices both pull from these slots — pick once here, reuse everywhere.
+        </div>
+
         <div
-          data-layout="palettePanel"
-          /* Card holding the project palette. Three regions per Rule 4:
-             pinned header (helper text), scrollable body (swatch grid),
-             pinned footer (legend). The footer stays visible while the
-             grid scrolls, so the user always has a small reminder of
-             how palette slots feed the rest of the app. */
-          style={{
-            borderRadius: '18px',
-            background: 'rgba(255,255,255,0.6)',
-            backdropFilter: 'blur(8px)',
-            border: '1px solid rgba(15,118,110,0.06)',
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden',
-          }}
+          data-layout="paletteSwatchGrid"
+          /* 3-up grid of palette swatches; sits inside the SubPageShell's
+             scrollable body so the shell's footer stays anchored even when
+             the grid overflows. */
+          style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '0.65rem', alignContent: 'start' }}
         >
-          <div
-            data-layout="paletteHeader"
-            /* pinned helper copy at top */
-            style={{
-              padding: '0.9rem 1rem 0.75rem 1rem',
-              color: '#0f766e',
-              fontSize: '0.82rem',
-              borderBottom: '1px solid rgba(15,118,110,0.08)',
-              background: 'linear-gradient(180deg, rgba(236,253,245,0.7) 0%, rgba(255,255,255,0) 100%)',
-            }}
-          >
-            AI and human color choices both pull from these slots — pick once here, reuse everywhere.
-          </div>
-
-          <div
-            data-layout="paletteSwatchGrid"
-            /* 3-up grid of palette swatches; this is the only region that scrolls */
-            style={{
-              flex: '1 1 auto',
-              minHeight: 0,
-              overflowY: 'auto',
-              padding: '0.9rem 1rem',
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-              gap: '0.65rem',
-              alignContent: 'start',
-            }}
-          >
-            {PROJECT_PALETTE_ORDER.map((paletteId) => (
-              <div
-                key={paletteId}
-                style={{
-                  borderRadius: '18px',
-                  border: '1px solid rgba(15,118,110,0.1)',
-                  background: 'rgba(248,250,252,0.82)',
-                  padding: '0.55rem',
-                  display: 'grid',
-                  gap: '0.4rem',
-                }}
-              >
-                <ProjectColorPicker
-                  label={PROJECT_PALETTE_LABELS[paletteId]}
-                  value={project.settings.colorPalette[paletteId]}
-                  compact
-                  palette={paletteOptions}
-                  onChange={(value) => onAssignPaletteColor(paletteId, value)}
-                  onAssignPaletteColor={(targetId, value) => onAssignPaletteColor(targetId, value)}
-                />
-                <div style={{ color: '#0f766e', fontSize: '0.72rem', fontWeight: 700, textAlign: 'center' }}>
-                  {PROJECT_PALETTE_LABELS[paletteId]}
-                </div>
+          {PROJECT_PALETTE_ORDER.map((paletteId) => (
+            <div
+              key={paletteId}
+              style={{
+                borderRadius: '18px',
+                border: '1px solid rgba(15,118,110,0.1)',
+                background: 'rgba(248,250,252,0.82)',
+                padding: '0.55rem',
+                display: 'grid',
+                gap: '0.4rem',
+              }}
+            >
+              <ProjectColorPicker
+                label={PROJECT_PALETTE_LABELS[paletteId]}
+                value={project.settings.colorPalette[paletteId]}
+                compact
+                palette={paletteOptions}
+                onChange={(value) => onAssignPaletteColor(paletteId, value)}
+                onAssignPaletteColor={(targetId, value) => onAssignPaletteColor(targetId, value)}
+              />
+              <div style={{ color: '#0f766e', fontSize: '0.72rem', fontWeight: 700, textAlign: 'center' }}>
+                {PROJECT_PALETTE_LABELS[paletteId]}
               </div>
-            ))}
-          </div>
-
-          <div
-            data-layout="paletteFooter"
-            /* pinned footer: dedicated breathing room + legend, plus a small
-               swatch preview so the user always sees the current palette
-               at a glance even when the grid is scrolled. */
-            style={{
-              flex: '0 0 auto',
-              padding: '0.85rem 1rem',
-              borderTop: '1px solid rgba(15,118,110,0.08)',
-              background: 'linear-gradient(0deg, rgba(236,253,245,0.6) 0%, rgba(255,255,255,0) 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.75rem',
-              flexWrap: 'wrap',
-            }}
-          >
-            <span style={{ color: '#0f766e', fontSize: '0.78rem', fontWeight: 600 }}>
-              Current palette
-            </span>
-            <div data-layout="paletteFooterSwatchRow" /* compact swatch preview, mirrors the home-tile preview */ style={{ display: 'flex', gap: '0.3rem', flex: '1 1 auto' }}>
-              {PROJECT_PALETTE_ORDER.map((paletteId) => (
-                <span
-                  key={paletteId}
-                  title={PROJECT_PALETTE_LABELS[paletteId]}
-                  style={{
-                    width: '18px',
-                    height: '18px',
-                    borderRadius: '999px',
-                    background: project.settings.colorPalette[paletteId] || 'rgba(15,118,110,0.15)',
-                    border: '2px solid rgba(255,255,255,0.7)',
-                    boxShadow: '0 1px 3px rgba(6,78,59,0.12)',
-                  }}
-                />
-              ))}
             </div>
-            <span style={{ color: 'rgba(15,118,110,0.6)', fontSize: '0.72rem', fontStyle: 'italic' }}>
-              9 slots · used by AI prompts and inspector color pickers
-            </span>
-          </div>
+          ))}
         </div>
       </SubPageShell>
     );

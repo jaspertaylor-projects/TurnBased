@@ -90,18 +90,56 @@ We are building a desktop app, not a webpage. Every primary content surface
 viewport**, not by the natural flow of its content. If content can grow
 beyond the surface, the surface scrolls internally — the page never does.
 
-- A card or form should not extend to the bottom of the page by stretching.
-  It should occupy a fixed region of the viewport with `flex: 1 1 auto`
-  inside an `AppPageFrame`-style container.
-- When content might overflow (chip lists, long forms, dynamic field counts,
-  generated previews), give the card three regions:
-  1. **Pinned header** — title, intro, primary identity. `flex: 0 0 auto`.
-  2. **Scrollable body** — the only region that grows or scrolls.
-     `flex: 1 1 auto; minHeight: 0; overflowY: auto`.
-  3. **Pinned footer** — submit, cancel, or status actions. `flex: 0 0 auto`.
-  The pinned regions stay visible while the body scrolls; the body never
-  pushes the footer off-screen.
-- Prefer fixed-size desktop affordances over web patterns: bounded cards
+### The mental model: a stationary frame with movable content inside
+
+The user should feel like the chrome of the surface — its header, its
+footer, its sidebars — is **carved into the viewport** and never moves.
+The contents *inside* that chrome are what scroll or rearrange. A footer
+"that you scroll down to" is a footer in the wrong place — it's part of
+the body, not part of the frame.
+
+### The header / body / footer pattern
+
+When content might overflow (chip lists, long forms, dynamic field counts,
+generated previews, swatch grids), give the surface three regions:
+
+1. **Pinned header** — title, intro, primary identity. `flex: 0 0 auto`.
+2. **Scrollable body** — the only region that grows or scrolls.
+   `flex: 1 1 auto; minHeight: 0; overflowY: auto`.
+3. **Pinned footer** — persistent space anchored to the **viewport bottom**,
+   used for actions, status, mini-previews, or just deliberate breathing
+   room. `flex: 0 0 auto`.
+
+The pinned regions stay visible while the body scrolls; the body never
+pushes them off-screen.
+
+### Critical: the surface must fill its viewport slot
+
+A common mistake is to apply the header / body / footer pattern to a card
+that is *shorter than the viewport*. Then the "pinned" footer is only
+pinned to the bottom of the card — it scrolls off when the user scrolls the
+**outer** container the card lives inside. That is the same failure mode
+as having no pinned footer at all.
+
+To actually pin a region to the viewport bottom:
+
+- The surface that owns the pattern must occupy `height: 100%` of its
+  parent, all the way up the tree to the root viewport. `flex: 1 1 auto`
+  + `minHeight: 0` on every ancestor that is itself a flex container.
+- The surface itself must use `display: flex; flexDirection: column;
+  overflow: hidden`. **The surface does not scroll** — only its body does.
+- If you find yourself wrapping a header/body/footer pattern inside a
+  separately-scrollable parent, lift the pattern up to where the parent's
+  scroll lives. Either eliminate the outer scroll, or move the
+  header/footer into the outer container so it owns the pinning.
+
+The body section of one frame can itself contain another header/body/footer
+frame — frames can nest. But the outer frame's footer must always anchor
+to the viewport, not the outer frame's *body*.
+
+### Other guidance
+
+- Prefer fixed-size desktop affordances over web patterns: bounded surfaces
   with internal scroll instead of pages that scroll, modal dialogs with
   scroll bodies instead of expanding flows, side-rail inspectors with their
   own overflow instead of growing the page.
@@ -109,6 +147,10 @@ beyond the surface, the surface scrolls internally — the page never does.
   you find yourself reaching for `body { overflow: auto }`, you are
   building a webpage — restructure the surface into header/body/footer
   flex regions instead.
+- Footer space is for **the user**, not for the page flow. Reserve it
+  deliberately when a surface benefits from a persistent action area, a
+  mini-preview of the current state, or simply explicit breathing room
+  between the content and the bottom of the screen.
 
 Why: a designer using this app on a laptop should be able to scan the
 whole UI in one glance, the way they would in Figma or a native creator
@@ -119,6 +161,8 @@ Current implementations of this pattern:
 - `apps/web/src/pages/CreateBlankProject.tsx`
 - `apps/web/src/pages/Editor.tsx` (sidebar + viewport split)
 - `apps/web/src/components/AppPageFrame.tsx` (frame primitive)
+- `apps/web/src/editor/sections/ArtSection.tsx` (`SubPageShell` —
+  header / body / optional footer all anchored to the shell viewport)
 
 ## Rule 5: One Scrollbar Style Across the App
 
