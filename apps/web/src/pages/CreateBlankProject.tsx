@@ -294,12 +294,14 @@ export const CreateBlankProject = () => {
         <div
           data-layout="newGameScrollBody"
           /* scrollable body: the only region that grows or scrolls. Anything that
-             can become long (chip presets, future fields) lives here. */
+             can become long (chip presets, future fields) lives here. Right
+             padding is bumped to give the cozy scrollbar (index.css) a visible
+             gutter away from the form fields. */
           style={{
             flex: '1 1 auto',
             minHeight: 0,
             overflowY: 'auto',
-            padding: '1rem 1.5rem',
+            padding: '1rem 1rem 1rem 1.5rem',
             display: 'grid',
             gap: '1.1rem',
           }}

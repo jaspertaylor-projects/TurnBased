@@ -120,6 +120,48 @@ Current implementations of this pattern:
 - `apps/web/src/pages/Editor.tsx` (sidebar + viewport split)
 - `apps/web/src/components/AppPageFrame.tsx` (frame primitive)
 
+## Rule 5: One Scrollbar Style Across the App
+
+Scrollbars are part of the desktop-app feel. We want every scrollable
+region — page bodies, modal contents, inspector rails, code panels,
+chip pickers — to share the **same sleek cozy-forest scrollbar**, so
+the app reads as one product instead of a collection of pages.
+
+The global style lives in `apps/web/src/index.css` under the
+`/* Cozy scrollbar */` block and applies to every element via the
+universal selector. Do **not** override it locally unless there is a
+very specific reason (e.g. a dark-on-dark surface that needs a
+different tint), and if you do, document the override inline with a
+brief justification.
+
+Key choices:
+
+- **Thin** (10px webkit width, `scrollbar-width: thin` on Firefox)
+  rather than the chunky default.
+- **Transparent track**, no background — the gutter is invisible
+  unless the thumb is present. The card chrome supplies the visual
+  separation.
+- **Teal thumb** with `background-clip: padding-box` and a transparent
+  2px border so the thumb floats inside the gutter with a soft inset.
+  Color `rgba(15, 118, 110, 0.32)` at rest, deeper green on hover and
+  active to feel responsive.
+- **Rounded** (border-radius 999px) and animated transition so it
+  reads as a deliberate part of the UI, not a browser default.
+
+When a surface needs visible breathing room between scrolling content
+and the scrollbar, add right-padding to the scroll body (e.g. the
+new-game card pads `1rem` on the right alongside `1.5rem` on the left).
+Do not solve this with a custom scrollbar style — keep the scrollbar
+identical app-wide and let the surrounding container provide the
+gutter.
+
+If you ever need to disable scrollbars (e.g. a static workbench), do
+it locally with `overflow: hidden` or `scrollbar-width: none` on that
+element only.
+
+Current implementation:
+- `apps/web/src/index.css` (the global rule, near the bottom).
+
 
 ## Lessons Learned
   Add any lessons you think would be useful for a future AI agent in .agents/lessons
