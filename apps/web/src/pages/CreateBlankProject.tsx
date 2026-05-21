@@ -1,5 +1,5 @@
 import { useState, type KeyboardEvent } from 'react';
-import { Brush, Plus, Sparkles, X } from 'lucide-react';
+import { Brush, ChevronDown, Plus, Sparkles, X } from 'lucide-react';
 
 import { AppPageFrame } from '../components/AppPageFrame';
 import { buildProjectWithAI } from '../editor/aiBuildService';
@@ -108,6 +108,7 @@ function ChipPicker({
   onChange: (next: string[]) => void;
 }) {
   const [draft, setDraft] = useState('');
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
 
   function commitDraft() {
     const next = addUniqueChip(selected, draft);
@@ -143,10 +144,52 @@ function ChipPicker({
         <span style={{ color: '#0f766e', fontSize: '0.82rem' }}>{helperText}</span>
       </div>
 
+      <div data-layout="chipPickerCustomRow" /* free-text input + Add button + View suggestions toggle, all on top */ style={{ display: 'flex', gap: '0.5rem', alignItems: 'stretch', flexWrap: 'wrap' }}>
+        <input
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={handleDraftKey}
+          placeholder={customPlaceholder}
+          style={{ flex: '1 1 220px', minWidth: 0, padding: '0.6rem 0.85rem', borderRadius: '12px', border: '1px solid rgba(15,118,110,0.16)', boxSizing: 'border-box', fontSize: '0.88rem', color: '#064e3b', background: 'white' }}
+        />
+        <button
+          type="button"
+          onClick={commitDraft}
+          disabled={draft.trim().length === 0}
+          style={{ padding: '0.55rem 1rem', borderRadius: '12px', border: 'none', background: draft.trim().length === 0 ? 'rgba(15,118,110,0.25)' : 'linear-gradient(135deg, #064e3b, #10b981)', color: 'white', cursor: draft.trim().length === 0 ? 'not-allowed' : 'pointer', fontWeight: 600, fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+        >
+          <Plus size={14} />
+          Add
+        </button>
+        <button
+          type="button"
+          onClick={() => setSuggestionsOpen((prev) => !prev)}
+          aria-expanded={suggestionsOpen}
+          style={{
+            padding: '0.55rem 0.85rem',
+            borderRadius: '12px',
+            border: '1px solid rgba(15,118,110,0.3)',
+            background: suggestionsOpen ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.85)',
+            color: '#0f766e',
+            cursor: 'pointer',
+            fontWeight: 600,
+            fontSize: '0.82rem',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.35rem',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          <Sparkles size={13} />
+          {suggestionsOpen ? 'Hide suggestions' : 'View suggestions'}
+          <ChevronDown size={14} style={{ transition: 'transform 160ms ease', transform: suggestionsOpen ? 'rotate(180deg)' : 'rotate(0deg)' }} />
+        </button>
+      </div>
+
       <div data-layout="chipPickerSelectedRow" /* selected chips with × remove buttons */ style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', minHeight: '2rem' }}>
         {selected.length === 0 ? (
           <span style={{ color: 'rgba(15,118,110,0.55)', fontSize: '0.82rem', fontStyle: 'italic', alignSelf: 'center' }}>
-            Pick a preset below or type your own.
+            Type your own above, or view suggestions for ideas.
           </span>
         ) : (
           selected.map((entry) => (
@@ -168,8 +211,8 @@ function ChipPicker({
         )}
       </div>
 
-      {presetsRemaining.length > 0 && (
-        <div data-layout="chipPickerPresetsRow" /* preset chips that can be tapped to add */ style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
+      {suggestionsOpen && presetsRemaining.length > 0 && (
+        <div data-layout="chipPickerPresetsRow" /* preset chips revealed by View suggestions */ style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', padding: '0.65rem 0.7rem', background: 'rgba(255,255,255,0.6)', borderRadius: '14px', border: '1px dashed rgba(16,185,129,0.22)' }}>
           {presetsRemaining.map((preset) => (
             <button
               key={preset}
@@ -190,24 +233,11 @@ function ChipPicker({
         </div>
       )}
 
-      <div data-layout="chipPickerCustomRow" /* free-text input to add a custom chip */ style={{ display: 'flex', gap: '0.5rem', alignItems: 'stretch' }}>
-        <input
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          onKeyDown={handleDraftKey}
-          placeholder={customPlaceholder}
-          style={{ flex: '1 1 auto', padding: '0.6rem 0.85rem', borderRadius: '12px', border: '1px solid rgba(15,118,110,0.16)', boxSizing: 'border-box', fontSize: '0.88rem', color: '#064e3b', background: 'white' }}
-        />
-        <button
-          type="button"
-          onClick={commitDraft}
-          disabled={draft.trim().length === 0}
-          style={{ padding: '0.55rem 1rem', borderRadius: '12px', border: 'none', background: draft.trim().length === 0 ? 'rgba(15,118,110,0.25)' : 'linear-gradient(135deg, #064e3b, #10b981)', color: 'white', cursor: draft.trim().length === 0 ? 'not-allowed' : 'pointer', fontWeight: 600, fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
-        >
-          <Plus size={14} />
-          Add
-        </button>
-      </div>
+      {suggestionsOpen && presetsRemaining.length === 0 && (
+        <p style={{ margin: 0, color: 'rgba(15,118,110,0.6)', fontSize: '0.82rem', fontStyle: 'italic' }}>
+          You have already picked every suggested option — type your own above to add more.
+        </p>
+      )}
     </div>
   );
 }
