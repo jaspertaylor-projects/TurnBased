@@ -13,6 +13,7 @@ import {
   updateProjectArt,
   updateProjectBrief,
   updateProjectDescription,
+  updateProjectRules,
   updateProjectSettings,
 } from '../editor/project';
 import { loadEditorProject, saveEditorProject } from '../editor/storage';
@@ -20,7 +21,7 @@ import {
   buildPreviewRuntime,
 } from '../editor/runtime';
 import type { EditorProject } from '../editor/types';
-import { SECTION_OPTIONS } from '../editor/constants';
+import { DEFAULT_EDITOR_SECTION, SECTION_OPTIONS } from '../editor/constants';
 import type { EditorSection } from '../editor/constants';
 import { readProjectIdFromHash } from '../editor/helpers';
 import { panelStyle, sectionTitleStyle } from '../editor/styles';
@@ -30,6 +31,7 @@ import { ComponentGallery } from '../editor/sections/ComponentGallery';
 import { VersionsSection } from '../editor/sections/VersionsSection';
 import { AppLayoutSection } from '../editor/sections/AppLayoutSection';
 import { ArtSection, STUDIO_BG_VALUE } from '../editor/sections/ArtSection';
+import { RulesSection } from '../editor/sections/RulesSection';
 import { SettingsSection } from '../editor/sections/SettingsSection';
 import type { BuiltInComponentType, ComponentInstanceModel } from '@turnbased/engine-components';
 import { commitProjectVersion, getProjectGitStatus, listProjectGitCommits, restoreProjectFromCommit } from '../editor/git';
@@ -83,7 +85,7 @@ export const Editor = () => {
     redo: redoProject,
     reset: resetProjectHistory,
   } = projectHistory;
-  const [activeSection, setActiveSection] = useState<EditorSection>('component_editor');
+  const [activeSection, setActiveSection] = useState<EditorSection>(DEFAULT_EDITOR_SECTION);
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
   const [paletteOwnerId] = useState<string | null>('player_one');
   const [editorNotice, setEditorNotice] = useState<string | null>(null);
@@ -98,7 +100,7 @@ export const Editor = () => {
 
       setProjectId(nextProjectId);
       resetProjectHistory(nextProject);
-      setActiveSection('component_editor');
+      setActiveSection(DEFAULT_EDITOR_SECTION);
       setSelectedComponentId(null);
       setEditorNotice(pendingNotice);
       if (pendingNotice) {
@@ -294,6 +296,13 @@ export const Editor = () => {
 
   function renderActiveSection() {
     switch (activeSection) {
+      case 'rules':
+        return (
+          <RulesSection
+            project={currentProject}
+            onUpdateRules={(updater) => commitProject(updateProjectRules(currentProject, updater))}
+          />
+        );
       case 'settings':
         return (
           <SettingsSection

@@ -15,7 +15,6 @@ import {
   createDefaultSeats,
   syncProjectViews,
 } from './project';
-import { buildPreviewRuntime } from './runtime';
 import type { EditorProject, RulesBuilderBrief } from './types';
 
 export interface RulesBriefSuggestion {
@@ -196,29 +195,14 @@ function inferPhases(brief: RulesBuilderBrief): string[] {
 }
 
 function inferRulesText(brief: RulesBuilderBrief, projectName: string): string {
-  const playerRange = brief.minPlayers === brief.maxPlayers
-    ? `${brief.maxPlayers} player${brief.maxPlayers === 1 ? '' : 's'}`
-    : `${brief.minPlayers}-${brief.maxPlayers} players`;
-  const soloNote = brief.hasDistinctSoloMode
-    ? ' A distinct solo mode should reinterpret the shared shell for a single seat when needed.'
-    : '';
-  const campaignNote = brief.isCampaignGame
-    ? ' The campaign flag means progress and naming should feel episodic even in the starter scaffold.'
-    : '';
-
-  return `${projectName} is a linked multi-view tabletop prototype for ${playerRange}. Each seat starts with 6 block resources in a Player Resources area, the shared board opens by default, the scaffold includes a shared Game Supply, and clicking a player summary should focus that player view while keeping the shared shell intact.${soloNote}${campaignNote}`;
+  void brief;
+  void projectName;
+  return '';
 }
 
 function buildDesignerNotes(brief: RulesBuilderBrief, extraNotes: string[] = []): string {
-  return [
-    `Setup name: ${brief.name || 'Untitled setup'}`,
-    `Player range: ${brief.minPlayers}-${brief.maxPlayers}`,
-    `Distinct solo mode: ${brief.hasDistinctSoloMode ? 'yes' : 'no'}`,
-    `Campaign game: ${brief.isCampaignGame ? 'yes' : 'no'}`,
-    `Theme: ${brief.theme || 'none'}`,
-    `Art style: ${brief.artStyle || 'none'}`,
-    ...extraNotes,
-  ].join('\n');
+  void brief;
+  return extraNotes.join('\n');
 }
 
 function buildComponentCatalogSummary(): AIBuildPromptPack['componentCatalog'] {
@@ -525,109 +509,6 @@ function getDefaultResourcesLabel(seat: EditorProject['seats'][number]): string 
   return `${seat.name} Resources`;
 }
 
-function getDefaultGameSupplyLabel(): string {
-  return 'Game Supply';
-}
-
-function countDestinationSurfaces(project: EditorProject): number {
-  return Object.values(project.instances).filter((instance) => (
-    instance.componentType === 'space' || instance.componentType === 'zone'
-  )).length;
-}
-
-function countOwnedMovers(project: EditorProject, ownerId: string): number {
-  return Object.values(project.instances).reduce((total, instance) => {
-    if (
-      (instance.componentType !== 'piece' && instance.componentType !== 'token')
-      || instance.bindings.ownerId !== ownerId
-    ) {
-      return total;
-    }
-
-    const quantity = instance.properties.quantity;
-    return total + (
-      typeof quantity === 'number' && Number.isFinite(quantity) && quantity > 0
-        ? Math.max(1, Math.trunc(quantity))
-        : 1
-    );
-  }, 0);
-}
-
-function hasGameSupply(project: EditorProject): boolean {
-  return project.rootInstanceIds.some((instanceId) => {
-    const instance = project.instances[instanceId];
-    if (!instance || instance.componentType !== 'zone' || instance.bindings.ownerId) {
-      return false;
-    }
-
-    const label = typeof instance.properties.label === 'string' ? instance.properties.label : instance.displayName ?? '';
-    return label.trim().toLowerCase() === getDefaultGameSupplyLabel().toLowerCase();
-  });
-}
-
-function ensureMinimumPreviewableStructure(project: EditorProject, brief: RulesBuilderBrief): EditorProject {
-  let nextProject = project;
-
-  if (countDestinationSurfaces(nextProject) === 0) {
-    nextProject = addBoardFromPlan(nextProject, brief, undefined);
-  }
-
-  for (const seat of nextProject.seats) {
-    if (countOwnedMovers(nextProject, seat.id) > 0) {
-      continue;
-    }
-
-    nextProject = addZoneWithPieces(nextProject, {
-      label: getDefaultResourcesLabel(seat),
-      ownerId: seat.id,
-      maxCapacity: null,
-      pieceCount: seat.resources.startingBlocks,
-      pieceType: 'piece',
-      pieceLabelPrefix: singularize(seat.resources.resourceLabel),
-      supplyMode: 'finite',
-    });
-  }
-
-  if (!hasGameSupply(nextProject)) {
-    nextProject = addZoneWithPieces(nextProject, {
-      label: getDefaultGameSupplyLabel(),
-      ownerId: null,
-      maxCapacity: null,
-      pieceCount: 1,
-      pieceType: 'piece',
-      pieceLabelPrefix: singularize(nextProject.seats[0]?.resources.resourceLabel ?? 'Blocks'),
-      supplyMode: 'infinite',
-    });
-  }
-
-  return nextProject;
-}
-
-function repairIfPreviewStillBlocked(project: EditorProject, brief: RulesBuilderBrief): EditorProject {
-  const runtime = buildPreviewRuntime(project);
-  if (runtime.requirements.length === 0) {
-    return project;
-  }
-
-  let rebuilt = createProjectShell(brief, {
-    projectName: project.name,
-    description: project.description,
-    phases: project.rules.phases,
-    rulesText: project.rules.rulesText,
-    targetScore: project.rules.targetScore,
-    maxTurns: project.rules.maxTurns,
-    designerNotes: project.rules.designerNotes.split('\n').filter(Boolean),
-    appLayout: project.appLayout,
-  });
-  rebuilt = {
-    ...rebuilt,
-    seats: project.seats,
-    views: syncProjectViews(project.views, project.seats, project.name),
-  };
-
-  return ensureMinimumPreviewableStructure(rebuilt, brief);
-}
-
 export function createSimpleRulesBrief(): RulesBuilderBrief {
   return {
     ...SIMPLE_EXAMPLE_BRIEF,
@@ -682,10 +563,7 @@ export function createAIBuildPromptPack(brief: RulesBuilderBrief): AIBuildPrompt
 }
 
 export function buildProjectScaffoldFromBrief(brief: RulesBuilderBrief): EditorProject {
-  return repairIfPreviewStillBlocked(
-    ensureMinimumPreviewableStructure(createProjectShell(brief), brief),
-    brief,
-  );
+  return createProjectShell(brief);
 }
 
 export function buildProjectFromAIBlueprint(brief: RulesBuilderBrief, blueprint: AIGameBlueprint): EditorProject {
@@ -702,7 +580,13 @@ export function buildProjectFromAIBlueprint(brief: RulesBuilderBrief, blueprint:
 
   project = applyPlayerIdentityPlan(project, blueprint.playerIdentities);
   project = applyViewPlan(project, blueprint.views);
-  project = addBoardFromPlan(project, brief, blueprint.board);
+
+  // Only seed components the AI blueprint explicitly specifies.
+  // New games default to zero components — the creator adds them in the
+  // Component Editor after writing the rules.
+  if (blueprint.board) {
+    project = addBoardFromPlan(project, brief, blueprint.board);
+  }
 
   for (const sharedZone of blueprint.sharedZones ?? []) {
     project = addZoneWithPieces(project, {
@@ -716,28 +600,25 @@ export function buildProjectFromAIBlueprint(brief: RulesBuilderBrief, blueprint:
     });
   }
 
-  for (const seat of project.seats) {
-    const matchingArea = (blueprint.playerAreas ?? []).find((area) => area.ownerId === seat.id);
+  for (const area of blueprint.playerAreas ?? []) {
+    const seat = project.seats.find((entry) => entry.id === area.ownerId);
+    if (!seat) continue;
     project = addZoneWithPieces(project, {
-      label: normalizeText(matchingArea?.resourceLabel ?? matchingArea?.reserveLabel, getDefaultResourcesLabel(seat)),
+      label: normalizeText(area.resourceLabel ?? area.reserveLabel, getDefaultResourcesLabel(seat)),
       ownerId: seat.id,
       maxCapacity: null,
       pieceCount: clamp(
-        Number.isFinite(matchingArea?.startingPieces) ? Math.trunc(matchingArea?.startingPieces ?? 0) : seat.resources.startingBlocks,
+        Number.isFinite(area.startingPieces) ? Math.trunc(area.startingPieces ?? 0) : seat.resources.startingBlocks,
         1,
         12,
       ),
-      pieceType: matchingArea?.pieceType === 'token' ? 'token' : 'piece',
-      pieceLabelPrefix: normalizeText(
-        matchingArea?.pieceLabelPrefix,
-        singularize(seat.resources.resourceLabel),
-      ),
-      supplyMode: matchingArea?.supplyMode === 'infinite' ? 'infinite' : 'finite',
+      pieceType: area.pieceType === 'token' ? 'token' : 'piece',
+      pieceLabelPrefix: normalizeText(area.pieceLabelPrefix, singularize(seat.resources.resourceLabel)),
+      supplyMode: area.supplyMode === 'infinite' ? 'infinite' : 'finite',
     });
   }
 
-  project = ensureMinimumPreviewableStructure(project, brief);
-  return repairIfPreviewStillBlocked(project, brief);
+  return project;
 }
 
 export function buildProjectWithAI(brief: RulesBuilderBrief): EditorProject {
