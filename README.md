@@ -1,8 +1,30 @@
 # TurnBased
 
-AI-first platform for building, previewing, playtesting, and versioning tabletop games on top of a shared deterministic engine.
+The online home for board game designers. Design components, version your
+rules, get AI help on text and art, and order physical prototypes through
+our supplier integration.
+
+Architecture and current scope live in [.agents/architecture.md](.agents/architecture.md).
+Current milestone is board game design + physical prototype ordering;
+online play and the digital marketplace are planned later milestones.
 
 ## Local Dev
+
+To start the full local stack in one command:
+
+```bash
+npm run dev:local
+```
+
+That script uses your existing `.env` when present. If `.env` is missing, it copies `.env.example` to `.env` without overwriting an existing file. It then starts Supabase, serves the local edge runtime, and starts the web app at `http://127.0.0.1:3000`.
+
+Set `RESET_DB=1` if you want to rebuild the local database from migrations and seed data:
+
+```bash
+RESET_DB=1 npm run dev:local
+```
+
+Manual setup:
 
 1. Copy `.env.example` to `.env` and fill in the values you need.
 2. Start local Supabase:

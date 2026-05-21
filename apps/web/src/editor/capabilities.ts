@@ -47,37 +47,37 @@ export const projectWarningCatalog: Record<ProjectAcknowledgedWarningId, Project
     id: 'extension-boundaries',
     title: 'Stay inside documented extension hooks',
     description: 'Advanced mode supports custom predicates, target generators, scoring helpers, derived views, AI hints, and affordance policies only.',
-    citation: 'docs/engine/extension-points.md',
+    citation: 'docs/future/engine/extension-points.md',
   },
   'browser-only-runtime': {
     id: 'browser-only-runtime',
     title: 'Custom behavior must remain browser-safe',
     description: 'Creators still cannot rely on arbitrary backend execution or side effects. Hook code must stay deterministic and serializable.',
-    citation: 'docs/engine/experimental-engine-override.md',
+    citation: 'docs/future/engine/experimental-engine-override.md',
   },
   'ai-degradation': {
     id: 'ai-degradation',
     title: 'AI assistance quality may degrade',
     description: 'Agents may not understand custom engine-adjacent behavior as reliably once overrides are enabled.',
-    citation: 'docs/engine/experimental-engine-override.md',
+    citation: 'docs/future/engine/experimental-engine-override.md',
   },
   'no-migration-guarantee': {
     id: 'no-migration-guarantee',
     title: 'Future engine upgrades may break overrides',
     description: 'Experimental projects do not receive compatibility or migration guarantees across engine changes.',
-    citation: 'docs/engine/experimental-engine-override.md',
+    citation: 'docs/future/engine/experimental-engine-override.md',
   },
   'marketplace-restriction': {
     id: 'marketplace-restriction',
     title: 'Marketplace publishing is restricted for experimental projects',
     description: 'Experimental projects can create release snapshots, but marketplace publication is disabled until override review lands.',
-    citation: 'docs/engine/experimental-engine-override.md',
+    citation: 'docs/future/engine/experimental-engine-override.md',
   },
   'irreversible-upgrade': {
     id: 'irreversible-upgrade',
     title: 'Experimental activation is permanent',
     description: 'Once a project is marked experimental it stays flagged as experimental so support and review tools can reason about it.',
-    citation: 'docs/adr/0003-engine-override-policy.md',
+    citation: 'docs/future/adr/0003-engine-override-policy.md',
   },
 };
 
@@ -86,37 +86,37 @@ export const advancedHookCatalog: readonly AdvancedHookTemplateDefinition[] = [
     type: 'predicate',
     label: 'Custom Predicate',
     description: 'Evaluate special rule conditions without touching core reducer behavior.',
-    citation: 'docs/engine/extension-points.md',
+    citation: 'docs/future/engine/extension-points.md',
   },
   {
     type: 'target-generator',
     label: 'Target Generator',
     description: 'Produce dynamic lists of legal targets for advanced actions.',
-    citation: 'docs/engine/extension-points.md',
+    citation: 'docs/future/engine/extension-points.md',
   },
   {
     type: 'scoring-helper',
     label: 'Scoring Helper',
     description: 'Compute custom scores or derived point totals.',
-    citation: 'docs/engine/extension-points.md',
+    citation: 'docs/future/engine/extension-points.md',
   },
   {
     type: 'derived-view',
     label: 'Derived View',
     description: 'Expose read-only computed state for players or spectators.',
-    citation: 'docs/engine/extension-points.md',
+    citation: 'docs/future/engine/extension-points.md',
   },
   {
     type: 'ai-hint',
     label: 'AI Hint',
     description: 'Add AI-facing hints while keeping AI input inside projected state boundaries.',
-    citation: 'docs/engine/extension-points.md',
+    citation: 'docs/future/engine/extension-points.md',
   },
   {
     type: 'affordance-policy',
     label: 'Affordance Policy',
     description: 'Adjust highlight and selection policy from the legal move tree instead of custom click logic.',
-    citation: 'docs/engine/extension-points.md',
+    citation: 'docs/future/engine/extension-points.md',
   },
 ] as const;
 
@@ -268,7 +268,7 @@ export function getProjectModeSupportSummary(project: EditorProject): ProjectMod
         'Extensions must stay inside documented hook contracts.',
         'No reducer, turn flow, or visibility overrides are supported here.',
       ],
-      citations: ['docs/engine/extension-points.md', 'docs/adr/0003-engine-override-policy.md'],
+      citations: ['docs/future/engine/extension-points.md', 'docs/future/adr/0003-engine-override-policy.md'],
     };
   }
 
@@ -284,7 +284,7 @@ export function getProjectModeSupportSummary(project: EditorProject): ProjectMod
         'Marketplace publishing is disabled for experimental projects right now.',
         'Save compatibility across engine upgrades is not guaranteed.',
       ],
-      citations: ['docs/engine/experimental-engine-override.md', 'docs/adr/0003-engine-override-policy.md'],
+      citations: ['docs/future/engine/experimental-engine-override.md', 'docs/future/adr/0003-engine-override-policy.md'],
     };
   }
 
@@ -294,7 +294,7 @@ export function getProjectModeSupportSummary(project: EditorProject): ProjectMod
     marketplaceEligible: true,
     aiGuidance: 'AI can assume standard engine semantics and should prefer built-in components and declarative rules.',
     reducedGuarantees: [],
-    citations: ['docs/adr/0003-engine-override-policy.md'],
+    citations: ['docs/future/adr/0003-engine-override-policy.md'],
   };
 }
 

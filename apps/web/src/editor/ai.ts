@@ -11,37 +11,37 @@ import type { EditorProject, PreviewRuntime } from './types';
 const ENGINE_DOC_GROUNDING = [
   {
     title: 'Component Model',
-    citation: 'docs/engine/component-model.md',
+    citation: 'docs/future/engine/component-model.md',
     summary: 'Built-in components carry placement, occupancy, render hints, and property definitions so the editor and preview share one contract.',
   },
   {
     title: 'Rules Authoring',
-    citation: 'docs/engine/rules-authoring.md',
+    citation: 'docs/future/engine/rules-authoring.md',
     summary: 'Turn structure, scoring, visibility, and win conditions should stay declarative whenever possible and only drop to hooks for exceptional behavior.',
   },
   {
     title: 'Legal Move Generation',
-    citation: 'docs/engine/legal-move-generation.md',
+    citation: 'docs/future/engine/legal-move-generation.md',
     summary: 'The legal move tree is the canonical source for current player actions, debug overlays, and AI prompts.',
   },
   {
     title: 'UI Interaction Contract',
-    citation: 'docs/engine/ui-interaction-contract.md',
+    citation: 'docs/future/engine/ui-interaction-contract.md',
     summary: 'Highlights, interactable states, and menus should be derived from the move tree instead of ad hoc per-game click logic.',
   },
   {
     title: 'AI Player Contract',
-    citation: 'docs/engine/ai-player-contract.md',
+    citation: 'docs/future/engine/ai-player-contract.md',
     summary: 'AI consumers should only see projected state, legal moves, recent visible history, and a concise rules summary.',
   },
   {
     title: 'Extension Points',
-    citation: 'docs/engine/extension-points.md',
+    citation: 'docs/future/engine/extension-points.md',
     summary: 'Advanced mode should use documented hook interfaces instead of reaching into reducer internals.',
   },
   {
     title: 'Experimental Engine Override Mode',
-    citation: 'docs/engine/experimental-engine-override.md',
+    citation: 'docs/future/engine/experimental-engine-override.md',
     summary: 'Experimental projects keep browser-only execution, but AI quality, marketplace readiness, and migration guarantees are reduced.',
   },
 ];
@@ -119,7 +119,7 @@ export function generateGroundedAdvice(
     return {
       title: 'Recommended Next Steps',
       body: `${nextSteps} ${modeNote} The component catalog should stay responsible for layout and occupancy, while the rules layer stays declarative around score and turn flow.`,
-      citations: ['docs/engine/component-model.md', 'docs/engine/rules-authoring.md', ...modeSupport.citations],
+      citations: ['docs/future/engine/component-model.md', 'docs/future/engine/rules-authoring.md', ...modeSupport.citations],
       groundingSummary: rulesSummary,
     };
   }
@@ -132,7 +132,7 @@ export function generateGroundedAdvice(
     return {
       title: 'Current Legal Move Readout',
       body: `The preview is driven directly from the legal move tree. Current actions: ${actionSummary} Interactable overlays should mirror those exact actions rather than inventing extra UI-only states.`,
-      citations: ['docs/engine/legal-move-generation.md', 'docs/engine/ui-interaction-contract.md'],
+      citations: ['docs/future/engine/legal-move-generation.md', 'docs/future/engine/ui-interaction-contract.md'],
       groundingSummary: JSON.stringify({
         player: aiEnvelope.playerInfo.displayName,
         turn: aiEnvelope.turnContext,
@@ -145,7 +145,7 @@ export function generateGroundedAdvice(
     return {
       title: 'AI Grounding Bundle',
       body: `A future agent should receive projected state, visible recent history, and legal moves only. Current mode: ${modeLabel}. ${modeSupport.aiGuidance} The current project already produces a compact rules summary and legal move envelope for the active seat, which is the right boundary for safe editor assistance.`,
-      citations: ['docs/engine/ai-player-contract.md', 'docs/engine/legal-move-generation.md', ...modeSupport.citations],
+      citations: ['docs/future/engine/ai-player-contract.md', 'docs/future/engine/legal-move-generation.md', ...modeSupport.citations],
       groundingSummary: JSON.stringify({
         projectMode: project.manifest.capabilities.mode,
         enabledOverrides: project.manifest.capabilities.enabledOverrides,
