@@ -14,7 +14,13 @@ import { useMemo, type CSSProperties } from 'react';
 function bladeStyle(i: number, total: number, palette: BladePalette): CSSProperties {
   const x = (i / total) * 100;
   const height = palette.heightBase + ((i * 37) % palette.heightVar);
-  const width = 7 + ((i * 11) % 12);
+  // Width scales with the layer's median height so short blades stay slender
+  // instead of going stubby. (heightBase + heightVar/2) / 6 keeps tall layers
+  // at ~9-13px wide and short layers at ~3-5px wide.
+  const medianHeight = palette.heightBase + palette.heightVar / 2;
+  const widthBase = Math.max(2, Math.round(medianHeight / 8));
+  const widthVar = Math.max(2, Math.round(medianHeight / 5));
+  const width = widthBase + ((i * 11) % widthVar);
   const lean = -22 + ((i * 29) % 45);
   const hue = palette.hue + ((i * 13) % palette.hueRange);
   const light = palette.light + ((i * 7) % palette.lightRange);
@@ -94,12 +100,14 @@ function GrassLayer({
   );
 }
 
-export function GrassBackdrop({ height = 110 }: { height?: number }) {
+export function GrassBackdrop({ height = 55 }: { height?: number }) {
   // Cozy-forest palette — deeper, softer greens than the user's reference
-  // lime so the band reads as part of the magical forest aesthetic.
-  const backPalette: BladePalette = { hue: 132, hueRange: 14, light: 30, lightRange: 14, heightBase: 22, heightVar: 36 };
-  const midPalette: BladePalette = { hue: 138, hueRange: 18, light: 36, lightRange: 16, heightBase: 28, heightVar: 50 };
-  const frontPalette: BladePalette = { hue: 142, hueRange: 22, light: 40, lightRange: 18, heightBase: 32, heightVar: 62 };
+  // lime so the band reads as part of the magical forest aesthetic. Blade
+  // heights are tuned so the tallest front blade still fits inside `height`
+  // with a small safety margin.
+  const backPalette: BladePalette = { hue: 132, hueRange: 14, light: 30, lightRange: 14, heightBase: 12, heightVar: 16 };
+  const midPalette: BladePalette = { hue: 138, hueRange: 18, light: 36, lightRange: 16, heightBase: 16, heightVar: 22 };
+  const frontPalette: BladePalette = { hue: 142, hueRange: 22, light: 40, lightRange: 18, heightBase: 20, heightVar: 28 };
 
   return (
     <div

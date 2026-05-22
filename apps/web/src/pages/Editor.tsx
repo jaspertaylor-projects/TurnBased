@@ -38,7 +38,7 @@ import { createWorkspaceFiles } from '../editor/shipping';
 import { saveProjectWorkspace } from '../editor/workspace';
 import { GrassBackdrop } from '../components/GrassBackdrop';
 
-const GRASS_BACKDROP_HEIGHT = 110;
+const GRASS_BACKDROP_HEIGHT = 55;
 
 const PENDING_EDITOR_NOTICE_KEY = 'turnbased.creator.pendingEditorNotice';
 const SUPPORT_ZONE_COMPONENT_TYPES = new Set([
