@@ -119,6 +119,18 @@ button:focus-visible {
   to { transform: rotate(360deg); }
 }
 
+/* Idle sway for the swaying-grass backdrop pinned to the bottom of the
+   editor viewport. Each blade gets a per-instance animation-delay so the
+   rows don't move in lockstep. See apps/web/src/components/GrassBackdrop.tsx. */
+@keyframes grassIdleSway {
+  0%, 100% {
+    transform: translateX(-50%) rotate(var(--blade-lean, -3deg));
+  }
+  50% {
+    transform: translateX(-50%) translateY(0) rotate(calc(var(--blade-lean, -3deg) + 8deg));
+  }
+}
+
 .inspector-accordion-trigger:hover {
   background: rgba(15,118,110,0.06) !important;
 }

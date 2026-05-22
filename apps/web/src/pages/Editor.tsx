@@ -36,6 +36,9 @@ import type { BuiltInComponentType, ComponentInstanceModel } from '@turnbased/en
 import { commitProjectVersion, getProjectGitStatus, listProjectGitCommits, restoreProjectFromCommit } from '../editor/git';
 import { createWorkspaceFiles } from '../editor/shipping';
 import { saveProjectWorkspace } from '../editor/workspace';
+import { GrassBackdrop } from '../components/GrassBackdrop';
+
+const GRASS_BACKDROP_HEIGHT = 110;
 
 const PENDING_EDITOR_NOTICE_KEY = 'turnbased.creator.pendingEditorNotice';
 const SUPPORT_ZONE_COMPONENT_TYPES = new Set([
@@ -440,7 +443,11 @@ export const Editor = () => {
       />
 
       {/* editorViewport — single container for ALL section content (canvas and non-canvas).
-          Everything that isn't the navbar or the sidebar renders inside this div. */}
+          Everything that isn't the navbar or the sidebar renders inside this div.
+          The viewport reserves bottom padding so the persistent GrassBackdrop at
+          the bottom of the editor doesn't cover section content. The grass is
+          absolutely positioned, so the reserved padding is the space sections
+          can't draw into. */}
       <div
         id="editor-viewport"
         data-layout="editorViewport"
@@ -452,6 +459,8 @@ export const Editor = () => {
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
+          paddingBottom: `${GRASS_BACKDROP_HEIGHT}px`,
+          boxSizing: 'border-box',
         }}
       >
         {isCanvasSection ? (
@@ -500,6 +509,8 @@ export const Editor = () => {
             {renderActiveSection()}
           </div>
         )}
+
+        <GrassBackdrop height={GRASS_BACKDROP_HEIGHT} />
       </div>
     </div>
   );
