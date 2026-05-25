@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, Plus, Sparkles, Trash2 } from 'lucide-react';
 
 import { addChapter, createBlankChapter, removeChapter, updateChapter } from '../project';
+import { generateRulesChapterText, type AIRulesMode } from '../aiRulesService';
 import type { EditorProject, EditorRuleConfig, RulesChapter } from '../types';
 
 const PAPER_BACKGROUND = 'linear-gradient(155deg, #fffdf6 0%, #f8efd9 100%)';
@@ -17,6 +18,14 @@ function clampSpread(index: number, totalChapters: number): number {
   return index;
 }
 
+interface AIDraftState {
+  chapterId: string;
+  prompt: string;
+  mode: AIRulesMode;
+  loading: boolean;
+  error: string | null;
+}
+
 interface PageProps {
   chapter: RulesChapter | null;
   pageNumber: number;
@@ -25,17 +34,174 @@ interface PageProps {
   onRemove: (chapterId: string) => void;
   onAdd: () => void;
   side: 'left' | 'right';
+  aiState: AIDraftState | null;
+  onOpenAI: (chapter: RulesChapter) => void;
+  onUpdateAI: (patch: Partial<AIDraftState>) => void;
+  onCancelAI: () => void;
+  onRunAI: (chapter: RulesChapter) => void;
 }
 
-function RulebookPage({ chapter, pageNumber, onTitleChange, onBodyChange, onRemove, onAdd, side }: PageProps) {
+function AIAssistPanel({
+  chapter,
+  state,
+  onUpdateAI,
+  onCancelAI,
+  onRunAI,
+}: {
+  chapter: RulesChapter;
+  state: AIDraftState;
+  onUpdateAI: (patch: Partial<AIDraftState>) => void;
+  onCancelAI: () => void;
+  onRunAI: (chapter: RulesChapter) => void;
+}) {
+  const bodyHasContent = chapter.body.trim().length > 0;
+  return (
+    <div
+      data-layout="aiAssistPanel"
+      /* inline AI prompt panel rendered between the title divider and the
+         body textarea. Cream parchment with a dashed teal accent so it
+         reads as a deliberate "AI editor" mode without clashing with the
+         page itself. */
+      style={{
+        flex: '0 0 auto',
+        display: 'grid',
+        gap: '0.55rem',
+        padding: '0.7rem 0.8rem',
+        borderRadius: '12px',
+        background: 'rgba(255,251,238,0.85)',
+        border: '1px dashed rgba(13,148,136,0.5)',
+        boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.6)',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+        <Sparkles size={14} style={{ color: '#0d9488' }} />
+        <span style={{ fontFamily: SERIF_STACK, fontWeight: 700, color: '#3b2412', fontSize: '0.92rem' }}>
+          AI assist — {chapter.title || 'Untitled section'}
+        </span>
+      </div>
+
+      <div data-layout="aiModeRow" /* draft / expand / rewrite mode toggle */ style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+        {(
+          [
+            { key: 'draft' as const, label: 'Fresh draft', disabledHint: bodyHasContent ? 'Will replace existing text' : null },
+            { key: 'expand' as const, label: 'Expand', disabledHint: bodyHasContent ? null : 'Nothing to expand yet' },
+            { key: 'rewrite' as const, label: 'Rewrite', disabledHint: bodyHasContent ? null : 'Nothing to rewrite yet' },
+          ]
+        ).map((option) => {
+          const disabled = (option.key !== 'draft' && !bodyHasContent);
+          const selected = state.mode === option.key;
+          return (
+            <button
+              key={option.key}
+              type="button"
+              onClick={() => !disabled && onUpdateAI({ mode: option.key })}
+              disabled={disabled || state.loading}
+              title={option.disabledHint ?? option.label}
+              style={{
+                padding: '0.32rem 0.7rem', borderRadius: '999px',
+                border: selected ? '1px solid rgba(13,148,136,0.8)' : '1px solid rgba(120,95,50,0.3)',
+                background: selected ? 'rgba(13,148,136,0.18)' : 'rgba(255,253,246,0.9)',
+                color: disabled ? 'rgba(120,95,50,0.4)' : '#3b2412',
+                fontFamily: SERIF_STACK, fontWeight: 700, fontSize: '0.78rem',
+                cursor: disabled ? 'not-allowed' : (state.loading ? 'wait' : 'pointer'),
+              }}
+            >
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+
+      <textarea
+        value={state.prompt}
+        onChange={(event) => onUpdateAI({ prompt: event.target.value })}
+        placeholder={
+          state.mode === 'draft'
+            ? 'Optional: tell the AI what this section should cover. Leave blank to draft from the rest of your rulebook.'
+            : state.mode === 'expand'
+              ? 'Optional: what would you like added? Examples, clarifications, an edge case…'
+              : 'Optional: what should change in the rewrite? Tone, structure, brevity…'
+        }
+        disabled={state.loading}
+        style={{
+          width: '100%', boxSizing: 'border-box',
+          minHeight: '64px',
+          padding: '0.55rem 0.7rem',
+          borderRadius: '10px',
+          border: '1px solid rgba(120,95,50,0.2)',
+          background: 'rgba(255,255,255,0.85)',
+          color: '#3b2412',
+          fontFamily: SERIF_STACK,
+          fontSize: '0.86rem',
+          resize: 'vertical',
+        }}
+      />
+
+      {state.error ? (
+        <div style={{ padding: '0.4rem 0.55rem', borderRadius: '8px', background: 'rgba(254,226,226,0.85)', border: '1px solid rgba(239,68,68,0.25)', color: '#991b1b', fontSize: '0.8rem' }}>
+          {state.error}
+        </div>
+      ) : null}
+
+      <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
+        <button
+          type="button"
+          onClick={onCancelAI}
+          disabled={state.loading}
+          style={{
+            padding: '0.4rem 0.8rem', borderRadius: '999px',
+            border: '1px solid rgba(120,95,50,0.3)',
+            background: 'rgba(255,253,246,0.95)', color: '#3b2412',
+            fontFamily: SERIF_STACK, fontWeight: 700, fontSize: '0.82rem',
+            cursor: state.loading ? 'wait' : 'pointer',
+          }}
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={() => onRunAI(chapter)}
+          disabled={state.loading}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+            padding: '0.4rem 0.95rem', borderRadius: '999px', border: 'none',
+            background: state.loading ? 'rgba(13,148,136,0.45)' : 'linear-gradient(135deg, #064e3b, #0d9488)',
+            color: 'white',
+            fontFamily: SERIF_STACK, fontWeight: 700, fontSize: '0.85rem',
+            cursor: state.loading ? 'wait' : 'pointer',
+          }}
+        >
+          {state.loading ? <Loader2 size={14} style={{ animation: 'spin 1.1s linear infinite' }} /> : <Sparkles size={14} />}
+          {state.loading ? 'Writing…' : 'Generate'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function RulebookPage({
+  chapter,
+  pageNumber,
+  onTitleChange,
+  onBodyChange,
+  onRemove,
+  onAdd,
+  side,
+  aiState,
+  onOpenAI,
+  onUpdateAI,
+  onCancelAI,
+  onRunAI,
+}: PageProps) {
   const isLeftPage = side === 'left';
+  const aiTargetsThisPage = chapter !== null && aiState !== null && aiState.chapterId === chapter.id;
   const pageInner: ReactNode = chapter ? (
     <div data-layout="pageContent" /* page content column inside the paper card */ style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, gap: '0.75rem' }}>
-      <div data-layout="pageTitleRow" /* editable chapter title + remove button */ style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+      <div data-layout="pageTitleRow" /* editable chapter title + AI / remove buttons */ style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
         <input
           value={chapter.title}
           onChange={(event) => onTitleChange(chapter.id, event.target.value)}
-          placeholder="Untitled chapter"
+          placeholder="Untitled section"
           aria-label="Chapter title"
           style={{
             flex: '1 1 auto', minWidth: 0,
@@ -52,9 +218,28 @@ function RulebookPage({ chapter, pageNumber, onTitleChange, onBodyChange, onRemo
         />
         <button
           type="button"
+          onClick={() => onOpenAI(chapter)}
+          disabled={aiTargetsThisPage}
+          aria-label={`Open AI assist for ${chapter.title || 'this section'}`}
+          title="Ask the AI for help with this section"
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+            padding: '0.3rem 0.6rem', borderRadius: '999px',
+            border: '1px solid rgba(13,148,136,0.4)',
+            background: aiTargetsThisPage ? 'rgba(13,148,136,0.18)' : 'rgba(255,253,246,0.9)',
+            color: '#0d9488',
+            fontFamily: SERIF_STACK, fontWeight: 700, fontSize: '0.78rem',
+            cursor: aiTargetsThisPage ? 'default' : 'pointer', flexShrink: 0,
+          }}
+        >
+          <Sparkles size={13} />
+          AI
+        </button>
+        <button
+          type="button"
           onClick={() => onRemove(chapter.id)}
           aria-label={`Remove ${chapter.title || 'chapter'}`}
-          title="Remove chapter"
+          title="Remove section"
           style={{
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
             width: '28px', height: '28px', borderRadius: '999px',
@@ -68,11 +253,22 @@ function RulebookPage({ chapter, pageNumber, onTitleChange, onBodyChange, onRemo
 
       <div aria-hidden style={{ height: '1px', background: 'linear-gradient(90deg, rgba(120,95,50,0.4) 0%, rgba(120,95,50,0.1) 100%)', flex: '0 0 auto' }} />
 
+      {aiTargetsThisPage && aiState ? (
+        <AIAssistPanel
+          chapter={chapter}
+          state={aiState}
+          onUpdateAI={onUpdateAI}
+          onCancelAI={onCancelAI}
+          onRunAI={onRunAI}
+        />
+      ) : null}
+
       <textarea
         value={chapter.body}
         onChange={(event) => onBodyChange(chapter.id, event.target.value)}
         placeholder="Write this part of the rulebook..."
         aria-label="Chapter text"
+        disabled={aiTargetsThisPage && aiState?.loading}
         style={{
           flex: '1 1 auto',
           minHeight: 0,
@@ -151,13 +347,20 @@ export function RulesSection({
 }) {
   const chapters = project.rules.chapters;
   const totalChapters = chapters.length;
-  const totalSpreads = Math.max(1, Math.ceil(Math.max(1, totalChapters) / 2));
   const [spreadIndex, setSpreadIndex] = useState(0);
+  const [aiState, setAiState] = useState<AIDraftState | null>(null);
 
   // Clamp spread when chapters shrink (delete) so we never land past the end.
   useEffect(() => {
     setSpreadIndex((prev) => clampSpread(prev, totalChapters));
   }, [totalChapters]);
+
+  // Drop AI panel state if its target chapter disappears (delete, etc.).
+  useEffect(() => {
+    if (!aiState) return;
+    const stillThere = chapters.some((chapter) => chapter.id === aiState.chapterId);
+    if (!stillThere) setAiState(null);
+  }, [aiState, chapters]);
 
   const leftIndex = spreadIndex * 2;
   const rightIndex = leftIndex + 1;
@@ -205,6 +408,46 @@ export function RulesSection({
 
   function handleNext() {
     if (canGoForward) setSpreadIndex(spreadIndex + 1);
+  }
+
+  function openAIPanel(chapter: RulesChapter) {
+    setAiState({
+      chapterId: chapter.id,
+      prompt: '',
+      mode: chapter.body.trim().length > 0 ? 'expand' : 'draft',
+      loading: false,
+      error: null,
+    });
+  }
+
+  function updateAIPanel(patch: Partial<AIDraftState>) {
+    setAiState((prev) => (prev ? { ...prev, ...patch } : prev));
+  }
+
+  function cancelAIPanel() {
+    setAiState(null);
+  }
+
+  async function runAI(chapter: RulesChapter) {
+    if (!aiState || aiState.chapterId !== chapter.id || aiState.loading) return;
+    const currentState = aiState;
+    setAiState({ ...currentState, loading: true, error: null });
+    try {
+      const result = await generateRulesChapterText({
+        project,
+        activeChapter: chapter,
+        userPrompt: currentState.prompt,
+        mode: currentState.mode,
+      });
+      // Replace the chapter body with the AI's output. All three modes
+      // (draft/expand/rewrite) return a complete body — see the edge
+      // function's system prompt.
+      onUpdateRules((rules) => updateChapter(rules, chapter.id, { body: result.text }));
+      setAiState(null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'AI request failed';
+      setAiState((prev) => (prev && prev.chapterId === chapter.id ? { ...prev, loading: false, error: message } : prev));
+    }
   }
 
   return (
@@ -255,6 +498,11 @@ export function RulesSection({
           onRemove={handleRemoveChapter}
           onAdd={handleAddChapter}
           side="left"
+          aiState={aiState}
+          onOpenAI={openAIPanel}
+          onUpdateAI={updateAIPanel}
+          onCancelAI={cancelAIPanel}
+          onRunAI={runAI}
         />
 
         {/* spine shadow between the two pages */}
@@ -276,6 +524,11 @@ export function RulesSection({
           onRemove={handleRemoveChapter}
           onAdd={handleAddChapter}
           side="right"
+          aiState={aiState}
+          onOpenAI={openAIPanel}
+          onUpdateAI={updateAIPanel}
+          onCancelAI={cancelAIPanel}
+          onRunAI={runAI}
         />
       </div>
 
