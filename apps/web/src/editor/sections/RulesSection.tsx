@@ -109,7 +109,7 @@ function RulebookPage({ chapter, pageNumber, onTitleChange, onBodyChange, onRemo
         }}
       >
         <Plus size={14} />
-        Add chapter
+        Add section
       </button>
       <span style={{ fontFamily: SERIF_STACK, fontStyle: 'italic', color: 'rgba(120, 95, 50, 0.55)', fontSize: '0.8rem' }}>
         A blank page, waiting.
@@ -314,7 +314,7 @@ export function RulesSection({
             fontFamily: SERIF_STACK, fontWeight: 700, fontSize: '0.85rem',
           }}
         >
-          <Plus size={14} /> Add chapter
+          <Plus size={14} /> Add section
         </button>
 
         <button
