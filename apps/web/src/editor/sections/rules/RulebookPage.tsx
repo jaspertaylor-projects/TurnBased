@@ -26,6 +26,10 @@ export interface RulebookPageProps {
   aiUndoBody: string | null;
   onUndoAI: (chapterId: string) => void;
   onBodyContextMenu: (event: ReactMouseEvent<HTMLTextAreaElement>) => void;
+  /* Append a new theme / art style to the project brief AND mark it
+     selected on the current AI panel. Provided by RulesSection. */
+  onAppendTheme: (value: string) => void;
+  onAppendArtStyle: (value: string) => void;
 }
 
 
@@ -45,6 +49,8 @@ export function RulebookPage({
   aiUndoBody,
   onUndoAI,
   onBodyContextMenu,
+  onAppendTheme,
+  onAppendArtStyle,
 }: RulebookPageProps) {
   const isLeftPage = side === 'left';
   const aiTargetsThisPage = chapter !== null && aiState !== null && aiState.chapterId === chapter.id;
@@ -133,6 +139,8 @@ export function RulebookPage({
           onUpdateAI={onUpdateAI}
           onCancelAI={onCancelAI}
           onRunAI={onRunAI}
+          onAppendTheme={onAppendTheme}
+          onAppendArtStyle={onAppendArtStyle}
         />
       ) : null}
 

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { ChevronLeft, ChevronRight, Plus, SpellCheck, X } from 'lucide-react';
 
-import { addChapter, createBlankChapter, removeChapter, updateChapter } from '../project';
+import { addChapter, createBlankChapter, removeChapter, splitBriefList, updateChapter } from '../project';
 import { generateRulesChapterText } from '../aiRulesService';
 import { saveRecentPrompt } from '../aiPromptHistory';
 import type { EditorProject, EditorRuleConfig, RulesChapter } from '../types';
@@ -24,30 +24,21 @@ function clampSpread(index: number, totalChapters: number): number {
   return index;
 }
 
-/* The brief stores themes and art styles as a single comma-joined string
-   (so the chip pickers on /new can round-trip cleanly to existing
-   downstream code). Split into an ordered, deduped list of trimmed
-   entries for the AI panel's chip toggles. */
-function splitBriefList(value: string): string[] {
-  const seen = new Set<string>();
-  const result: string[] = [];
-  for (const raw of value.split(',')) {
-    const trimmed = raw.trim();
-    if (!trimmed) continue;
-    const key = trimmed.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    result.push(trimmed);
-  }
-  return result;
-}
 
 export function RulesSection({
   project,
   onUpdateRules,
+  onAppendProjectTheme,
+  onAppendProjectArtStyle,
 }: {
   project: EditorProject;
   onUpdateRules: (updater: (rules: EditorRuleConfig) => EditorRuleConfig) => void;
+  /* Persist a new theme on the project brief (so it survives across
+     generations and surfaces in other AI calls / project metadata).
+     RulesSection wraps these to ALSO add the new chip to the current
+     panel's available + selected lists so the user immediately sees it. */
+  onAppendProjectTheme: (theme: string) => void;
+  onAppendProjectArtStyle: (style: string) => void;
 }) {
   const chapters = project.rules.chapters;
   const totalChapters = chapters.length;
@@ -203,9 +194,38 @@ export function RulesSection({
     if (canGoForward) setSpreadIndex(spreadIndex + 1);
   }
 
+  function appendAndSelect(kind: 'themes' | 'artStyles', value: string) {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    // 1. Persist to the project brief
+    if (kind === 'themes') onAppendProjectTheme(trimmed);
+    else onAppendProjectArtStyle(trimmed);
+    // 2. Mirror into the current draft so the chip shows up + is selected
+    //    without waiting for a panel re-mount.
+    setAiState((prev) => {
+      if (!prev) return prev;
+      const availableKey = kind === 'themes' ? 'availableThemes' : 'availableArtStyles';
+      const selectedKey = kind === 'themes' ? 'selectedThemes' : 'selectedArtStyles';
+      const available = prev[availableKey];
+      const selected = prev[selectedKey];
+      const lower = trimmed.toLowerCase();
+      const nextAvailable = available.some((entry) => entry.toLowerCase() === lower)
+        ? available
+        : [...available, trimmed];
+      const nextSelected = selected.some((entry) => entry.toLowerCase() === lower)
+        ? selected
+        : [...selected, trimmed];
+      return { ...prev, [availableKey]: nextAvailable, [selectedKey]: nextSelected };
+    });
+  }
+
   function openAIPanel(chapter: RulesChapter) {
-    const availableThemes = splitBriefList(project.brief.theme);
-    const availableArtStyles = splitBriefList(project.brief.artStyle);
+    // normalizeRulesBuilderBrief stores the literal "none" as a placeholder
+    // when the user left themes / art styles blank at project creation.
+    // Filter it out so we don't render an opaque "none" chip the user can't
+    // act on; an empty available[] just shows the + Add affordance.
+    const availableThemes = splitBriefList(project.brief.theme).filter((entry) => entry.toLowerCase() !== 'none');
+    const availableArtStyles = splitBriefList(project.brief.artStyle).filter((entry) => entry.toLowerCase() !== 'none');
     setAiState({
       chapterId: chapter.id,
       prompt: '',
@@ -329,6 +349,8 @@ export function RulesSection({
           aiUndoBody={leftChapter ? aiUndoBodies[leftChapter.id] ?? null : null}
           onUndoAI={undoAI}
           onBodyContextMenu={handleBodyContextMenu}
+          onAppendTheme={(value) => appendAndSelect('themes', value)}
+          onAppendArtStyle={(value) => appendAndSelect('artStyles', value)}
         />
 
         {/* spine shadow between the two pages */}
@@ -358,6 +380,8 @@ export function RulesSection({
           aiUndoBody={rightChapter ? aiUndoBodies[rightChapter.id] ?? null : null}
           onUndoAI={undoAI}
           onBodyContextMenu={handleBodyContextMenu}
+          onAppendTheme={(value) => appendAndSelect('themes', value)}
+          onAppendArtStyle={(value) => appendAndSelect('artStyles', value)}
         />
       </div>
 

@@ -11,6 +11,7 @@ import {
   updateComponentInstance,
   updateProjectAppLayout,
   updateProjectArt,
+  appendBriefList,
   updateProjectBrief,
   updateProjectDescription,
   updateProjectRules,
@@ -303,6 +304,14 @@ export const Editor = () => {
           <RulesSection
             project={currentProject}
             onUpdateRules={(updater) => commitProject(updateProjectRules(currentProject, updater))}
+            onAppendProjectTheme={(theme) => commitProject(updateProjectBrief(currentProject, (brief) => ({
+              ...brief,
+              theme: appendBriefList(brief.theme, theme),
+            })))}
+            onAppendProjectArtStyle={(style) => commitProject(updateProjectBrief(currentProject, (brief) => ({
+              ...brief,
+              artStyle: appendBriefList(brief.artStyle, style),
+            })))}
           />
         );
       case 'art':

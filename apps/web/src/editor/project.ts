@@ -105,6 +105,38 @@ export function createDefaultRulesBrief(): RulesBuilderBrief {
   };
 }
 
+/* The brief stores `theme` and `artStyle` as a single comma-joined string so
+   downstream consumers (AI grounding, runtime, project description) get a
+   stable scalar. UI surfaces that want to render them as chip lists go
+   through splitBriefList; appendBriefList adds a new value to the joined
+   string, dedupes case-insensitively, and trims. */
+export function splitBriefList(value: string): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const raw of value.split(',')) {
+    const trimmed = raw.trim();
+    if (!trimmed) continue;
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(trimmed);
+  }
+  return result;
+}
+
+export function appendBriefList(value: string, entry: string): string {
+  const trimmed = entry.trim();
+  if (!trimmed) return value;
+  // Filter out the literal "none" placeholder that normalizeRulesBuilderBrief
+  // injects when the brief field was left empty at project creation — once
+  // a real entry is being added, the placeholder should evaporate.
+  const existing = splitBriefList(value).filter((item) => item.toLowerCase() !== 'none');
+  if (existing.some((item) => item.toLowerCase() === trimmed.toLowerCase())) {
+    return existing.join(', ');
+  }
+  return [...existing, trimmed].join(', ');
+}
+
 export function normalizeRulesBuilderBrief(brief: RulesBuilderBrief): RulesBuilderBrief {
   const normalizedMin = Math.max(1, Math.min(6, Math.trunc(brief.minPlayers || 1)));
   const normalizedMax = Math.max(normalizedMin, Math.min(6, Math.trunc(brief.maxPlayers || normalizedMin)));
