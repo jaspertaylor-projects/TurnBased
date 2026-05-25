@@ -2,6 +2,7 @@ import { useState, type KeyboardEvent } from 'react';
 import { Brush, ChevronDown, Plus, Sparkles, X } from 'lucide-react';
 
 import { AppPageFrame } from '../components/AppPageFrame';
+import { NumericInput } from '../components/NumericInput';
 import { buildProjectWithAI } from '../editor/aiBuildService';
 import { commitProjectVersion } from '../editor/git';
 import { buildPreviewRuntime } from '../editor/runtime';
@@ -347,6 +348,42 @@ export const CreateBlankProject = () => {
               style={{ padding: '0.8rem 0.95rem', borderRadius: '12px', border: '1px solid rgba(15,118,110,0.16)', fontSize: '1rem', color: '#064e3b' }}
             />
           </label>
+
+          <div data-layout="newGamePlayersField" /* players range — small inline editor; brief stores min/max */ style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+            <span style={{ color: '#0f766e', fontSize: '0.85rem', fontWeight: 700 }}>Players</span>
+            <NumericInput
+              min={1}
+              max={6}
+              value={brief.minPlayers}
+              onValueChange={(value) => setBrief((current) => {
+                const nextMin = Math.max(1, Math.min(6, value));
+                return {
+                  ...current,
+                  minPlayers: Math.min(nextMin, current.maxPlayers),
+                  maxPlayers: Math.max(nextMin, current.maxPlayers),
+                };
+              })}
+              style={{ width: '70px', padding: '0.55rem 0.7rem', borderRadius: '10px', border: '1px solid rgba(15,118,110,0.16)', textAlign: 'center', color: '#064e3b' }}
+            />
+            <span style={{ color: 'rgba(15,118,110,0.7)', fontSize: '0.85rem' }}>to</span>
+            <NumericInput
+              min={1}
+              max={6}
+              value={brief.maxPlayers}
+              onValueChange={(value) => setBrief((current) => {
+                const nextMax = Math.max(1, Math.min(6, value));
+                return {
+                  ...current,
+                  minPlayers: Math.min(current.minPlayers, nextMax),
+                  maxPlayers: Math.max(current.minPlayers, nextMax),
+                };
+              })}
+              style={{ width: '70px', padding: '0.55rem 0.7rem', borderRadius: '10px', border: '1px solid rgba(15,118,110,0.16)', textAlign: 'center', color: '#064e3b' }}
+            />
+            <span style={{ color: 'rgba(15,118,110,0.55)', fontSize: '0.78rem', fontStyle: 'italic' }}>
+              You can change this later in the Stats tab.
+            </span>
+          </div>
 
           <ChipPicker
             legendIcon={<Sparkles size={16} />}
