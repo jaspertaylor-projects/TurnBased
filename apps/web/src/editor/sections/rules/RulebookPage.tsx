@@ -130,9 +130,11 @@ function AIAssistPanel({
       />
 
       <div data-layout="aiPlaceholderHint" /* convention hint */ style={{ color: 'rgba(15,118,110,0.85)', fontSize: '0.74rem', fontStyle: 'italic', lineHeight: 1.4 }}>
-        Tip: write angle-bracket placeholders ending in <code style={{ background: 'rgba(13,148,136,0.1)', padding: '0 0.25rem', borderRadius: '4px', fontStyle: 'normal', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>-here</code> directly into the section
-        (e.g. <code style={{ background: 'rgba(13,148,136,0.1)', padding: '0 0.25rem', borderRadius: '4px', fontStyle: 'normal', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{'<city-name-here>'}</code>,{' '}
-        <code style={{ background: 'rgba(13,148,136,0.1)', padding: '0 0.25rem', borderRadius: '4px', fontStyle: 'normal', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{'<faction-here>'}</code>) and the AI will fill each one with something fitting the theme.
+        Tip: write angle-bracket placeholders directly into the section &mdash;
+        e.g. <code style={{ background: 'rgba(13,148,136,0.1)', padding: '0 0.25rem', borderRadius: '4px', fontStyle: 'normal', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{'<city-name>'}</code>,{' '}
+        <code style={{ background: 'rgba(13,148,136,0.1)', padding: '0 0.25rem', borderRadius: '4px', fontStyle: 'normal', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{'<faction>'}</code>,{' '}
+        <code style={{ background: 'rgba(13,148,136,0.1)', padding: '0 0.25rem', borderRadius: '4px', fontStyle: 'normal', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{'<sacred-item>'}</code> &mdash;
+        and the AI will fill each one with something fitting the theme.
       </div>
 
       {state.error ? (
