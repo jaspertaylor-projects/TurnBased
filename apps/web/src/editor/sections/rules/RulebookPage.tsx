@@ -1,7 +1,8 @@
-import { type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
-import { Loader2, Plus, RotateCcw, Sparkles, Trash2 } from 'lucide-react';
+import { useEffect, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
+import { Clock, Loader2, Plus, RotateCcw, Sparkles, Trash2, X } from 'lucide-react';
 
 import type { AIRulesMode } from '../../aiRulesService';
+import { loadRecentPrompts, removeRecentPrompt } from '../../aiPromptHistory';
 import type { RulesChapter } from '../../types';
 import { PAPER_BACKGROUND, PAPER_BORDER, PAPER_SHADOW, SERIF_STACK } from './rulebookStyles';
 
@@ -48,6 +49,34 @@ function AIAssistPanel({
   onRunAI: (chapter: RulesChapter) => void;
 }) {
   const bodyHasContent = chapter.body.trim().length > 0;
+  // Recents are reloaded each time this panel mounts (i.e. each time the
+  // user opens AI on a section). After a successful save in
+  // RulesSection.runAI the panel closes anyway, so it'll re-mount fresh
+  // next time and pick up the newly-saved prompt.
+  const [recents, setRecents] = useState<string[]>(() => loadRecentPrompts());
+  const [historyOpen, setHistoryOpen] = useState(false);
+
+  // If localStorage changes from another tab, mirror it. Rare in practice
+  // but cheap to support.
+  useEffect(() => {
+    function onStorage(event: StorageEvent) {
+      if (event.key === 'turnbased.rules.aiPromptHistory') {
+        setRecents(loadRecentPrompts());
+      }
+    }
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
+  function applyRecent(prompt: string) {
+    onUpdateAI({ prompt });
+    setHistoryOpen(false);
+  }
+
+  function deleteRecent(prompt: string) {
+    setRecents(removeRecentPrompt(prompt));
+  }
+
   return (
     <div
       data-layout="aiAssistPanel"
@@ -71,7 +100,94 @@ function AIAssistPanel({
         <span style={{ fontFamily: SERIF_STACK, fontWeight: 700, color: '#3b2412', fontSize: '0.92rem' }}>
           AI assist — {chapter.title || 'Untitled section'}
         </span>
+        <div style={{ flex: 1 }} />
+        {recents.length > 0 ? (
+          <button
+            type="button"
+            onClick={() => setHistoryOpen((prev) => !prev)}
+            aria-expanded={historyOpen}
+            aria-label={historyOpen ? 'Hide recent prompts' : 'Show recent prompts'}
+            title="Recent prompts"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+              padding: '0.25rem 0.55rem', borderRadius: '999px',
+              border: '1px solid rgba(120,95,50,0.3)',
+              background: historyOpen ? 'rgba(13,148,136,0.15)' : 'rgba(255,253,246,0.9)',
+              color: '#3b2412',
+              fontFamily: SERIF_STACK, fontWeight: 700, fontSize: '0.74rem',
+              cursor: 'pointer', flexShrink: 0,
+            }}
+          >
+            <Clock size={12} />
+            Recent ({recents.length})
+          </button>
+        ) : null}
       </div>
+
+      {historyOpen && recents.length > 0 ? (
+        <div
+          data-layout="aiRecentPromptsList"
+          /* Scrollable list of the user's last 10 prompts. Click an item to
+             load it into the textarea; × removes it from history. */
+          style={{
+            border: '1px solid rgba(120,95,50,0.2)',
+            borderRadius: '10px',
+            background: 'rgba(255,253,246,0.95)',
+            maxHeight: '180px',
+            overflowY: 'auto',
+            padding: '0.25rem',
+            display: 'grid',
+            gap: '0.2rem',
+          }}
+        >
+          {recents.map((entry) => (
+            <div
+              key={entry}
+              data-layout="aiRecentPromptRow"
+              style={{ display: 'flex', alignItems: 'flex-start', gap: '0.35rem', borderRadius: '6px' }}
+            >
+              <button
+                type="button"
+                onClick={() => applyRecent(entry)}
+                title="Load this prompt into the textarea"
+                style={{
+                  flex: '1 1 auto', minWidth: 0,
+                  textAlign: 'left',
+                  padding: '0.4rem 0.55rem',
+                  border: 'none',
+                  background: 'transparent',
+                  color: '#3b2412',
+                  fontFamily: SERIF_STACK, fontSize: '0.82rem', lineHeight: 1.35,
+                  cursor: 'pointer',
+                  borderRadius: '6px',
+                  whiteSpace: 'normal',
+                  wordBreak: 'break-word',
+                }}
+                onMouseEnter={(event) => { (event.currentTarget as HTMLButtonElement).style.background = 'rgba(13,148,136,0.10)'; }}
+                onMouseLeave={(event) => { (event.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
+              >
+                {entry.length > 220 ? `${entry.slice(0, 220)}…` : entry}
+              </button>
+              <button
+                type="button"
+                onClick={() => deleteRecent(entry)}
+                aria-label="Remove from history"
+                title="Remove from history"
+                style={{
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  width: '22px', height: '22px', flexShrink: 0,
+                  borderRadius: '999px',
+                  border: 'none', background: 'transparent',
+                  color: 'rgba(120,60,30,0.55)', cursor: 'pointer',
+                  marginTop: '0.25rem',
+                }}
+              >
+                <X size={11} />
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       <div data-layout="aiModeRow" /* draft / expand / rewrite mode toggle */ style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
         {([

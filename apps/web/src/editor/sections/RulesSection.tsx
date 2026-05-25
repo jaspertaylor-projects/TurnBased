@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, Plus, Replace, SpellCheck, X } from 'lucide-
 
 import { addChapter, createBlankChapter, removeChapter, updateChapter } from '../project';
 import { generateRulesChapterText } from '../aiRulesService';
+import { saveRecentPrompt } from '../aiPromptHistory';
 import type { EditorProject, EditorRuleConfig, RulesChapter } from '../types';
 import { RulebookPage, type AIDraftState } from './rules/RulebookPage';
 import { PAPER_BACKGROUND, PAPER_BORDER, PAPER_SHADOW, SERIF_STACK } from './rules/rulebookStyles';
@@ -200,6 +201,10 @@ export function RulesSection({
     if (!aiState || aiState.chapterId !== chapter.id || aiState.loading) return;
     const currentState = aiState;
     setAiState({ ...currentState, loading: true, error: null });
+    // Save the prompt to global history BEFORE awaiting the network call —
+    // a user-typed prompt is worth remembering even if the request fails.
+    // Empty prompts are filtered out by saveRecentPrompt itself.
+    saveRecentPrompt(currentState.prompt);
     try {
       const result = await generateRulesChapterText({
         project,
