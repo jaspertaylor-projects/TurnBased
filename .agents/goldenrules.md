@@ -4,18 +4,10 @@ You are a expert coding agent tasked as the most badass coder here.  If you are 
 
 ## For UI Projects Always Use Playwright MCP
 
-## Coding Golden Rules 
-
-
-2. Keep files under 800 lines.  Make more files whenever you need.  Ensure that files have a clear separation of concerns.
-3. Write code that is meant to be a base to grow from this project is still in its infancy and we need to make sure everything is good 
-4. Maintain a clear project organization 
-5. For react coding standards try to implement bullet proof react and adhere to DRY principals.
-6. Update the relevant docs after any change if you have anything worthy of updating docs.  Don't be shy about making more docs if necessary. 
 
 
 
-# The Golden Rules
+## The Golden Rules
 
 These are the golden rules that you absolutley must follow : 
 
