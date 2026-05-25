@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { ChevronLeft, ChevronRight, Loader2, Plus, Sparkles, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, Plus, Sparkles, SpellCheck, Trash2, X } from 'lucide-react';
 
 import { addChapter, createBlankChapter, removeChapter, updateChapter } from '../project';
 import { generateRulesChapterText, type AIRulesMode } from '../aiRulesService';
@@ -9,6 +9,7 @@ const PAPER_BACKGROUND = 'linear-gradient(155deg, #fffdf6 0%, #f8efd9 100%)';
 const PAPER_BORDER = '1px solid rgba(120, 95, 50, 0.22)';
 const PAPER_SHADOW = '0 8px 24px rgba(80, 55, 25, 0.16), 0 1px 2px rgba(60, 40, 20, 0.18)';
 const SERIF_STACK = "'Georgia', 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', serif";
+const SPELLCHECK_HINT_KEY = 'turnbased.rulebook.spellcheckHintDismissed';
 
 function clampSpread(index: number, totalChapters: number): number {
   if (totalChapters <= 0) return 0;
@@ -349,6 +350,19 @@ export function RulesSection({
   const totalChapters = chapters.length;
   const [spreadIndex, setSpreadIndex] = useState(0);
   const [aiState, setAiState] = useState<AIDraftState | null>(null);
+  // Show a one-time hint about the browser's "Add to dictionary" right-click,
+  // since most users don't realize that's how custom words get added to the
+  // native spellchecker. Dismiss persists in localStorage.
+  const [spellHintVisible, setSpellHintVisible] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    try { return window.localStorage.getItem(SPELLCHECK_HINT_KEY) !== '1'; }
+    catch { return true; }
+  });
+  function dismissSpellHint() {
+    setSpellHintVisible(false);
+    try { window.localStorage.setItem(SPELLCHECK_HINT_KEY, '1'); }
+    catch { /* localStorage may be unavailable in private/strict modes */ }
+  }
 
   // Clamp spread when chapters shrink (delete) so we never land past the end.
   useEffect(() => {
@@ -531,6 +545,48 @@ export function RulesSection({
           onRunAI={runAI}
         />
       </div>
+
+      {spellHintVisible ? (
+        <div
+          data-layout="rulebookSpellHint"
+          /* one-time, dismissable tip: most users don't know browsers natively
+             support "Add to dictionary" via right-click. Living between the
+             spread and the nav row keeps it out of the way of editing. */
+          style={{
+            flex: '0 0 auto',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            padding: '0.45rem 0.7rem',
+            borderRadius: '10px',
+            border: '1px dashed rgba(120, 95, 50, 0.28)',
+            background: 'rgba(255, 251, 235, 0.7)',
+            color: 'rgba(80, 55, 25, 0.78)',
+            fontFamily: SERIF_STACK,
+            fontStyle: 'italic',
+            fontSize: '0.82rem',
+          }}
+        >
+          <SpellCheck size={14} style={{ color: '#0d9488', flexShrink: 0 }} />
+          <span style={{ flex: 1 }}>
+            Tip: right-click a red-underlined word to add it to your browser&rsquo;s personal dictionary &mdash; works for proper names, game terms, and anything else.
+          </span>
+          <button
+            type="button"
+            onClick={dismissSpellHint}
+            aria-label="Dismiss spellcheck tip"
+            title="Dismiss"
+            style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              width: '22px', height: '22px', borderRadius: '999px',
+              border: 'none', background: 'rgba(120, 95, 50, 0.1)',
+              color: 'rgba(80, 55, 25, 0.7)', cursor: 'pointer', flexShrink: 0,
+            }}
+          >
+            <X size={12} />
+          </button>
+        </div>
+      ) : null}
 
       <div data-layout="rulebookNav" /* Prev / Next + add-chapter actions */ style={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
         <button
