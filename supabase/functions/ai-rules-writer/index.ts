@@ -100,11 +100,19 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
-        global: { headers: { Authorization: req.headers.get('Authorization')! } },
+        global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } },
       },
     );
 
-    const { data: { user } } = await supabaseClient.auth.getUser();
+    // Validate the user's JWT explicitly. Passing it as an argument bypasses
+    // supabase-js's local session lookup (which is always empty on a server-
+    // side client) and verifies the token directly. Calling getUser() with no
+    // argument returns "Auth session missing!" even when the Authorization
+    // header is present.
+    const authHeader = req.headers.get('Authorization') ?? '';
+    const jwt = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
+    if (!jwt) throw new Error('Not Authenticated');
+    const { data: { user } } = await supabaseClient.auth.getUser(jwt);
     if (!user) throw new Error('Not Authenticated');
 
     const body = await req.json();

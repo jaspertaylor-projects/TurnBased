@@ -69,20 +69,28 @@ npx supabase stop                # tears down all the supabase_* containers
 # then Ctrl+C the npm run dev:local terminal to stop the Vite dev server
 ```
 
-**Restart just the edge runtime** (e.g. after adding a new function in
-`supabase/functions/`). This is faster than restarting the whole stack and
-preserves Postgres, Auth, your dev server, etc.:
+**Register a newly-added edge function with the running runtime.** The
+edge runtime container's function route table is built when the CLI's
+`supabase functions serve` worker registers them on startup — `docker restart`
+alone keeps the OLD list. To add a function you just dropped into
+`supabase/functions/`, (re-)run the serve worker:
 ```bash
-docker restart supabase_edge_runtime_TurnBased
+# kill any stale serve worker first
+pkill -f 'supabase functions serve' 2>/dev/null
+
+# from the repo root — the named function doesn't matter; the worker
+# exposes EVERY directory under supabase/functions/ from the same process
+npx supabase functions serve ai-project-builder --env-file .env
 ```
 
-After it comes back, smoke-test the runtime picked up your function:
+Leave that terminal running while developing — it also hot-reloads function
+code on save. To smoke-test the route is wired:
 ```bash
 curl -sS http://127.0.0.1:54321/functions/v1/<function-name> \
   -X POST -H "Content-Type: application/json" -d '{}'
 ```
-`{"error":"Not Authenticated"}` is the expected response for an auth-gated
-function — it confirms the route is live.
+`{"msg":"Missing authorization header"}` (HTTP 401) is the expected
+response for an auth-gated function — it confirms the route exists.
 
 **Tail edge function logs** while developing:
 ```bash
@@ -147,6 +155,50 @@ Keys the edge functions actually read:
 
 When signed in, initial AI builds can create Supabase-backed project history
 in addition to the local browser working copy.
+
+### Local dev account
+
+A pre-confirmed account is seeded into the local Postgres on every
+`supabase db reset`:
+
+- **Email:** `dev@turnbased.local`
+- **Password:** `dev-local-only`
+
+Use it to exercise any flow that requires auth (the `Build with AI` path,
+the rulebook `AI` button on each section, anything that hits the edge
+functions). If you already have local data and don't want a full reset,
+the same account can be created against the running DB with:
+
+```bash
+scripts/seed-dev-account.sh
+```
+
+The seed/script logic both live in `supabase/seed.sql` — credentials never
+leave local-dev databases, they're not deployed to hosted Supabase.
+
+### Edge function gotcha: validate JWTs explicitly
+
+When writing a new edge function that needs the caller's identity, do NOT
+rely on the supabase-js client's session lookup:
+
+```ts
+// ✗ "Auth session missing!" even when the Authorization header is present
+const { data: { user } } = await supabaseClient.auth.getUser();
+```
+
+The server-side client has no persisted session, so a no-arg `getUser()`
+returns the missing-session error. Pass the JWT from the request explicitly:
+
+```ts
+// ✓ verifies the token from the request header directly
+const authHeader = req.headers.get('Authorization') ?? '';
+const jwt = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
+const { data: { user } } = await supabaseClient.auth.getUser(jwt);
+```
+
+`ai-rules-writer` follows this pattern. Older functions in this repo predate
+the fix and may surface the same issue once they go through more rigorous
+testing.
 
 ### Troubleshooting
 

@@ -16,24 +16,30 @@ function hasSupabaseConfig(): boolean {
 
 /**
  * supabase-js's FunctionsHttpError swallows the function's response body and
- * gives back a generic message. This pulls the JSON `error` field off the
- * response so we can surface the real cause (e.g. "OpenRouter API Key not
- * configured", "Not Authenticated") instead of "non-2xx status code".
+ * gives back a generic message. The `context` field on the thrown error is
+ * the raw Response object (verified against
+ * @supabase/functions-js FunctionsClient — `throw new FunctionsHttpError(response)`).
+ * Read it to surface the real cause (e.g. "OpenRouter API Key not configured",
+ * "Not Authenticated") instead of "non-2xx status code".
  */
 async function extractFunctionError(error: unknown): Promise<string | null> {
   if (!error || typeof error !== 'object') return null;
-  const ctx = (error as { context?: { response?: Response } }).context;
-  const response = ctx?.response;
-  if (!response) return null;
+  const response = (error as { context?: Response }).context;
+  if (!response || typeof response.clone !== 'function') return null;
   try {
     const cloned = response.clone();
     const text = await cloned.text();
     if (!text) return null;
     try {
       const parsed = JSON.parse(text);
+      // Different layers use different keys. Kong returns { msg: ... }, our
+      // edge function returns { error: ... }, and some Supabase paths return
+      // { message: ... }. Try each.
       if (parsed && typeof parsed.error === 'string') return parsed.error;
+      if (parsed && typeof parsed.msg === 'string') return parsed.msg;
+      if (parsed && typeof parsed.message === 'string') return parsed.message;
     } catch {
-      // Not JSON — return the raw text snippet.
+      // Not JSON — fall through and return the raw text snippet.
     }
     return text.slice(0, 400);
   } catch {
