@@ -1,12 +1,18 @@
 import { useEffect, useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Replace, SpellCheck, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, SpellCheck, X } from 'lucide-react';
 
 import { addChapter, createBlankChapter, removeChapter, updateChapter } from '../project';
 import { generateRulesChapterText } from '../aiRulesService';
 import { saveRecentPrompt } from '../aiPromptHistory';
 import type { EditorProject, EditorRuleConfig, RulesChapter } from '../types';
 import { RulebookPage, type AIDraftState } from './rules/RulebookPage';
-import { PAPER_BACKGROUND, PAPER_BORDER, PAPER_SHADOW, SERIF_STACK } from './rules/rulebookStyles';
+import { SERIF_STACK } from './rules/rulebookStyles';
+import {
+  ReplaceAllDialog,
+  RulebookContextMenu,
+  type ReplaceAllState,
+  type RulebookContextMenuState,
+} from './rules/ReplaceAllDialog';
 
 const SPELLCHECK_HINT_KEY = 'turnbased.rulebook.spellcheckHintDismissed';
 
@@ -16,6 +22,24 @@ function clampSpread(index: number, totalChapters: number): number {
   if (index < 0) return 0;
   if (index > lastSpread) return lastSpread;
   return index;
+}
+
+/* The brief stores themes and art styles as a single comma-joined string
+   (so the chip pickers on /new can round-trip cleanly to existing
+   downstream code). Split into an ordered, deduped list of trimmed
+   entries for the AI panel's chip toggles. */
+function splitBriefList(value: string): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const raw of value.split(',')) {
+    const trimmed = raw.trim();
+    if (!trimmed) continue;
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(trimmed);
+  }
+  return result;
 }
 
 export function RulesSection({
@@ -38,9 +62,9 @@ export function RulesSection({
   // Custom right-click context menu, shown ONLY when the user has text
   // selected inside a body textarea. With no selection we fall through to
   // the browser's native menu so spellcheck "Add to dictionary" still works.
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; selectedText: string } | null>(null);
+  const [contextMenu, setContextMenu] = useState<RulebookContextMenuState | null>(null);
   // Active find/replace dialog state.
-  const [replaceState, setReplaceState] = useState<{ from: string; to: string } | null>(null);
+  const [replaceState, setReplaceState] = useState<ReplaceAllState | null>(null);
 
   // Close the context menu when the user clicks anywhere else or hits Esc.
   useEffect(() => {
@@ -180,12 +204,21 @@ export function RulesSection({
   }
 
   function openAIPanel(chapter: RulesChapter) {
+    const availableThemes = splitBriefList(project.brief.theme);
+    const availableArtStyles = splitBriefList(project.brief.artStyle);
     setAiState({
       chapterId: chapter.id,
       prompt: '',
       mode: chapter.body.trim().length > 0 ? 'expand' : 'draft',
       loading: false,
       error: null,
+      // Default: every theme and art style from project creation is included.
+      // The panel renders chip toggles so the user can narrow this on a
+      // per-generation basis.
+      selectedThemes: [...availableThemes],
+      selectedArtStyles: [...availableArtStyles],
+      availableThemes,
+      availableArtStyles,
     });
   }
 
@@ -211,6 +244,8 @@ export function RulesSection({
         activeChapter: chapter,
         userPrompt: currentState.prompt,
         mode: currentState.mode,
+        themes: currentState.selectedThemes,
+        artStyles: currentState.selectedArtStyles,
       });
       // Snapshot the most recent body just before swapping it out, then
       // replace. The body might differ from the chapter.body we opened the
@@ -425,169 +460,23 @@ export function RulesSection({
       </div>
 
       {contextMenu ? (
-        <div
-          data-layout="rulebookContextMenu"
-          /* Custom right-click menu shown when text is selected inside a
-             chapter body. Anchored to the viewport at the cursor; native
-             menu is preserved everywhere there's no selection. */
-          onMouseDown={(event) => event.stopPropagation()}
-          style={{
-            position: 'fixed',
-            top: Math.min(contextMenu.y, window.innerHeight - 80),
-            left: Math.min(contextMenu.x, window.innerWidth - 280),
-            zIndex: 200,
-            minWidth: '240px',
-            background: 'rgba(255,253,246,0.98)',
-            border: '1px solid rgba(120,95,50,0.25)',
-            borderRadius: '10px',
-            boxShadow: '0 10px 28px rgba(60,40,20,0.18)',
-            padding: '0.35rem',
-            display: 'grid',
-            gap: '0.15rem',
+        <RulebookContextMenu
+          state={contextMenu}
+          onOpenReplaceDialog={(selectedText) => {
+            setReplaceState({ from: selectedText, to: '' });
+            setContextMenu(null);
           }}
-        >
-          <button
-            type="button"
-            onClick={() => {
-              setReplaceState({ from: contextMenu.selectedText, to: '' });
-              setContextMenu(null);
-            }}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '0.5rem',
-              padding: '0.55rem 0.7rem', borderRadius: '6px',
-              border: 'none', background: 'transparent',
-              color: '#3b2412', cursor: 'pointer',
-              fontFamily: SERIF_STACK, fontWeight: 600, fontSize: '0.86rem',
-              textAlign: 'left',
-            }}
-            onMouseEnter={(event) => { (event.currentTarget as HTMLButtonElement).style.background = 'rgba(13,148,136,0.10)'; }}
-            onMouseLeave={(event) => { (event.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
-          >
-            <Replace size={14} style={{ color: '#0d9488', flexShrink: 0 }} />
-            <span style={{ flex: 1 }}>
-              Replace all &ldquo;{contextMenu.selectedText.length > 24 ? `${contextMenu.selectedText.slice(0, 24)}…` : contextMenu.selectedText}&rdquo; in rulebook
-            </span>
-          </button>
-        </div>
+        />
       ) : null}
 
       {replaceState ? (
-        <div
-          data-layout="rulebookReplaceModal"
-          /* Modal backdrop + dialog for the find/replace operation. */
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) setReplaceState(null);
-          }}
-          style={{
-            position: 'fixed', inset: 0, zIndex: 250,
-            background: 'rgba(60,40,20,0.32)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            padding: '1rem',
-          }}
-        >
-          <div
-            data-layout="rulebookReplaceDialog"
-            /* Card with the find input (selection prefilled), replacement
-               input, match count, and the Replace All / Cancel actions. */
-            style={{
-              width: '100%', maxWidth: '480px',
-              background: PAPER_BACKGROUND,
-              border: PAPER_BORDER,
-              borderRadius: '14px',
-              boxShadow: PAPER_SHADOW,
-              padding: '1.1rem 1.2rem',
-              display: 'grid', gap: '0.7rem',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Replace size={16} style={{ color: '#0d9488' }} />
-              <span style={{ fontFamily: SERIF_STACK, fontWeight: 800, fontSize: '1.05rem', color: '#3b2412' }}>
-                Replace all in rulebook
-              </span>
-              <div style={{ flex: 1 }} />
-              <button
-                type="button"
-                onClick={() => setReplaceState(null)}
-                aria-label="Close replace dialog"
-                style={{
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  width: '24px', height: '24px', borderRadius: '999px',
-                  border: 'none', background: 'rgba(120,95,50,0.1)', color: '#3b2412', cursor: 'pointer',
-                }}
-              >
-                <X size={12} />
-              </button>
-            </div>
-
-            <label style={{ display: 'grid', gap: '0.25rem', fontFamily: SERIF_STACK, fontSize: '0.85rem', color: 'rgba(80,55,25,0.85)' }}>
-              Find
-              <input
-                value={replaceState.from}
-                onChange={(event) => setReplaceState((prev) => (prev ? { ...prev, from: event.target.value } : prev))}
-                autoFocus={false}
-                spellCheck={false}
-                style={{ padding: '0.55rem 0.7rem', borderRadius: '8px', border: '1px solid rgba(120,95,50,0.25)', background: 'rgba(255,255,255,0.85)', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: '0.85rem', color: '#3b2412' }}
-              />
-            </label>
-
-            <label style={{ display: 'grid', gap: '0.25rem', fontFamily: SERIF_STACK, fontSize: '0.85rem', color: 'rgba(80,55,25,0.85)' }}>
-              Replace with
-              <input
-                value={replaceState.to}
-                onChange={(event) => setReplaceState((prev) => (prev ? { ...prev, to: event.target.value } : prev))}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') performReplaceAll(replaceState.from, replaceState.to);
-                }}
-                autoFocus
-                spellCheck={false}
-                placeholder="(leave blank to delete every occurrence)"
-                style={{ padding: '0.55rem 0.7rem', borderRadius: '8px', border: '1px solid rgba(120,95,50,0.25)', background: 'rgba(255,255,255,0.85)', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: '0.85rem', color: '#3b2412' }}
-              />
-            </label>
-
-            <div style={{ fontFamily: SERIF_STACK, fontStyle: 'italic', color: 'rgba(80,55,25,0.7)', fontSize: '0.82rem' }}>
-              {(() => {
-                const matches = countMatches(replaceState.from);
-                if (!replaceState.from) return 'Enter something to find.';
-                if (matches === 0) return 'No occurrences in this rulebook.';
-                if (matches === 1) return '1 occurrence will be replaced (search is case-sensitive; titles included).';
-                return `${matches} occurrences will be replaced (search is case-sensitive; titles included).`;
-              })()}
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.45rem' }}>
-              <button
-                type="button"
-                onClick={() => setReplaceState(null)}
-                style={{
-                  padding: '0.45rem 0.85rem', borderRadius: '999px',
-                  border: '1px solid rgba(120,95,50,0.3)',
-                  background: 'rgba(255,253,246,0.95)', color: '#3b2412',
-                  fontFamily: SERIF_STACK, fontWeight: 700, fontSize: '0.85rem',
-                  cursor: 'pointer',
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => performReplaceAll(replaceState.from, replaceState.to)}
-                disabled={!replaceState.from || countMatches(replaceState.from) === 0}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
-                  padding: '0.45rem 1rem', borderRadius: '999px', border: 'none',
-                  background: (!replaceState.from || countMatches(replaceState.from) === 0) ? 'rgba(13,148,136,0.35)' : 'linear-gradient(135deg, #064e3b, #0d9488)',
-                  color: 'white',
-                  fontFamily: SERIF_STACK, fontWeight: 700, fontSize: '0.88rem',
-                  cursor: (!replaceState.from || countMatches(replaceState.from) === 0) ? 'not-allowed' : 'pointer',
-                }}
-              >
-                <Replace size={14} />
-                Replace All
-              </button>
-            </div>
-          </div>
-        </div>
+        <ReplaceAllDialog
+          state={replaceState}
+          countMatches={countMatches}
+          onChange={(next) => setReplaceState(next)}
+          onCancel={() => setReplaceState(null)}
+          onConfirm={() => performReplaceAll(replaceState.from, replaceState.to)}
+        />
       ) : null}
     </div>
   );

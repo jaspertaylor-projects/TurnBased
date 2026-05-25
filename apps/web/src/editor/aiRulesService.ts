@@ -60,12 +60,19 @@ interface ServerResponse {
  * Ask the AI rules writer to draft / expand / rewrite the active chapter.
  * Sends the whole rulebook as grounding so the model picks up established
  * voice and terminology from the user's other chapters.
+ *
+ * `themes` and `artStyles` let the caller send a *subset* of the project's
+ * themes/art-styles instead of all of them — used by the AI panel's
+ * theme/style chip toggles. Pass the full brief lists to match the
+ * old behavior.
  */
 export async function generateRulesChapterText(args: {
   project: EditorProject;
   activeChapter: RulesChapter;
   userPrompt: string;
   mode: AIRulesMode;
+  themes: string[];
+  artStyles: string[];
 }): Promise<AIRulesAssistResult> {
   if (!hasSupabaseConfig()) {
     throw new Error('Supabase is not configured in this environment, so AI assist is unavailable.');
@@ -76,11 +83,14 @@ export async function generateRulesChapterText(args: {
     throw new Error('Sign in to use the AI rules writer.');
   }
 
-  const { project, activeChapter, userPrompt, mode } = args;
+  const { project, activeChapter, userPrompt, mode, themes, artStyles } = args;
   const body = {
     gameName: project.brief.name || project.name,
-    theme: project.brief.theme ?? '',
-    artStyle: project.brief.artStyle ?? '',
+    /* themes / artStyles come from the chip toggles in the AI panel — they
+       may be a subset of the brief's full list. Sent to the server as
+       comma-joined strings to match the existing edge function shape. */
+    theme: themes.join(', '),
+    artStyle: artStyles.join(', '),
     /* Art studio's richer per-style definitions — names + free-text
        descriptions. Keeps the prompt grounded in the user's actual art
        direction instead of only the shorter brief.artStyle string. */

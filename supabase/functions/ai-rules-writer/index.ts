@@ -177,11 +177,44 @@ serve(async (req) => {
       activeIndex: activeIndex >= 0 ? activeIndex : chapters.length,
     });
 
-    const modeInstruction = mode === 'rewrite'
-      ? `Rewrite the existing "${activeChapterTitle}" section more clearly. Preserve every concrete rule from the existing draft, but improve flow, structure, and word choice.`
-      : mode === 'expand'
-        ? `Expand the existing "${activeChapterTitle}" section. Keep all existing rules verbatim, then add useful detail, examples, and clarifications.`
-        : `Write a clear first draft of the "${activeChapterTitle}" section.`;
+    const activeBodyTrim = activeChapterBody.trim();
+    const hasExistingBody = activeBodyTrim.length > 0;
+
+    let modeInstruction: string;
+    if (mode === 'rewrite' && hasExistingBody) {
+      modeInstruction = [
+        `MODE: REWRITE the existing "${activeChapterTitle}" section.`,
+        'You MUST preserve every concrete rule, term, value, and named entity from the existing draft verbatim.',
+        'You MAY ONLY change wording, sentence structure, paragraph order, and flow.',
+        'DO NOT add new rules, new examples, new entities, or new content beyond what the existing draft already says.',
+        'DO NOT shorten by dropping rules; if you reorganize, every rule still appears somewhere.',
+        'Length should stay within ±15% of the existing draft. Word count target: roughly the same as the input.',
+        '',
+        'EXISTING TEXT TO REWRITE (output a cleaner version that says the same things):',
+        activeBodyTrim,
+      ].join('\n');
+    } else if (mode === 'expand' && hasExistingBody) {
+      modeInstruction = [
+        `MODE: EXPAND the existing "${activeChapterTitle}" section.`,
+        'You MUST include the existing draft\'s text VERBATIM, word-for-word — every sentence currently in it must appear in your output unchanged.',
+        'AFTER reproducing the existing text, ADD new material: missing details, clarifying examples, edge cases, an illustrative scenario, or a quick reference list.',
+        'The output should be noticeably LONGER than the input — typically 1.5× to 2.5× the length.',
+        'Do not contradict any existing rule. New material must be consistent with what is already there.',
+        '',
+        'EXISTING TEXT TO PRESERVE AND BUILD ON:',
+        activeBodyTrim,
+      ].join('\n');
+    } else {
+      // `draft` mode, or fallback when expand/rewrite were chosen but the
+      // section is empty. Ignore any existing body so the user gets a
+      // genuine fresh start instead of a near-duplicate.
+      modeInstruction = [
+        `MODE: FRESH DRAFT of the "${activeChapterTitle}" section.`,
+        'IGNORE any text currently in this section. Write a clean, original first draft from scratch, grounded in the rulebook context above (themes, art direction, sibling sections, user guidance).',
+        'Do not include or paraphrase the current body — it is a placeholder being replaced wholesale.',
+        'Target a focused first draft: 2-4 short paragraphs unless the user asks for more.',
+      ].join('\n');
+    }
 
     const userHint = userPrompt
       ? `\n\nADDITIONAL USER GUIDANCE:\n${userPrompt}`
