@@ -14,6 +14,33 @@ function hasSupabaseConfig(): boolean {
   return Boolean(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY);
 }
 
+/**
+ * supabase-js's FunctionsHttpError swallows the function's response body and
+ * gives back a generic message. This pulls the JSON `error` field off the
+ * response so we can surface the real cause (e.g. "OpenRouter API Key not
+ * configured", "Not Authenticated") instead of "non-2xx status code".
+ */
+async function extractFunctionError(error: unknown): Promise<string | null> {
+  if (!error || typeof error !== 'object') return null;
+  const ctx = (error as { context?: { response?: Response } }).context;
+  const response = ctx?.response;
+  if (!response) return null;
+  try {
+    const cloned = response.clone();
+    const text = await cloned.text();
+    if (!text) return null;
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed && typeof parsed.error === 'string') return parsed.error;
+    } catch {
+      // Not JSON — return the raw text snippet.
+    }
+    return text.slice(0, 400);
+  } catch {
+    return null;
+  }
+}
+
 interface ServerResponse {
   success: boolean;
   text: string;
@@ -59,7 +86,12 @@ export async function generateRulesChapterText(args: {
 
   const { data, error } = await supabase.functions.invoke<ServerResponse>('ai-rules-writer', { body });
   if (error) {
-    throw new Error(error.message || 'The AI rules service was unavailable.');
+    // supabase.functions.invoke surfaces a generic "non-2xx status code" message
+    // and stuffs the function's actual response on error.context.response. Pull
+    // the JSON `error` field out so the user sees the real cause (missing API
+    // key, not authenticated, etc.) instead of an opaque HTTP error.
+    const detail = await extractFunctionError(error);
+    throw new Error(detail || error.message || 'The AI rules service was unavailable.');
   }
   if (!data?.success || typeof data.text !== 'string' || data.text.trim().length === 0) {
     throw new Error(data?.error || 'The AI returned no text. Try again or refine your prompt.');
