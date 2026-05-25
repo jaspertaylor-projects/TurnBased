@@ -417,9 +417,12 @@ export const Editor = () => {
     }
   }
 
-  // For canvas-based sections (component editor, art), the page container must
-  // stretch children to fill the full viewport height and avoid wrapping.
-  const isCanvasSection = activeSection === 'component_editor' || activeSection === 'art';
+  // For canvas-based sections (component editor, art, rules), the page
+  // container must stretch children to fill the full viewport height and
+  // avoid wrapping. Rules joins this list so the rulebook spread can fill
+  // the available viewport height rather than being squeezed by the
+  // non-canvas grid wrapper.
+  const isCanvasSection = activeSection === 'component_editor' || activeSection === 'art' || activeSection === 'rules';
 
   return (
     <div style={{

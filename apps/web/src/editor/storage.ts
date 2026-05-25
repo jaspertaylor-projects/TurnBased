@@ -1,11 +1,13 @@
 import type { EditorArtReference, EditorIconAsset, EditorProject, StoredEditorProjects } from './types';
 import { ensureProjectManifest } from './manifest';
 import {
+  createBlankChapter,
   createDefaultAppLayout,
   createDefaultProjectArtDirection,
   createDefaultProjectSettings,
   createDefaultProjectViews,
   createDefaultRulesBrief,
+  createDefaultRulesChapters,
   createDefaultSeats,
   syncProjectViews,
 } from './project';
@@ -84,6 +86,41 @@ function normalizeIconAsset(
   };
 }
 
+function normalizeRules(rules: EditorProject['rules'] | undefined): EditorProject['rules'] {
+  const safe = rules ?? ({} as Partial<EditorProject['rules']>);
+  const legacyChapters = Array.isArray(safe.chapters) ? safe.chapters : [];
+
+  // Migration: if no chapters but legacy rulesText is present, lift it into a
+  // single "Rules" chapter so existing projects don't appear empty after the
+  // rulebook switch. If both are empty, seed the 7 default chapters.
+  let chapters = legacyChapters
+    .filter((chapter) => chapter && typeof chapter.id === 'string')
+    .map((chapter) => ({
+      id: chapter.id,
+      title: typeof chapter.title === 'string' ? chapter.title : 'Untitled Chapter',
+      body: typeof chapter.body === 'string' ? chapter.body : '',
+    }));
+
+  if (chapters.length === 0) {
+    if (typeof safe.rulesText === 'string' && safe.rulesText.trim().length > 0) {
+      const seeded = createBlankChapter('Rules');
+      chapters = [{ ...seeded, body: safe.rulesText }];
+    } else {
+      chapters = createDefaultRulesChapters();
+    }
+  }
+
+  return {
+    prototypeMode: safe.prototypeMode ?? 'territory',
+    phases: Array.isArray(safe.phases) && safe.phases.length > 0 ? safe.phases : ['main'],
+    targetScore: typeof safe.targetScore === 'number' && Number.isFinite(safe.targetScore) ? safe.targetScore : 3,
+    maxTurns: typeof safe.maxTurns === 'number' && Number.isFinite(safe.maxTurns) ? safe.maxTurns : 12,
+    rulesText: typeof safe.rulesText === 'string' ? safe.rulesText : '',
+    designerNotes: typeof safe.designerNotes === 'string' ? safe.designerNotes : '',
+    chapters,
+  };
+}
+
 function normalizeEditorProject(project: EditorProject): EditorProject {
   const defaultBrief = createDefaultRulesBrief();
   const legacyPlayerCount = clampPlayerCount((project.brief as Partial<Record<'playerCount', number>> | undefined)?.playerCount, project.seats?.length ?? 2);
@@ -123,6 +160,7 @@ function normalizeEditorProject(project: EditorProject): EditorProject {
     brief: normalizedBrief,
     seats,
     views,
+    rules: normalizeRules(project.rules),
     settings: {
       ...createDefaultProjectSettings(),
       ...(project.settings ?? {}),

@@ -25,9 +25,11 @@ import type {
   EditorProject,
   EditorProjectView,
   EditorProjectViews,
+  EditorRuleConfig,
   EditorSeat,
   EditorSettings,
   RulesBuilderBrief,
+  RulesChapter,
 } from './types';
 
 function now(): string {
@@ -296,6 +298,7 @@ export function createBlankProject(name = 'Untitled Prototype'): EditorProject {
       maxTurns: 12,
       rulesText: '',
       designerNotes: '',
+      chapters: createDefaultRulesChapters(),
     },
     settings: createDefaultProjectSettings(),
     art: createDefaultProjectArtDirection(),
@@ -332,6 +335,62 @@ export function updateProjectRules(
     ...project,
     rules: updater(project.rules),
   });
+}
+
+// ── Rulebook chapters ───────────────────────────────────────────────────
+
+const DEFAULT_CHAPTER_TITLES = [
+  'Concept',
+  'Components',
+  'Setup',
+  'Game Structure',
+  'Taking a Turn',
+  'End Game',
+  'Glossary',
+];
+
+export function createDefaultRulesChapters(): RulesChapter[] {
+  return DEFAULT_CHAPTER_TITLES.map((title) => ({
+    id: generateId('chapter'),
+    title,
+    body: '',
+  }));
+}
+
+export function createBlankChapter(title = 'New Chapter'): RulesChapter {
+  return { id: generateId('chapter'), title, body: '' };
+}
+
+export function updateChapter(
+  rules: EditorRuleConfig,
+  chapterId: string,
+  patch: Partial<Omit<RulesChapter, 'id'>>,
+): EditorRuleConfig {
+  return {
+    ...rules,
+    chapters: rules.chapters.map((chapter) =>
+      chapter.id === chapterId ? { ...chapter, ...patch } : chapter,
+    ),
+  };
+}
+
+export function addChapter(rules: EditorRuleConfig, chapter: RulesChapter = createBlankChapter()): EditorRuleConfig {
+  return { ...rules, chapters: [...rules.chapters, chapter] };
+}
+
+export function removeChapter(rules: EditorRuleConfig, chapterId: string): EditorRuleConfig {
+  return { ...rules, chapters: rules.chapters.filter((chapter) => chapter.id !== chapterId) };
+}
+
+export function moveChapter(rules: EditorRuleConfig, chapterId: string, direction: -1 | 1): EditorRuleConfig {
+  const index = rules.chapters.findIndex((chapter) => chapter.id === chapterId);
+  if (index === -1) return rules;
+  const target = index + direction;
+  if (target < 0 || target >= rules.chapters.length) return rules;
+  const next = [...rules.chapters];
+  const [moved] = next.splice(index, 1);
+  next.splice(target, 0, moved);
+  return { ...rules, chapters: next };
 }
 
 export function updateProjectSeats(

@@ -102,13 +102,27 @@ export interface RulesBuilderBrief {
   artStyle: string;
 }
 
+export interface RulesChapter {
+  id: string;
+  title: string;
+  body: string;
+}
+
 export interface EditorRuleConfig {
   prototypeMode: PrototypeMode;
   phases: string[];
   targetScore: number;
   maxTurns: number;
+  /* Legacy single-blob rules text. Kept for backward compatibility with old
+     stored projects and AI grounding paths that still emit a single string.
+     The Rules editor surfaces `chapters` instead — see storage.ts for the
+     migration that turns a non-empty `rulesText` into a single chapter on
+     first load. */
   rulesText: string;
   designerNotes: string;
+  /* Ordered list of rulebook chapters surfaced by the Rules section. Each
+     chapter is one "page" in the two-page-spread rulebook UI. */
+  chapters: RulesChapter[];
 }
 
 export type EditorTimeControlMode = 'none' | 'per_turn' | 'per_match';
