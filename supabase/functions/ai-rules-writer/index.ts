@@ -64,10 +64,24 @@ function normalizeChapter(value: unknown): ChapterContext | null {
   return { title, body };
 }
 
+interface ArtStyleDetail {
+  name: string;
+  description: string;
+}
+
+function normalizeArtStyleDetail(value: unknown): ArtStyleDetail | null {
+  if (!isRecord(value)) return null;
+  const name = typeof value.name === 'string' ? value.name.trim() : '';
+  const description = typeof value.description === 'string' ? value.description.trim() : '';
+  if (!name && !description) return null;
+  return { name, description };
+}
+
 function buildContextBlock(payload: {
   gameName: string;
   theme: string;
   artStyle: string;
+  artStyleDetails: ArtStyleDetail[];
   playerMin: number;
   playerMax: number;
   chapters: ChapterContext[];
@@ -75,8 +89,17 @@ function buildContextBlock(payload: {
 }): string {
   const parts: string[] = [];
   parts.push(`GAME NAME: ${payload.gameName || 'Untitled game'}`);
-  if (payload.theme.trim()) parts.push(`THEME: ${payload.theme}`);
-  if (payload.artStyle.trim()) parts.push(`ART STYLE: ${payload.artStyle}`);
+  if (payload.theme.trim()) parts.push(`THEMES: ${payload.theme}`);
+  if (payload.artStyle.trim()) parts.push(`ART STYLES: ${payload.artStyle}`);
+  if (payload.artStyleDetails.length > 0) {
+    parts.push('');
+    parts.push('ART DIRECTION (from the project\'s Art studio — match the language and references when describing visuals):');
+    payload.artStyleDetails.forEach((style) => {
+      const name = style.name || 'Untitled style';
+      const desc = style.description ? ` — ${trimText(style.description, 500)}` : '';
+      parts.push(`  - ${name}${desc}`);
+    });
+  }
   parts.push(`PLAYER COUNT: ${payload.playerMin}-${payload.playerMax}`);
   parts.push('');
   parts.push('RULEBOOK SO FAR (all sections, in order):');
@@ -135,6 +158,9 @@ serve(async (req) => {
     const chapters = Array.isArray(body.chapters)
       ? body.chapters.map(normalizeChapter).filter((c): c is ChapterContext => c !== null)
       : [];
+    const artStyleDetails = Array.isArray(body.artStyleDetails)
+      ? body.artStyleDetails.map(normalizeArtStyleDetail).filter((d): d is ArtStyleDetail => d !== null)
+      : [];
     const activeChapterTitle = typeof body.activeChapterTitle === 'string' ? body.activeChapterTitle : '';
     const activeChapterBody = typeof body.activeChapterBody === 'string' ? body.activeChapterBody : '';
     const activeIndex = chapters.findIndex((c) => c.title === activeChapterTitle && c.body === activeChapterBody);
@@ -146,7 +172,7 @@ serve(async (req) => {
     }
 
     const contextBlock = buildContextBlock({
-      gameName, theme, artStyle, playerMin, playerMax,
+      gameName, theme, artStyle, artStyleDetails, playerMin, playerMax,
       chapters: chapters.length > 0 ? chapters : [{ title: activeChapterTitle, body: activeChapterBody }],
       activeIndex: activeIndex >= 0 ? activeIndex : chapters.length,
     });
@@ -165,6 +191,8 @@ serve(async (req) => {
       'You are a co-designer helping a game creator write the rulebook for their tabletop board game.',
       'Write in clean, modern board-game-rulebook prose — concise, instructive, second-person ("you"), and unambiguous.',
       'Match the tone and any terminology already established in other sections of the rulebook.',
+      'GROUND every reference to setting, characters, factions, locations, and visual flavor in the project\'s THEMES, ART STYLES, and ART DIRECTION listed in the context block. If the themes say "Cozy forest, Magical garden" the prose should evoke that, not generic fantasy.',
+      'PLACEHOLDER CONVENTION: if you see angle-bracket tokens ending in "-here" — e.g. <city-name-here>, <faction-name-here>, <character-name-here>, <evil-trinket-here> — REPLACE each with a single specific value that fits the game\'s themes. The angle-bracket marker text must not appear in your output; only the chosen replacement does. Read the hyphenated middle of the tag as a hint about what kind of thing to invent.',
       'NEVER restate the section title in your output — the heading is already shown above your text.',
       'NEVER use markdown headings (#, ##) or fenced code blocks. Plain paragraphs only, with occasional bulleted lists where they aid clarity.',
       'Return ONLY the body text for the requested section. No preamble, no closing remarks, no JSON.',

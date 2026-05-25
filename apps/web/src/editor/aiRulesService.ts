@@ -81,6 +81,13 @@ export async function generateRulesChapterText(args: {
     gameName: project.brief.name || project.name,
     theme: project.brief.theme ?? '',
     artStyle: project.brief.artStyle ?? '',
+    /* Art studio's richer per-style definitions — names + free-text
+       descriptions. Keeps the prompt grounded in the user's actual art
+       direction instead of only the shorter brief.artStyle string. */
+    artStyleDetails: (project.art?.definedArtStyles ?? []).map((style) => ({
+      name: style.name ?? '',
+      description: style.description ?? '',
+    })),
     playerMin: project.brief.minPlayers,
     playerMax: project.brief.maxPlayers,
     chapters: project.rules.chapters.map((chapter) => ({ title: chapter.title, body: chapter.body })),

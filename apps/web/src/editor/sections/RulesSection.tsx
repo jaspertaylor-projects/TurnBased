@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { ChevronLeft, ChevronRight, Loader2, Plus, Sparkles, SpellCheck, Trash2, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, Plus, RotateCcw, Sparkles, SpellCheck, Trash2, X } from 'lucide-react';
 
 import { addChapter, createBlankChapter, removeChapter, updateChapter } from '../project';
 import { generateRulesChapterText, type AIRulesMode } from '../aiRulesService';
@@ -40,6 +40,11 @@ interface PageProps {
   onUpdateAI: (patch: Partial<AIDraftState>) => void;
   onCancelAI: () => void;
   onRunAI: (chapter: RulesChapter) => void;
+  /* If this chapter had its body replaced by AI and the user hasn't
+     made any other change yet, the previous body is held here so they
+     can press Undo to restore it. */
+  aiUndoBody: string | null;
+  onUndoAI: (chapterId: string) => void;
 }
 
 function AIAssistPanel({
@@ -124,6 +129,7 @@ function AIAssistPanel({
               : 'Optional: what should change in the rewrite? Tone, structure, brevity…'
         }
         disabled={state.loading}
+        spellCheck={false}
         style={{
           width: '100%', boxSizing: 'border-box',
           minHeight: '64px',
@@ -137,6 +143,12 @@ function AIAssistPanel({
           resize: 'vertical',
         }}
       />
+
+      <div data-layout="aiPlaceholderHint" /* convention hint */ style={{ color: 'rgba(15,118,110,0.85)', fontSize: '0.74rem', fontStyle: 'italic', lineHeight: 1.4 }}>
+        Tip: write angle-bracket placeholders ending in <code style={{ background: 'rgba(13,148,136,0.1)', padding: '0 0.25rem', borderRadius: '4px', fontStyle: 'normal', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>-here</code> directly into the section
+        (e.g. <code style={{ background: 'rgba(13,148,136,0.1)', padding: '0 0.25rem', borderRadius: '4px', fontStyle: 'normal', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{'<city-name-here>'}</code>,{' '}
+        <code style={{ background: 'rgba(13,148,136,0.1)', padding: '0 0.25rem', borderRadius: '4px', fontStyle: 'normal', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{'<faction-here>'}</code>) and the AI will fill each one with something fitting the theme.
+      </div>
 
       {state.error ? (
         <div style={{ padding: '0.4rem 0.55rem', borderRadius: '8px', background: 'rgba(254,226,226,0.85)', border: '1px solid rgba(239,68,68,0.25)', color: '#991b1b', fontSize: '0.8rem' }}>
@@ -193,6 +205,8 @@ function RulebookPage({
   onUpdateAI,
   onCancelAI,
   onRunAI,
+  aiUndoBody,
+  onUndoAI,
 }: PageProps) {
   const isLeftPage = side === 'left';
   const aiTargetsThisPage = chapter !== null && aiState !== null && aiState.chapterId === chapter.id;
@@ -236,6 +250,26 @@ function RulebookPage({
           <Sparkles size={13} />
           AI
         </button>
+        {aiUndoBody !== null ? (
+          <button
+            type="button"
+            onClick={() => onUndoAI(chapter.id)}
+            aria-label={`Undo last AI change to ${chapter.title || 'this section'}`}
+            title="Undo the last AI change to this section"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+              padding: '0.3rem 0.6rem', borderRadius: '999px',
+              border: '1px solid rgba(180, 83, 9, 0.45)',
+              background: 'rgba(255,251,235,0.9)',
+              color: '#9a3412',
+              fontFamily: SERIF_STACK, fontWeight: 700, fontSize: '0.78rem',
+              cursor: 'pointer', flexShrink: 0,
+            }}
+          >
+            <RotateCcw size={13} />
+            Undo AI
+          </button>
+        ) : null}
         <button
           type="button"
           onClick={() => onRemove(chapter.id)}
@@ -350,6 +384,11 @@ export function RulesSection({
   const totalChapters = chapters.length;
   const [spreadIndex, setSpreadIndex] = useState(0);
   const [aiState, setAiState] = useState<AIDraftState | null>(null);
+  // Per-chapter pre-AI body snapshot. Set right before we replace the body
+  // with the model's output; cleared when the user clicks Undo. Lives in
+  // local state — we deliberately don't persist this across reloads so the
+  // Undo affordance only lives as long as the editor session.
+  const [aiUndoBodies, setAiUndoBodies] = useState<Record<string, string>>({});
   // Show a one-time hint about the browser's "Add to dictionary" right-click,
   // since most users don't realize that's how custom words get added to the
   // native spellchecker. Dismiss persists in localStorage.
@@ -453,15 +492,30 @@ export function RulesSection({
         userPrompt: currentState.prompt,
         mode: currentState.mode,
       });
-      // Replace the chapter body with the AI's output. All three modes
-      // (draft/expand/rewrite) return a complete body — see the edge
-      // function's system prompt.
+      // Snapshot the most recent body just before swapping it out, then
+      // replace. The body might differ from the chapter.body we opened the
+      // AI panel with if the user kept typing while the request was in
+      // flight — read fresh from project.rules.chapters by id.
+      const fresh = project.rules.chapters.find((c) => c.id === chapter.id);
+      const previousBody = fresh?.body ?? chapter.body;
       onUpdateRules((rules) => updateChapter(rules, chapter.id, { body: result.text }));
+      setAiUndoBodies((prev) => ({ ...prev, [chapter.id]: previousBody }));
       setAiState(null);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'AI request failed';
       setAiState((prev) => (prev && prev.chapterId === chapter.id ? { ...prev, loading: false, error: message } : prev));
     }
+  }
+
+  function undoAI(chapterId: string) {
+    setAiUndoBodies((prev) => {
+      const snapshot = prev[chapterId];
+      if (snapshot === undefined) return prev;
+      onUpdateRules((rules) => updateChapter(rules, chapterId, { body: snapshot }));
+      const next = { ...prev };
+      delete next[chapterId];
+      return next;
+    });
   }
 
   return (
@@ -517,6 +571,8 @@ export function RulesSection({
           onUpdateAI={updateAIPanel}
           onCancelAI={cancelAIPanel}
           onRunAI={runAI}
+          aiUndoBody={leftChapter ? aiUndoBodies[leftChapter.id] ?? null : null}
+          onUndoAI={undoAI}
         />
 
         {/* spine shadow between the two pages */}
@@ -543,6 +599,8 @@ export function RulesSection({
           onUpdateAI={updateAIPanel}
           onCancelAI={cancelAIPanel}
           onRunAI={runAI}
+          aiUndoBody={rightChapter ? aiUndoBodies[rightChapter.id] ?? null : null}
+          onUndoAI={undoAI}
         />
       </div>
 
