@@ -111,10 +111,6 @@ function normalizeRules(rules: EditorProject['rules'] | undefined): EditorProjec
   }
 
   return {
-    prototypeMode: safe.prototypeMode ?? 'territory',
-    phases: Array.isArray(safe.phases) && safe.phases.length > 0 ? safe.phases : ['main'],
-    targetScore: typeof safe.targetScore === 'number' && Number.isFinite(safe.targetScore) ? safe.targetScore : 3,
-    maxTurns: typeof safe.maxTurns === 'number' && Number.isFinite(safe.maxTurns) ? safe.maxTurns : 12,
     rulesText: typeof safe.rulesText === 'string' ? safe.rulesText : '',
     designerNotes: typeof safe.designerNotes === 'string' ? safe.designerNotes : '',
     chapters,

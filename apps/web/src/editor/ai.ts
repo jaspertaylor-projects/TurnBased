@@ -109,7 +109,7 @@ export function generateGroundedAdvice(
   if (normalizedQuestion.includes('missing') || normalizedQuestion.includes('next')) {
     const nextSteps = missingStructure.length > 0
       ? `Next structural steps: ${missingStructure.join('; ')}.`
-      : `The structure is already playable. Focus next on pacing: raise or lower the target score (${project.rules.targetScore}) and tighten the turn cap (${project.rules.maxTurns}) to match the board size.`;
+      : `The structure is already playable. Focus next on pacing — adjust component counts, board size, and rules prose so the play loop matches the experience you're after.`;
     const modeNote = project.manifest.capabilities.mode === 'standard'
       ? 'Stay on the standard path unless documented extension hooks are clearly necessary.'
       : project.manifest.capabilities.mode === 'advanced'

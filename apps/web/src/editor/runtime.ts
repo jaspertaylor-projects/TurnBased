@@ -31,6 +31,15 @@ import type { EditorProject, PreviewRuntime } from './types';
 const ZONE_TYPES = new Set(['space', 'zone', 'track', 'deck', 'hand', 'discard', 'bag', 'score-track']);
 const DESTINATION_TYPES = new Set(['space', 'zone']);
 
+/* Editor-side fallback game structure. The user-facing
+   targetScore / maxTurns / phases fields were removed from EditorRuleConfig;
+   the preview runtime still needs *something* to drive turn / score-limit
+   logic, so it uses these constants. They're effectively unreachable values
+   so the preview only ends via "all zones claimed". */
+const PREVIEW_DEFAULT_PHASES: string[] = ['main'];
+const PREVIEW_TARGET_SCORE = 999;
+const PREVIEW_MAX_TURNS = 999;
+
 export function toPreviewZoneId(instanceId: string): ZoneId {
   return createZoneId(`zone_${instanceId}`);
 }
@@ -496,7 +505,7 @@ function createEndTurnDefinition(): LegalMoveDefinition {
 }
 
 export function buildPreviewRuntime(project: EditorProject): PreviewRuntime {
-  const phases = clonePhases(project.rules.phases.length > 0 ? project.rules.phases : ['main']);
+  const phases = clonePhases(PREVIEW_DEFAULT_PHASES);
   const zones = buildZones(project);
   const { entities, supplyEntityIds } = buildEntities(project);
 
@@ -554,7 +563,7 @@ export function buildPreviewRuntime(project: EditorProject): PreviewRuntime {
       phaseIndex: 0,
       stepIndex: 0,
       basePhases: phases,
-      phases: clonePhases(project.rules.phases.length > 0 ? project.rules.phases : ['main']),
+      phases: clonePhases(PREVIEW_DEFAULT_PHASES),
       turnDirection: 'forward',
       currentTurnKind: 'normal',
       extraTurns: [],
@@ -632,8 +641,6 @@ export function buildPreviewRuntime(project: EditorProject): PreviewRuntime {
       .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry)),
     additionalNotes: [
       project.rules.designerNotes,
-      `Target score: ${project.rules.targetScore}.`,
-      `Max turns: ${project.rules.maxTurns}.`,
     ].filter((value) => value.trim().length > 0),
   };
 
@@ -652,8 +659,8 @@ export function buildPreviewRuntime(project: EditorProject): PreviewRuntime {
         destinationZoneIds,
       },
       [],
-      project.rules.targetScore,
-      project.rules.maxTurns,
+      PREVIEW_TARGET_SCORE,
+      PREVIEW_MAX_TURNS,
     ),
     gameDefinition,
     legalMoveDefinitions: [

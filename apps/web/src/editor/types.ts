@@ -12,7 +12,6 @@ import type {
   ComponentValidationResult,
 } from '@turnbased/engine-components';
 
-export type PrototypeMode = 'territory';
 export type ProjectCapabilityMode = 'standard' | 'advanced' | 'experimental';
 export type ProjectAcknowledgedWarningId =
   | 'extension-boundaries'
@@ -109,10 +108,6 @@ export interface RulesChapter {
 }
 
 export interface EditorRuleConfig {
-  prototypeMode: PrototypeMode;
-  phases: string[];
-  targetScore: number;
-  maxTurns: number;
   /* Legacy single-blob rules text. Kept for backward compatibility with old
      stored projects and AI grounding paths that still emit a single string.
      The Rules editor surfaces `chapters` instead — see storage.ts for the

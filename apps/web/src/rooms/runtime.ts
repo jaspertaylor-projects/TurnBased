@@ -23,6 +23,13 @@ export interface RoomReplayResult {
   runtime: ReturnType<typeof buildPreviewRuntime>;
 }
 
+/* Effectively-unbounded score/turn ceilings — same rationale as the
+   editor's PREVIEW_TARGET_SCORE / PREVIEW_MAX_TURNS. The editor no longer
+   exposes these as project fields, so the room replay falls back to
+   constants. Games end via the engine's own win/end conditions. */
+const ROOM_TARGET_SCORE = 999;
+const ROOM_MAX_TURNS = 999;
+
 function toMoveRequest(move: RoomActionRequest) {
   return {
     actionId: move.actionId,
@@ -68,8 +75,8 @@ export function replayRoomLog(project: EditorProject, moves: readonly RoomMoveRe
       state,
       runtime,
       canonicalActions,
-      project.rules.targetScore,
-      project.rules.maxTurns,
+      ROOM_TARGET_SCORE,
+      ROOM_MAX_TURNS,
     );
   }
 

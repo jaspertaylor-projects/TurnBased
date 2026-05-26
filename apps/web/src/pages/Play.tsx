@@ -34,6 +34,12 @@ const EMPTY_SELECTION: UISelectionState = {
   subChoiceSelections: {},
 };
 
+/* Effectively-unbounded score / turn ceilings used by the local-build
+   replay path. Mirrors the editor's PREVIEW_TARGET_SCORE / PREVIEW_MAX_TURNS
+   — those fields are no longer user-editable on the project. */
+const PLAY_TARGET_SCORE = 999;
+const PLAY_MAX_TURNS = 999;
+
 function readPlayTarget() {
   const hash = window.location.hash;
   const parts = hash.split('/');
@@ -340,8 +346,8 @@ export const Play = () => {
       localBuildState,
       localRuntime,
       canonicalActions,
-      localBuild.projectSnapshot.rules.targetScore,
-      localBuild.projectSnapshot.rules.maxTurns,
+      PLAY_TARGET_SCORE,
+      PLAY_MAX_TURNS,
     );
 
     setLocalBuildState(nextState);

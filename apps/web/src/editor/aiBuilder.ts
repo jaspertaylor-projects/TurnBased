@@ -43,9 +43,6 @@ export interface AIGameBlueprint {
   projectName?: string;
   description?: string;
   rulesText?: string;
-  phases?: string[];
-  targetScore?: number;
-  maxTurns?: number;
   designerNotes?: string[];
   playerRange?: {
     min?: number;
@@ -164,15 +161,6 @@ function normalizeText(value: string | undefined, fallback: string): string {
   return trimmed && trimmed.length > 0 ? trimmed : fallback;
 }
 
-function normalizeStringList(values: string[] | undefined, fallback: string[]): string[] {
-  const normalized = (values ?? [])
-    .map((value) => value.trim().toLowerCase())
-    .filter(Boolean)
-    .map((value) => value.replace(/[^a-z0-9]+/g, '-'));
-
-  return normalized.length > 0 ? Array.from(new Set(normalized)) : fallback;
-}
-
 function singularize(label: string): string {
   return label.endsWith('s') ? label.slice(0, -1) : label;
 }
@@ -184,14 +172,6 @@ function inferProjectName(brief: RulesBuilderBrief): string {
 
 function inferPlayerCount(brief: RulesBuilderBrief): number {
   return clamp(Math.max(brief.minPlayers, brief.maxPlayers), 1, 6);
-}
-
-function inferPhases(brief: RulesBuilderBrief): string[] {
-  if (brief.isCampaignGame) {
-    return ['setup', 'main', 'campaign', 'end'];
-  }
-
-  return ['setup', 'main', 'end'];
 }
 
 function inferRulesText(brief: RulesBuilderBrief, projectName: string): string {
@@ -241,10 +221,7 @@ function createProjectShell(
   overrides: {
     projectName?: string;
     description?: string;
-    phases?: string[];
     rulesText?: string;
-    targetScore?: number;
-    maxTurns?: number;
     designerNotes?: string[];
     appLayout?: Partial<EditorProject['appLayout']>;
   } = {},
@@ -261,7 +238,6 @@ function createProjectShell(
       resourceLabel: 'Blocks',
     },
   }));
-  const phases = normalizeStringList(overrides.phases, inferPhases(brief));
   const views = createDefaultProjectViews(seats, projectName);
 
   return {
@@ -280,17 +256,6 @@ function createProjectShell(
     views,
     rules: {
       ...baseProject.rules,
-      phases,
-      targetScore: clamp(
-        Number.isFinite(overrides.targetScore) ? Math.trunc(overrides.targetScore ?? 0) : Math.max(3, Math.ceil(seats.length * 1.5)),
-        2,
-        20,
-      ),
-      maxTurns: clamp(
-        Number.isFinite(overrides.maxTurns) ? Math.trunc(overrides.maxTurns ?? 0) : 12 + seats.length,
-        4,
-        60,
-      ),
       rulesText: normalizeText(overrides.rulesText, inferRulesText(brief, projectName)),
       designerNotes: buildDesignerNotes(brief, overrides.designerNotes),
     },
@@ -570,10 +535,7 @@ export function buildProjectFromAIBlueprint(brief: RulesBuilderBrief, blueprint:
   let project = createProjectShell(brief, {
     projectName: blueprint.projectName,
     description: blueprint.description,
-    phases: blueprint.phases,
     rulesText: blueprint.rulesText,
-    targetScore: blueprint.targetScore,
-    maxTurns: blueprint.maxTurns,
     designerNotes: blueprint.designerNotes,
     appLayout: blueprint.appLayout,
   });

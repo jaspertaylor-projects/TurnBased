@@ -324,10 +324,6 @@ export function createBlankProject(name = 'Untitled Prototype'): EditorProject {
     rootInstanceIds: [],
     instances: {},
     rules: {
-      prototypeMode: 'territory',
-      phases: ['main'],
-      targetScore: 3,
-      maxTurns: 12,
       rulesText: '',
       designerNotes: '',
       chapters: createDefaultRulesChapters(),

@@ -320,7 +320,6 @@ export const Editor = () => {
           <StatsSection
             project={currentProject}
             onUpdateBrief={(updater) => commitProject(updateProjectBrief(currentProject, updater))}
-            onUpdateRules={(updater) => commitProject(updateProjectRules(currentProject, updater))}
           />
         );
       case 'art':

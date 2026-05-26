@@ -109,9 +109,6 @@ function coerceBlueprint(value: unknown): AIGameBlueprint | null {
     projectName: typeof value.projectName === 'string' ? value.projectName : undefined,
     description: typeof value.description === 'string' ? value.description : undefined,
     rulesText: typeof value.rulesText === 'string' ? value.rulesText : undefined,
-    phases: toStringArray(value.phases),
-    targetScore: typeof value.targetScore === 'number' ? value.targetScore : undefined,
-    maxTurns: typeof value.maxTurns === 'number' ? value.maxTurns : undefined,
     designerNotes: toStringArray(value.designerNotes),
     playerRange: isRecord(value.playerRange) ? {
       min: typeof value.playerRange.min === 'number' ? value.playerRange.min : undefined,

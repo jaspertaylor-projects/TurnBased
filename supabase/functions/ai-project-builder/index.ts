@@ -127,9 +127,6 @@ serve(async (req: Request) => {
                 projectName: 'string',
                 description: 'string',
                 rulesText: 'string',
-                phases: ['setup', 'main', 'end'],
-                targetScore: 3,
-                maxTurns: 12,
                 designerNotes: ['string'],
                 playerRange: {
                   min: 2,
