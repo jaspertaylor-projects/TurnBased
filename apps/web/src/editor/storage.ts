@@ -153,6 +153,12 @@ function normalizeEditorProject(project: EditorProject): EditorProject {
   const legacyPlayerCount = clampPlayerCount((project.brief as Partial<Record<'playerCount', number>> | undefined)?.playerCount, project.seats?.length ?? 2);
   const minPlayers = clampPlayerCount(project.brief?.minPlayers, Math.min(2, legacyPlayerCount));
   const maxPlayers = clampPlayerCount(project.brief?.maxPlayers, legacyPlayerCount);
+  const clampInt = (value: unknown, lo: number, hi: number, fallback: number): number => {
+    const numeric = typeof value === 'number' && Number.isFinite(value) ? Math.trunc(value) : fallback;
+    return Math.max(lo, Math.min(hi, numeric));
+  };
+  const rawPtMin = clampInt(project.brief?.playtimeMinMinutes, 1, 999, defaultBrief.playtimeMinMinutes);
+  const rawPtMax = clampInt(project.brief?.playtimeMaxMinutes, 1, 999, defaultBrief.playtimeMaxMinutes);
   const normalizedBrief = {
     ...defaultBrief,
     ...(project.brief ?? {}),
@@ -163,6 +169,9 @@ function normalizeEditorProject(project: EditorProject): EditorProject {
     isCampaignGame: Boolean(project.brief?.isCampaignGame),
     theme: project.brief?.theme ?? defaultBrief.theme,
     artStyle: project.brief?.artStyle ?? defaultBrief.artStyle,
+    minAge: clampInt(project.brief?.minAge, 0, 99, defaultBrief.minAge),
+    playtimeMinMinutes: Math.min(rawPtMin, rawPtMax),
+    playtimeMaxMinutes: Math.max(rawPtMin, rawPtMax),
   };
   const seatCount = Math.max(project.seats?.length ?? 0, normalizedBrief.maxPlayers, 1);
   const defaultSeats = createDefaultSeats(seatCount);
