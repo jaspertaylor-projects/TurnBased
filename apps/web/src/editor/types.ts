@@ -100,6 +100,12 @@ export interface RulesBuilderBrief {
   isCampaignGame: boolean;
   theme: string;
   artStyle: string;
+  /* Marketing copy that shows on the side of a real board-game box. Used in
+     the Stats section info panel AND fed into AI grounding so generated
+     prose reflects the intended audience and pacing. */
+  minAge: number;
+  playtimeMinMinutes: number;
+  playtimeMaxMinutes: number;
 }
 
 export type RulesChapterKind = 'standard' | 'components';

@@ -105,6 +105,9 @@ export function createDefaultRulesBrief(): RulesBuilderBrief {
     isCampaignGame: false,
     theme: '',
     artStyle: '',
+    minAge: 10,
+    playtimeMinMinutes: 30,
+    playtimeMaxMinutes: 60,
   };
 }
 
@@ -143,6 +146,11 @@ export function appendBriefList(value: string, entry: string): string {
 export function normalizeRulesBuilderBrief(brief: RulesBuilderBrief): RulesBuilderBrief {
   const normalizedMin = Math.max(1, Math.min(6, Math.trunc(brief.minPlayers || 1)));
   const normalizedMax = Math.max(normalizedMin, Math.min(6, Math.trunc(brief.maxPlayers || normalizedMin)));
+  const normalizedAge = Math.max(0, Math.min(99, Math.trunc(brief.minAge || 0)));
+  const rawPtMin = Math.max(1, Math.min(999, Math.trunc(brief.playtimeMinMinutes || 1)));
+  const rawPtMax = Math.max(1, Math.min(999, Math.trunc(brief.playtimeMaxMinutes || rawPtMin)));
+  const normalizedPtMin = Math.min(rawPtMin, rawPtMax);
+  const normalizedPtMax = Math.max(rawPtMin, rawPtMax);
 
   return {
     ...brief,
@@ -151,6 +159,9 @@ export function normalizeRulesBuilderBrief(brief: RulesBuilderBrief): RulesBuild
     maxPlayers: normalizedMax,
     theme: brief.theme.trim() || 'none',
     artStyle: brief.artStyle.trim() || 'none',
+    minAge: normalizedAge,
+    playtimeMinMinutes: normalizedPtMin,
+    playtimeMaxMinutes: normalizedPtMax,
   };
 }
 
