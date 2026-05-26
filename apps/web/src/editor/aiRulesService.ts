@@ -86,6 +86,7 @@ export async function generateRulesChapterText(args: {
   themes: string[];
   artStyles: string[];
   contextWeights: AIRulesContextWeights;
+  modelId: string;
 }): Promise<AIRulesAssistResult> {
   if (!hasSupabaseConfig()) {
     throw new Error('Supabase is not configured in this environment, so AI assist is unavailable.');
@@ -96,7 +97,7 @@ export async function generateRulesChapterText(args: {
     throw new Error('Sign in to use the AI rules writer.');
   }
 
-  const { project, activeChapter, userPrompt, mode, themes, artStyles, contextWeights } = args;
+  const { project, activeChapter, userPrompt, mode, themes, artStyles, contextWeights, modelId } = args;
   const body = {
     gameName: project.brief.name || project.name,
     /* themes / artStyles come from the chip toggles in the AI panel — they
@@ -119,6 +120,7 @@ export async function generateRulesChapterText(args: {
     userPrompt,
     mode,
     contextWeights,
+    modelId,
   };
 
   const { data, error } = await supabase.functions.invoke<ServerResponse>('ai-rules-writer', { body });
@@ -194,6 +196,7 @@ export async function brainstormRulesIdeas(args: {
   themes: string[];
   artStyles: string[];
   contextWeights: AIRulesContextWeights;
+  modelId: string;
 }): Promise<AIRulesBrainstormResult> {
   if (!hasSupabaseConfig()) {
     throw new Error('Supabase is not configured in this environment, so AI brainstorm is unavailable.');
@@ -204,7 +207,7 @@ export async function brainstormRulesIdeas(args: {
     throw new Error('Sign in to use the AI brainstorm.');
   }
 
-  const { project, activeChapter, userPrompt, themes, artStyles, contextWeights } = args;
+  const { project, activeChapter, userPrompt, themes, artStyles, contextWeights, modelId } = args;
   const body = {
     gameName: project.brief.name || project.name,
     theme: themes.join(', '),
@@ -221,6 +224,7 @@ export async function brainstormRulesIdeas(args: {
     userPrompt,
     mode: 'brainstorm' as const,
     contextWeights,
+    modelId,
   };
 
   const { data, error } = await supabase.functions.invoke<ServerResponse>('ai-rules-writer', { body });

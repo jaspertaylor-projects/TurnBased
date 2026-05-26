@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { ChevronLeft, ChevronRight, Plus, SpellCheck, X } from 'lucide-react';
 
+import type { BuiltInComponentType } from '@turnbased/engine-components';
+
 import { addChapter, createBlankChapter, removeChapter, splitBriefList, updateChapter } from '../project';
 import {
   DEFAULT_AI_RULES_CONTEXT_WEIGHTS,
@@ -8,7 +10,12 @@ import {
   generateRulesChapterText,
 } from '../aiRulesService';
 import { saveRecentPrompt } from '../aiPromptHistory';
-import type { EditorProject, EditorRuleConfig, RulesChapter } from '../types';
+import type {
+  CustomRulebookComponent,
+  EditorProject,
+  EditorRuleConfig,
+  RulesChapter,
+} from '../types';
 import { RulebookPage, type AIDraftState } from './rules/RulebookPage';
 import { SERIF_STACK } from './rules/rulebookStyles';
 import {
@@ -34,6 +41,10 @@ export function RulesSection({
   onUpdateRules,
   onAppendProjectTheme,
   onAppendProjectArtStyle,
+  onAddCatalogComponent,
+  onUpdateInstanceNotes,
+  onUpdateInstanceName,
+  onRemoveInstance,
 }: {
   project: EditorProject;
   onUpdateRules: (updater: (rules: EditorRuleConfig) => EditorRuleConfig) => void;
@@ -43,6 +54,14 @@ export function RulesSection({
      panel's available + selected lists so the user immediately sees it. */
   onAppendProjectTheme: (theme: string) => void;
   onAppendProjectArtStyle: (style: string) => void;
+  /* Components-chapter wiring: these mutate project.instances so picks made
+     inside the rulebook show up in the gallery and vice-versa. Custom
+     components stay inside `rules.customComponents` and are handled via
+     onUpdateRules below — no separate handler needed. */
+  onAddCatalogComponent: (type: BuiltInComponentType) => void;
+  onUpdateInstanceNotes: (instanceId: string, notes: string) => void;
+  onUpdateInstanceName: (instanceId: string, displayName: string) => void;
+  onRemoveInstance: (instanceId: string) => void;
 }) {
   const chapters = project.rules.chapters;
   const totalChapters = chapters.length;
@@ -197,6 +216,16 @@ export function RulesSection({
     onUpdateRules((rules) => removeChapter(rules, chapterId));
   }
 
+  const handleAddCustomComponent = (entry: CustomRulebookComponent) =>
+    onUpdateRules((rules) => ({ ...rules, customComponents: [...rules.customComponents, entry] }));
+  const handleUpdateCustomComponent = (id: string, patch: Partial<Omit<CustomRulebookComponent, 'id'>>) =>
+    onUpdateRules((rules) => ({
+      ...rules,
+      customComponents: rules.customComponents.map((entry) => entry.id === id ? { ...entry, ...patch } : entry),
+    }));
+  const handleRemoveCustomComponent = (id: string) =>
+    onUpdateRules((rules) => ({ ...rules, customComponents: rules.customComponents.filter((entry) => entry.id !== id) }));
+
   function handlePrev() {
     if (canGoBack) setSpreadIndex(spreadIndex - 1);
   }
@@ -285,6 +314,7 @@ export function RulesSection({
           themes: currentState.selectedThemes,
           artStyles: currentState.selectedArtStyles,
           contextWeights: currentState.contextWeights,
+          modelId: project.settings.aiModels.rulesWriter,
         });
         setAiState((prev) => (prev && prev.chapterId === chapter.id
           ? { ...prev, loading: false, error: null, brainstormResults: result.ideas }
@@ -299,6 +329,7 @@ export function RulesSection({
         themes: currentState.selectedThemes,
         artStyles: currentState.selectedArtStyles,
         contextWeights: currentState.contextWeights,
+        modelId: project.settings.aiModels.rulesWriter,
       });
       // Snapshot the most recent body just before swapping it out, then
       // replace. The body might differ from the chapter.body we opened the
@@ -384,6 +415,14 @@ export function RulesSection({
           onBodyContextMenu={handleBodyContextMenu}
           onAppendTheme={(value) => appendAndSelect('themes', value)}
           onAppendArtStyle={(value) => appendAndSelect('artStyles', value)}
+          project={project}
+          onAddCatalogComponent={onAddCatalogComponent}
+          onUpdateInstanceNotes={onUpdateInstanceNotes}
+          onUpdateInstanceName={onUpdateInstanceName}
+          onRemoveInstance={onRemoveInstance}
+          onAddCustomComponent={handleAddCustomComponent}
+          onUpdateCustomComponent={handleUpdateCustomComponent}
+          onRemoveCustomComponent={handleRemoveCustomComponent}
         />
 
         {/* spine shadow between the two pages */}
@@ -415,6 +454,14 @@ export function RulesSection({
           onBodyContextMenu={handleBodyContextMenu}
           onAppendTheme={(value) => appendAndSelect('themes', value)}
           onAppendArtStyle={(value) => appendAndSelect('artStyles', value)}
+          project={project}
+          onAddCatalogComponent={onAddCatalogComponent}
+          onUpdateInstanceNotes={onUpdateInstanceNotes}
+          onUpdateInstanceName={onUpdateInstanceName}
+          onRemoveInstance={onRemoveInstance}
+          onAddCustomComponent={handleAddCustomComponent}
+          onUpdateCustomComponent={handleUpdateCustomComponent}
+          onRemoveCustomComponent={handleRemoveCustomComponent}
         />
       </div>
 

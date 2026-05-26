@@ -163,6 +163,7 @@ A pre-confirmed account is seeded into the local Postgres on every
 
 - **Email:** `dev@turnbased.local`
 - **Password:** `dev-local-only`
+- **Local AI wallet:** `$50.00`
 
 Use it to exercise any flow that requires auth (the `Build with AI` path,
 the rulebook `AI` button on each section, anything that hits the edge
@@ -190,6 +191,13 @@ The script opens a visible Chrome window with a persistent local profile at
 `.playwright-codex/chrome-profile` and remote debugging on port `9223`. Sign in
 there once with the local dev account above; future Codex browser checks can
 reuse that session without disturbing Claude's browser.
+
+Codex can inspect or screenshot that browser through the approved helper scripts:
+
+```bash
+node scripts/codex-browser-inspect.mjs http://127.0.0.1:3000/#/settings
+node scripts/codex-browser-screenshot.mjs http://127.0.0.1:3000/#/settings settings.png
+```
 
 Useful overrides:
 

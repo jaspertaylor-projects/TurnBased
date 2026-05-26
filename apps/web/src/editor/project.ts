@@ -19,7 +19,9 @@ import { generateId } from '@turnbased/shared-utils';
 
 import { createDefaultProjectManifest } from './manifest';
 import { createDefaultProjectColorPalette } from './projectPalette';
+import { getUserSettings } from '../userSettings';
 import type {
+  CustomRulebookComponent,
   EditorAppLayout,
   EditorArtDirection,
   EditorProject,
@@ -59,6 +61,7 @@ export function createDefaultProjectSettings(): EditorSettings {
     timeControlMode: 'none',
     timeControlSeconds: 300,
     colorPalette: createDefaultProjectColorPalette(),
+    aiModels: getUserSettings().defaultAIModels,
   };
 }
 
@@ -327,6 +330,7 @@ export function createBlankProject(name = 'Untitled Prototype'): EditorProject {
       rulesText: '',
       designerNotes: '',
       chapters: createDefaultRulesChapters(),
+      customComponents: [],
     },
     settings: createDefaultProjectSettings(),
     art: createDefaultProjectArtDirection(),
@@ -382,11 +386,44 @@ export function createDefaultRulesChapters(): RulesChapter[] {
     id: generateId('chapter'),
     title,
     body: '',
+    kind: title === 'Components' ? 'components' as const : 'standard' as const,
   }));
 }
 
 export function createBlankChapter(title = 'New Chapter'): RulesChapter {
-  return { id: generateId('chapter'), title, body: '' };
+  return { id: generateId('chapter'), title, body: '', kind: 'standard' };
+}
+
+// ── Custom rulebook components ──────────────────────────────────────────
+
+export function addCustomRulebookComponent(
+  rules: EditorRuleConfig,
+  component: CustomRulebookComponent,
+): EditorRuleConfig {
+  return { ...rules, customComponents: [...rules.customComponents, component] };
+}
+
+export function updateCustomRulebookComponent(
+  rules: EditorRuleConfig,
+  componentId: string,
+  patch: Partial<Omit<CustomRulebookComponent, 'id'>>,
+): EditorRuleConfig {
+  return {
+    ...rules,
+    customComponents: rules.customComponents.map((entry) =>
+      entry.id === componentId ? { ...entry, ...patch } : entry,
+    ),
+  };
+}
+
+export function removeCustomRulebookComponent(
+  rules: EditorRuleConfig,
+  componentId: string,
+): EditorRuleConfig {
+  return {
+    ...rules,
+    customComponents: rules.customComponents.filter((entry) => entry.id !== componentId),
+  };
 }
 
 export function updateChapter(

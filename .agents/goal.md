@@ -20,7 +20,6 @@ order a physical prototype.  Make a playable online version of their game, and p
     2. Keep this direction in mind that each board game will eventually need to be playable online when making coding decisions for board game designer + physical order milestone
 
 
-
 3.  Online economy 
     1. To be designed later, but keep in mind that we will need to be able to have robust user accounts of different types (designer/playtester/user ) etc.   
 

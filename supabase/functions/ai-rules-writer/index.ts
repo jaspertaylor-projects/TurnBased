@@ -114,9 +114,19 @@ function buildContextBlock(payload: {
   chapters: ChapterContext[];
   activeIndex: number;
   weights: ContextWeights;
+  mode: 'draft' | 'rewrite' | 'expand' | 'brainstorm';
 }): string {
+  // When the user has dialed BOTH project flavor (chips) and the rulebook to 0,
+  // they're explicitly asking for a prompt-only response. Stripping the
+  // GAME NAME / PLAYER COUNT / chapter heading entirely is the only reliable
+  // way to keep stylistic leakage from a name like "No Honor" out of the
+  // brainstorm — left in, the model will infer a vibe even with no theme
+  // string present.
+  const flavorMuted = payload.weights.chips <= 0 && payload.weights.rulebook <= 0;
   const parts: string[] = [];
-  parts.push(`GAME NAME: ${payload.gameName || 'Untitled game'}`);
+  if (!flavorMuted) {
+    parts.push(`GAME NAME: ${payload.gameName || 'Untitled game'}`);
+  }
   if (payload.weights.chips > 0 && payload.theme.trim()) parts.push(`THEMES: ${payload.theme}`);
   if (payload.weights.chips > 0 && payload.artStyle.trim()) parts.push(`ART STYLES: ${payload.artStyle}`);
   if (payload.weights.chips > 0 && payload.artStyleDetails.length > 0) {
@@ -128,9 +138,13 @@ function buildContextBlock(payload: {
       parts.push(`  - ${name}${desc}`);
     });
   }
-  parts.push(`PLAYER COUNT: ${payload.playerMin}-${payload.playerMax}`);
+  if (!flavorMuted) {
+    parts.push(`PLAYER COUNT: ${payload.playerMin}-${payload.playerMax}`);
+  }
   parts.push('');
-  if (payload.weights.rulebook <= 0) {
+  if (flavorMuted) {
+    parts.push('PROJECT CONTEXT: intentionally withheld by user weighting (rulebook=0 and chips=0). Do not invent a project tone; follow ONLY the user prompt below.');
+  } else if (payload.weights.rulebook <= 0) {
     const active = payload.chapters[payload.activeIndex];
     parts.push('RULEBOOK SO FAR: ignored by user weighting. Active section only:');
     parts.push(`### ${(payload.activeIndex >= 0 ? payload.activeIndex : 0) + 1}. ${active?.title || 'Untitled section'} ← YOU ARE WRITING THIS SECTION`);
@@ -215,6 +229,7 @@ serve(async (req) => {
       chapters: chapters.length > 0 ? chapters : [{ title: activeChapterTitle, body: activeChapterBody }],
       activeIndex: activeIndex >= 0 ? activeIndex : chapters.length,
       weights: contextWeights,
+      mode,
     });
 
     const activeBodyTrim = activeChapterBody.trim();
@@ -229,7 +244,7 @@ serve(async (req) => {
         'Make the 20 entries varied — mix tones, syllable counts, vibes — so the user has real choice. Avoid duplicates and near-duplicates.',
         'Use the GENERATION PRIORITIES below to decide how strongly to honor the user prompt, chips, and existing rulebook. If the prompt has the highest weight, its style constraints win over the project flavor.',
         'If the user prompt names a kind of thing (e.g. "city names", "faction names", "starter items"), brainstorm that specifically.',
-        'When brainstorming city/place names and the user asks for realistic, modern, map-like, or real-world names, avoid fantasy, gothic, mythic, medieval, and epic compound naming unless the prompt explicitly requests that style.',
+        'Follow the user prompt as written. If it names a specific reference (a city, franchise, era, aesthetic, mood), match that reference faithfully rather than the keywords in its name.',
       ].join('\n');
     } else if (mode === 'rewrite' && hasExistingBody) {
       modeInstruction = [
@@ -282,17 +297,33 @@ serve(async (req) => {
       ? 'For brainstorm mode, return ONLY the JSON array requested by the task. No preamble, no markdown, no closing remarks.'
       : 'Return ONLY the body text for the requested section. No preamble, no closing remarks, no JSON.';
 
-    const systemPrompt = [
+    // System-prompt rules that ground the model in project flavor are
+    // CONDITIONAL on the user's weights. With chips=0 the model must not
+    // evoke unstated themes; with rulebook=0 it must not mimic an unseen
+    // voice. Leaving these in unconditionally is what makes a brainstorm
+    // run drift toward project-vibe defaults even when the user dialed the
+    // flavor sliders to zero.
+    const systemRules: string[] = [
       'You are a co-designer helping a game creator write the rulebook for their tabletop board game.',
       'Write in clean, modern board-game-rulebook prose — concise, instructive, second-person ("you"), and unambiguous.',
-      'Match the tone and any terminology already established in other sections of the rulebook.',
-      'GROUND every reference to setting, characters, factions, locations, and visual flavor in the project\'s THEMES, ART STYLES, and ART DIRECTION listed in the context block. If the themes say "Cozy forest, Magical garden" the prose should evoke that, not generic fantasy.',
+    ];
+    if (contextWeights.rulebook > 0) {
+      systemRules.push('Match the tone and any terminology already established in other sections of the rulebook.');
+    }
+    if (contextWeights.chips > 0) {
+      systemRules.push('GROUND every reference to setting, characters, factions, locations, and visual flavor in the project\'s THEMES, ART STYLES, and ART DIRECTION listed in the context block. If the themes say "Cozy forest, Magical garden" the prose should evoke that, not generic fantasy.');
+    }
+    if (contextWeights.rulebook <= 0 && contextWeights.chips <= 0) {
+      systemRules.push('The user has explicitly muted both project flavor (chips=0) and the rest of the rulebook (rulebook=0). Treat this as a clean-slate brainstorm/draft driven ONLY by the user prompt. Do NOT infer a tone, setting, genre, or aesthetic from the game name, chapter title, or any prior context — invent only from what the user prompt says.');
+    }
+    systemRules.push(
       'Respect the GENERATION PRIORITIES from the user message. User guidance with a higher weight can override project flavor; project flavor with a 0 chip weight should not influence the answer.',
       'PLACEHOLDER CONVENTION: any angle-bracket token containing a short hyphenated descriptor — e.g. <city-name>, <faction>, <character-archetype>, <sacred-item>, <evil-trinket>, <ritual-name> — is a placeholder. REPLACE each with a single specific value that fits the game\'s themes. The angle-bracket marker text must not appear in your output; only the chosen replacement does. Read the descriptor inside the brackets as a hint about what kind of thing to invent. (Do not treat real HTML/markup tokens like </p> or self-closing slashes as placeholders.)',
       'NEVER restate the section title in your output — the heading is already shown above your text.',
       'NEVER use markdown headings (#, ##) or fenced code blocks. Plain paragraphs only, with occasional bulleted lists where they aid clarity.',
       responseFormatInstruction,
-    ].join('\n');
+    );
+    const systemPrompt = systemRules.join('\n');
 
     const userMessage = [
       priorityBlock,
@@ -320,6 +351,12 @@ serve(async (req) => {
         tier_min: 'free',
       }, { onConflict: 'provider,model_id' });
 
+    // Brainstorm needs more variety than rulebook prose; 0.6 keeps prose
+    // crisp but produces near-deterministic name lists (the model keeps
+    // sampling the same compound-name basin). 0.95 broadens it without
+    // making the JSON wrap unreliable.
+    const temperature = mode === 'brainstorm' ? 0.95 : 0.6;
+
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -328,7 +365,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         model: resolvedModel,
-        temperature: 0.6,
+        temperature,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userMessage },
@@ -362,7 +399,21 @@ serve(async (req) => {
     const providerCostUsd = pricing
       ? ((promptTokens * pricing.inputPerMillionUsd) + (completionTokens * pricing.outputPerMillionUsd)) / 1_000_000
       : null;
-    const providerCostCents = providerCostUsd === null ? 0 : Math.round(providerCostUsd * 100);
+    const providerCostCents = providerCostUsd === null ? 0 : Math.ceil(providerCostUsd * 100);
+    const platformFeeCents = providerCostCents;
+    const totalChargedCents = providerCostCents + platformFeeCents;
+    const platformFeeUsd = providerCostUsd;
+    const totalChargedUsd = providerCostUsd === null ? null : providerCostUsd * 2;
+
+    if (totalChargedCents > 0) {
+      const { data: debited, error: debitError } = await supabaseClient.rpc('wallet_debit', {
+        amount_cents: totalChargedCents,
+      });
+      if (debitError) throw new Error(debitError.message);
+      if (!debited) {
+        throw new Error(`Insufficient account balance for AI rules call (${(totalChargedCents / 100).toFixed(2)}).`);
+      }
+    }
 
     await supabaseAdmin
       .from('ai_usage_ledger')
@@ -372,8 +423,8 @@ serve(async (req) => {
         model_id: resolvedModel,
         modality: 'text',
         provider_cost_cents: providerCostCents,
-        platform_fee_cents: 0,
-        total_charged_cents: providerCostCents,
+        platform_fee_cents: platformFeeCents,
+        total_charged_cents: totalChargedCents,
         request_meta: {
           surface: 'ai-rules-writer',
           activeChapterTitle,
@@ -386,6 +437,9 @@ serve(async (req) => {
           completion_tokens: completionTokens,
           total_tokens: totalTokens,
           pricing_known: Boolean(pricing),
+          provider_cost_usd: providerCostUsd,
+          platform_fee_usd: platformFeeUsd,
+          total_charged_usd: totalChargedUsd,
         },
       });
 
@@ -397,7 +451,8 @@ serve(async (req) => {
       cost: {
         estimatedCostUsd: providerCostUsd,
         providerCostCents,
-        totalChargedCents: providerCostCents,
+        platformFeeCents,
+        totalChargedCents,
         pricingKnown: Boolean(pricing),
         currency: 'USD',
       },

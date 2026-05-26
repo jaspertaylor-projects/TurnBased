@@ -1,9 +1,14 @@
 import { type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
 import { Plus, RotateCcw, Sparkles, Trash2 } from 'lucide-react';
 
-import type { RulesChapter } from '../../types';
+import type {
+  BuiltInComponentType,
+} from '@turnbased/engine-components';
+
+import type { CustomRulebookComponent, EditorProject, RulesChapter } from '../../types';
 import { PAPER_BACKGROUND, PAPER_BORDER, PAPER_SHADOW, SERIF_STACK } from './rulebookStyles';
 import { AIAssistPanel, type AIDraftState } from './AIAssistPanel';
+import { ComponentsChapterPage } from './ComponentsChapterPage';
 
 export type { AIDraftState };
 
@@ -30,6 +35,18 @@ export interface RulebookPageProps {
      selected on the current AI panel. Provided by RulesSection. */
   onAppendTheme: (value: string) => void;
   onAppendArtStyle: (value: string) => void;
+  /* Components-chapter handlers — passed through so the special page can
+     drive add/remove on project.instances and on the rules-only custom
+     list. Required because the Components chapter renders a picker
+     instead of a freeform textarea. */
+  project: EditorProject;
+  onAddCatalogComponent: (type: BuiltInComponentType) => void;
+  onUpdateInstanceNotes: (instanceId: string, notes: string) => void;
+  onUpdateInstanceName: (instanceId: string, displayName: string) => void;
+  onRemoveInstance: (instanceId: string) => void;
+  onAddCustomComponent: (entry: CustomRulebookComponent) => void;
+  onUpdateCustomComponent: (id: string, patch: Partial<Omit<CustomRulebookComponent, 'id'>>) => void;
+  onRemoveCustomComponent: (id: string) => void;
 }
 
 
@@ -51,9 +68,21 @@ export function RulebookPage({
   onBodyContextMenu,
   onAppendTheme,
   onAppendArtStyle,
+  project,
+  onAddCatalogComponent,
+  onUpdateInstanceNotes,
+  onUpdateInstanceName,
+  onRemoveInstance,
+  onAddCustomComponent,
+  onUpdateCustomComponent,
+  onRemoveCustomComponent,
 }: RulebookPageProps) {
   const isLeftPage = side === 'left';
   const aiTargetsThisPage = chapter !== null && aiState !== null && aiState.chapterId === chapter.id;
+  // The Components chapter uses a structured catalog picker instead of a
+  // freeform body — the AI assist button doesn't apply there because the
+  // descriptions live per-component, not in a single text blob.
+  const isComponentsChapter = chapter?.kind === 'components';
   const pageInner: ReactNode = chapter ? (
     <div data-layout="pageContent" /* page content column inside the paper card */ style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, gap: '0.75rem' }}>
       <div data-layout="pageTitleRow" /* editable chapter title + AI / remove buttons */ style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -75,26 +104,28 @@ export function RulebookPage({
             borderRadius: '6px',
           }}
         />
-        <button
-          type="button"
-          onClick={() => onOpenAI(chapter)}
-          disabled={aiTargetsThisPage}
-          aria-label={`Open AI assist for ${chapter.title || 'this section'}`}
-          title="Ask the AI for help with this section"
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
-            padding: '0.3rem 0.6rem', borderRadius: '999px',
-            border: '1px solid rgba(13,148,136,0.4)',
-            background: aiTargetsThisPage ? 'rgba(13,148,136,0.18)' : 'rgba(255,253,246,0.9)',
-            color: '#0d9488',
-            fontFamily: SERIF_STACK, fontWeight: 700, fontSize: '0.78rem',
-            cursor: aiTargetsThisPage ? 'default' : 'pointer', flexShrink: 0,
-          }}
-        >
-          <Sparkles size={13} />
-          AI
-        </button>
-        {aiUndoBody !== null ? (
+        {isComponentsChapter ? null : (
+          <button
+            type="button"
+            onClick={() => onOpenAI(chapter)}
+            disabled={aiTargetsThisPage}
+            aria-label={`Open AI assist for ${chapter.title || 'this section'}`}
+            title="Ask the AI for help with this section"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+              padding: '0.3rem 0.6rem', borderRadius: '999px',
+              border: '1px solid rgba(13,148,136,0.4)',
+              background: aiTargetsThisPage ? 'rgba(13,148,136,0.18)' : 'rgba(255,253,246,0.9)',
+              color: '#0d9488',
+              fontFamily: SERIF_STACK, fontWeight: 700, fontSize: '0.78rem',
+              cursor: aiTargetsThisPage ? 'default' : 'pointer', flexShrink: 0,
+            }}
+          >
+            <Sparkles size={13} />
+            AI
+          </button>
+        )}
+        {!isComponentsChapter && aiUndoBody !== null ? (
           <button
             type="button"
             onClick={() => onUndoAI(chapter.id)}
@@ -132,7 +163,7 @@ export function RulebookPage({
 
       <div aria-hidden style={{ height: '1px', background: 'linear-gradient(90deg, rgba(120,95,50,0.4) 0%, rgba(120,95,50,0.1) 100%)', flex: '0 0 auto' }} />
 
-      {aiTargetsThisPage && aiState ? (
+      {!isComponentsChapter && aiTargetsThisPage && aiState ? (
         <AIAssistPanel
           chapter={chapter}
           state={aiState}
@@ -144,27 +175,40 @@ export function RulebookPage({
         />
       ) : null}
 
-      <textarea
-        value={chapter.body}
-        onChange={(event) => onBodyChange(chapter.id, event.target.value)}
-        onContextMenu={onBodyContextMenu}
-        placeholder="Write this part of the rulebook..."
-        aria-label="Chapter text"
-        disabled={aiTargetsThisPage && aiState?.loading}
-        style={{
-          flex: '1 1 auto',
-          minHeight: 0,
-          border: 'none',
-          background: 'transparent',
-          resize: 'none',
-          color: '#3b2412',
-          fontFamily: SERIF_STACK,
-          fontSize: '0.96rem',
-          lineHeight: 1.6,
-          padding: '0.2rem 0.2rem',
-          outline: 'none',
-        }}
-      />
+      {isComponentsChapter ? (
+        <ComponentsChapterPage
+          project={project}
+          onAddCatalogComponent={onAddCatalogComponent}
+          onUpdateInstanceNotes={onUpdateInstanceNotes}
+          onUpdateInstanceName={onUpdateInstanceName}
+          onRemoveInstance={onRemoveInstance}
+          onAddCustomComponent={onAddCustomComponent}
+          onUpdateCustomComponent={onUpdateCustomComponent}
+          onRemoveCustomComponent={onRemoveCustomComponent}
+        />
+      ) : (
+        <textarea
+          value={chapter.body}
+          onChange={(event) => onBodyChange(chapter.id, event.target.value)}
+          onContextMenu={onBodyContextMenu}
+          placeholder="Write this part of the rulebook..."
+          aria-label="Chapter text"
+          disabled={aiTargetsThisPage && aiState?.loading}
+          style={{
+            flex: '1 1 auto',
+            minHeight: 0,
+            border: 'none',
+            background: 'transparent',
+            resize: 'none',
+            color: '#3b2412',
+            fontFamily: SERIF_STACK,
+            fontSize: '0.96rem',
+            lineHeight: 1.6,
+            padding: '0.2rem 0.2rem',
+            outline: 'none',
+          }}
+        />
+      )}
 
       <div data-layout="pageNumberRow" /* page-number flourish at the bottom corner */ style={{ flex: '0 0 auto', display: 'flex', justifyContent: isLeftPage ? 'flex-start' : 'flex-end' }}>
         <span style={{ fontFamily: SERIF_STACK, fontStyle: 'italic', color: 'rgba(120, 95, 50, 0.55)', fontSize: '0.78rem' }}>

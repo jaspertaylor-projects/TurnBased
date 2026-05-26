@@ -313,6 +313,19 @@ export const Editor = () => {
               ...brief,
               artStyle: appendBriefList(brief.artStyle, style),
             })))}
+            /* Catalog picks made from the rulebook reuse the same gallery
+               add path so a picked board / deck / tile shows up in the
+               Component Editor with its standard default placement. */
+            onAddCatalogComponent={(type) => { handleAddComponent(type, null, { focusNewComponent: false }); }}
+            onUpdateInstanceNotes={(instanceId, notes) => updateComponent(instanceId, (instance) => ({
+              ...instance,
+              notes,
+            }))}
+            onUpdateInstanceName={(instanceId, displayName) => updateComponent(instanceId, (instance) => ({
+              ...instance,
+              displayName,
+            }))}
+            onRemoveInstance={removeComponent}
           />
         );
       case 'stats':

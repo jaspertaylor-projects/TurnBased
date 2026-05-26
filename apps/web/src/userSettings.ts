@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import { DEFAULT_PROJECT_AI_MODELS, normalizeProjectAIModels, type ProjectAIModelSettings } from './editor/aiModelCatalog';
 
 /**
  * User-level settings that persist across projects and live in localStorage.
@@ -11,12 +12,15 @@ export type UserLengthUnit = 'mm' | 'inches';
 export interface UserSettings {
   /** Display unit for physical dimensions in every editor surface. */
   preferredUnits: UserLengthUnit;
+  /** Default model choices used when creating new projects. */
+  defaultAIModels: ProjectAIModelSettings;
 }
 
 const DEFAULT_USER_SETTINGS: UserSettings = {
   // Default to inches — our primary supplier catalog expresses board/tile
   // sizes in inches (18×18, 24×24…), so that matches the dropdown labels.
   preferredUnits: 'inches',
+  defaultAIModels: DEFAULT_PROJECT_AI_MODELS,
 };
 
 const STORAGE_KEY = 'turnbased.user.settings';
@@ -26,7 +30,11 @@ function loadFromStorage(): UserSettings {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_USER_SETTINGS;
     const parsed = JSON.parse(raw) as Partial<UserSettings>;
-    return { ...DEFAULT_USER_SETTINGS, ...parsed };
+    return {
+      ...DEFAULT_USER_SETTINGS,
+      ...parsed,
+      defaultAIModels: normalizeProjectAIModels(parsed.defaultAIModels),
+    };
   } catch {
     return DEFAULT_USER_SETTINGS;
   }

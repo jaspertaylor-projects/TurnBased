@@ -11,6 +11,7 @@ import type {
   ComponentInstanceModel,
   ComponentValidationResult,
 } from '@turnbased/engine-components';
+import type { ProjectAIModelSettings } from './aiModelCatalog';
 
 export type ProjectCapabilityMode = 'standard' | 'advanced' | 'experimental';
 export type ProjectAcknowledgedWarningId =
@@ -101,10 +102,25 @@ export interface RulesBuilderBrief {
   artStyle: string;
 }
 
+export type RulesChapterKind = 'standard' | 'components';
+
 export interface RulesChapter {
   id: string;
   title: string;
   body: string;
+  /* When `'components'`, the rulebook spread swaps the freeform textarea
+     for the catalog picker + component list described in
+     ComponentsChapterPage. Standard chapters keep the freeform body. */
+  kind?: RulesChapterKind;
+}
+
+/* Rulebook-only component the user invented that does NOT exist in the
+   supplier / engine catalog. Stays out of project.instances so the gallery
+   stays clean; surfaces only inside the Components chapter. */
+export interface CustomRulebookComponent {
+  id: string;
+  name: string;
+  description: string;
 }
 
 export interface EditorRuleConfig {
@@ -118,6 +134,10 @@ export interface EditorRuleConfig {
   /* Ordered list of rulebook chapters surfaced by the Rules section. Each
      chapter is one "page" in the two-page-spread rulebook UI. */
   chapters: RulesChapter[];
+  /* User-invented components that live only in the rulebook (no catalog
+     match). Carry a warning in the UI that they cannot be shipped via the
+     physical-prototype supplier. */
+  customComponents: CustomRulebookComponent[];
 }
 
 export type EditorTimeControlMode = 'none' | 'per_turn' | 'per_match';
@@ -147,6 +167,7 @@ export interface EditorSettings {
   timeControlMode: EditorTimeControlMode;
   timeControlSeconds: number;
   colorPalette: ProjectColorPalette;
+  aiModels: ProjectAIModelSettings;
 }
 
 import type { BoardSurfaceTextureId } from '@turnbased/engine-components';

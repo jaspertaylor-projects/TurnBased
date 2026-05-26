@@ -1,5 +1,6 @@
-import type { EditorArtReference, EditorIconAsset, EditorProject, StoredEditorProjects } from './types';
+import type { EditorArtReference, EditorIconAsset, EditorProject, RulesChapter, StoredEditorProjects } from './types';
 import { ensureProjectManifest } from './manifest';
+import { normalizeProjectAIModels } from './aiModelCatalog';
 import {
   createBlankChapter,
   createDefaultAppLayout,
@@ -93,27 +94,57 @@ function normalizeRules(rules: EditorProject['rules'] | undefined): EditorProjec
   // Migration: if no chapters but legacy rulesText is present, lift it into a
   // single "Rules" chapter so existing projects don't appear empty after the
   // rulebook switch. If both are empty, seed the 7 default chapters.
-  let chapters = legacyChapters
+  let chapters: RulesChapter[] = legacyChapters
     .filter((chapter) => chapter && typeof chapter.id === 'string')
-    .map((chapter) => ({
-      id: chapter.id,
-      title: typeof chapter.title === 'string' ? chapter.title : 'Untitled Chapter',
-      body: typeof chapter.body === 'string' ? chapter.body : '',
-    }));
+    .map((chapter) => {
+      const title = typeof chapter.title === 'string' ? chapter.title : 'Untitled Chapter';
+      // Stored projects from before the components-chapter migration won't have
+      // a `kind` field — infer it from the title so the catalog picker shows up.
+      const storedKind = (chapter as { kind?: unknown }).kind;
+      const kind: 'standard' | 'components' = storedKind === 'components'
+        ? 'components'
+        : storedKind === 'standard'
+          ? 'standard'
+          : title.trim().toLowerCase() === 'components'
+            ? 'components'
+            : 'standard';
+      return {
+        id: chapter.id,
+        title,
+        body: typeof chapter.body === 'string' ? chapter.body : '',
+        kind,
+      };
+    });
 
   if (chapters.length === 0) {
     if (typeof safe.rulesText === 'string' && safe.rulesText.trim().length > 0) {
       const seeded = createBlankChapter('Rules');
-      chapters = [{ ...seeded, body: safe.rulesText }];
+      chapters = [{ ...seeded, body: safe.rulesText, kind: 'standard' }];
     } else {
       chapters = createDefaultRulesChapters();
     }
   }
 
+  const rawCustom = Array.isArray((safe as { customComponents?: unknown }).customComponents)
+    ? (safe as { customComponents: unknown[] }).customComponents
+    : [];
+  const customComponents = rawCustom
+    .filter((entry): entry is { id?: unknown; name?: unknown; description?: unknown } => (
+      typeof entry === 'object' && entry !== null
+    ))
+    .map((entry, index) => ({
+      id: typeof entry.id === 'string' && entry.id.trim().length > 0
+        ? entry.id
+        : `custom_component_${index + 1}`,
+      name: typeof entry.name === 'string' ? entry.name : '',
+      description: typeof entry.description === 'string' ? entry.description : '',
+    }));
+
   return {
     rulesText: typeof safe.rulesText === 'string' ? safe.rulesText : '',
     designerNotes: typeof safe.designerNotes === 'string' ? safe.designerNotes : '',
     chapters,
+    customComponents,
   };
 }
 
@@ -164,6 +195,7 @@ function normalizeEditorProject(project: EditorProject): EditorProject {
         ...createDefaultProjectColorPalette(),
         ...(project.settings?.colorPalette ?? {}),
       },
+      aiModels: normalizeProjectAIModels(project.settings?.aiModels),
     },
     art: {
       ...createDefaultProjectArtDirection(),

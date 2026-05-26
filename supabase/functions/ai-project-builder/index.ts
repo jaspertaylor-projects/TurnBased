@@ -57,15 +57,19 @@ serve(async (req: Request) => {
   }
 
   try {
+    const authHeader = req.headers.get('Authorization') ?? '';
+    const jwt = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
+    if (!jwt) throw new Error('Not Authenticated');
+
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
-        global: { headers: { Authorization: req.headers.get('Authorization')! } },
+        global: { headers: { Authorization: authHeader } },
       },
     );
 
-    const { data: { user } } = await supabaseClient.auth.getUser();
+    const { data: { user } } = await supabaseClient.auth.getUser(jwt);
     if (!user) {
       throw new Error('Not Authenticated');
     }
@@ -239,9 +243,19 @@ serve(async (req: Request) => {
     const providerCostUsd = pricing
       ? ((promptTokens * pricing.inputPerMillionUsd) + (completionTokens * pricing.outputPerMillionUsd)) / 1_000_000
       : null;
-    const providerCostCents = providerCostUsd === null ? 0 : Math.round(providerCostUsd * 100);
-    const platformFeeCents = 0;
+    const providerCostCents = providerCostUsd === null ? 0 : Math.ceil(providerCostUsd * 100);
+    const platformFeeCents = providerCostCents;
     const totalChargedCents = providerCostCents + platformFeeCents;
+
+    if (totalChargedCents > 0) {
+      const { data: debited, error: debitError } = await supabaseClient.rpc('wallet_debit', {
+        amount_cents: totalChargedCents,
+      });
+      if (debitError) throw new Error(debitError.message);
+      if (!debited) {
+        throw new Error(`Insufficient account balance for AI project build (${(totalChargedCents / 100).toFixed(2)}).`);
+      }
+    }
 
     await supabaseAdmin
       .from('ai_usage_ledger')

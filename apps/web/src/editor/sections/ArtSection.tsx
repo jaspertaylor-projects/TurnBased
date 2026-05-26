@@ -96,10 +96,11 @@ function StudioTile({
 // ── Images sub-page content ────────────────────────────────────────
 
 function ImagesContent({
-  projectId, images, onUpdateImages,
+  projectId, images, imageModelId, onUpdateImages,
 }: {
   projectId: string;
   images: EditorImageAsset[];
+  imageModelId: string;
   onUpdateImages: (updater: (images: EditorImageAsset[]) => EditorImageAsset[]) => void;
 }) {
   const [isUploading, setIsUploading] = useState(false);
@@ -130,7 +131,7 @@ function ImagesContent({
     const trimmed = aiPrompt.trim(); if (!trimmed) return;
     setIsGenerating(true); setError(null);
     try {
-      const { data, error: genErr } = await supabase.functions.invoke('ai-image-agent', { body: { projectId, prompt: trimmed } });
+      const { data, error: genErr } = await supabase.functions.invoke('ai-image-agent', { body: { projectId, prompt: trimmed, modelId: imageModelId } });
       if (genErr) throw new Error(genErr.message || 'Image generation failed');
       onUpdateImages((c) => [{ id: generateId('img'), name: trimmed.slice(0, 60), r2Key: data?.r2Key ?? `${projectId}/ai-${Date.now()}.png`, mime: 'image/png', bytes: data?.sizeBytes ?? 0, aiPrompt: trimmed, tags: [], createdAt: new Date().toISOString() }, ...c]);
       setAiPrompt(''); setShowAiInput(false);
@@ -456,7 +457,7 @@ export function ArtSection({
   // ── Images ──
   return (
     <SubPageShell title="Images" icon={<ImagePlus size={22} />} onBack={() => setPage('home')}>
-      <ImagesContent projectId={projectId} images={project.art.images ?? []}
+      <ImagesContent projectId={projectId} images={project.art.images ?? []} imageModelId={project.settings.aiModels.imageGeneration}
         onUpdateImages={(updater) => onUpdateArt((art) => ({ ...art, images: updater(art.images ?? []) }))} />
     </SubPageShell>
   );

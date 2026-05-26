@@ -13,6 +13,7 @@
 -- (ai-project-builder, ai-rules-writer, etc.) — those edge functions all
 -- require an authenticated user, and seeding the account here means anyone
 -- on the team can sign in to local dev with a fresh `supabase db reset`.
+-- The account starts with $50.00 of local-only AI wallet balance.
 -- ─────────────────────────────────────────────────────────────────────────
 
 DO $$
@@ -55,4 +56,9 @@ BEGIN
       NOW(), NOW(), NOW()
     );
   END IF;
+
+  INSERT INTO public.profiles (id, wallet_cents)
+  VALUES (v_user_id, 5000)
+  ON CONFLICT (id) DO UPDATE
+    SET wallet_cents = 5000;
 END $$;
