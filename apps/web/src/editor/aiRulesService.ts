@@ -1,7 +1,19 @@
 import { supabase } from '../lib/supabaseClient';
 import type { EditorProject, RulesChapter } from './types';
 
-export type AIRulesMode = 'draft' | 'rewrite' | 'expand';
+export type AIRulesMode = 'draft' | 'rewrite' | 'expand' | 'brainstorm';
+
+export interface AIRulesContextWeights {
+  rulebook: number;
+  prompt: number;
+  chips: number;
+}
+
+export const DEFAULT_AI_RULES_CONTEXT_WEIGHTS: AIRulesContextWeights = {
+  rulebook: 70,
+  prompt: 100,
+  chips: 70,
+};
 
 export interface AIRulesAssistResult {
   text: string;
@@ -73,6 +85,7 @@ export async function generateRulesChapterText(args: {
   mode: AIRulesMode;
   themes: string[];
   artStyles: string[];
+  contextWeights: AIRulesContextWeights;
 }): Promise<AIRulesAssistResult> {
   if (!hasSupabaseConfig()) {
     throw new Error('Supabase is not configured in this environment, so AI assist is unavailable.');
@@ -83,7 +96,7 @@ export async function generateRulesChapterText(args: {
     throw new Error('Sign in to use the AI rules writer.');
   }
 
-  const { project, activeChapter, userPrompt, mode, themes, artStyles } = args;
+  const { project, activeChapter, userPrompt, mode, themes, artStyles, contextWeights } = args;
   const body = {
     gameName: project.brief.name || project.name,
     /* themes / artStyles come from the chip toggles in the AI panel — they
@@ -105,6 +118,7 @@ export async function generateRulesChapterText(args: {
     activeChapterBody: activeChapter.body,
     userPrompt,
     mode,
+    contextWeights,
   };
 
   const { data, error } = await supabase.functions.invoke<ServerResponse>('ai-rules-writer', { body });
@@ -138,4 +152,123 @@ export async function generateRulesChapterText(args: {
 
 export function aiRulesAvailable(): boolean {
   return hasSupabaseConfig();
+}
+
+export interface AIRulesBrainstormResult {
+  ideas: string[];
+  model: string | null;
+}
+
+/* Quoted-list parsing fallback — strips bullets / numbering / quotes /
+   stray commas so a model that ignored "JSON only" still produces a clean
+   list. Drops anything > 80 chars (likely prose, not a name). */
+function parseLooseList(raw: string): string[] {
+  const lines = raw.split(/\r?\n+/);
+  const cleaned: string[] = [];
+  for (const line of lines) {
+    let trimmed = line.trim();
+    if (!trimmed) continue;
+    trimmed = trimmed.replace(/^[\s]*[-*•]\s*/, '');
+    trimmed = trimmed.replace(/^[\s]*\d+[.)]\s*/, '');
+    trimmed = trimmed.replace(/^[\s]*"|"[\s]*$/g, '');
+    trimmed = trimmed.replace(/^[\s]*'|'[\s]*$/g, '');
+    trimmed = trimmed.replace(/[,;]+\s*$/, '');
+    if (!trimmed) continue;
+    if (trimmed.length > 80) continue;
+    cleaned.push(trimmed);
+  }
+  return cleaned;
+}
+
+/**
+ * Ask the AI for ~20 short ideas, typically used for naming things — cities,
+ * factions, items, characters, anything where the user wants a list to pick
+ * from rather than a paragraph. The model is asked to return a JSON array;
+ * if that fails to parse we fall back to line-by-line cleanup so the user
+ * still gets usable output.
+ */
+export async function brainstormRulesIdeas(args: {
+  project: EditorProject;
+  activeChapter: RulesChapter;
+  userPrompt: string;
+  themes: string[];
+  artStyles: string[];
+  contextWeights: AIRulesContextWeights;
+}): Promise<AIRulesBrainstormResult> {
+  if (!hasSupabaseConfig()) {
+    throw new Error('Supabase is not configured in this environment, so AI brainstorm is unavailable.');
+  }
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session || session.user.is_anonymous) {
+    throw new Error('Sign in to use the AI brainstorm.');
+  }
+
+  const { project, activeChapter, userPrompt, themes, artStyles, contextWeights } = args;
+  const body = {
+    gameName: project.brief.name || project.name,
+    theme: themes.join(', '),
+    artStyle: artStyles.join(', '),
+    artStyleDetails: (project.art?.definedArtStyles ?? []).map((style) => ({
+      name: style.name ?? '',
+      description: style.description ?? '',
+    })),
+    playerMin: project.brief.minPlayers,
+    playerMax: project.brief.maxPlayers,
+    chapters: project.rules.chapters.map((chapter) => ({ title: chapter.title, body: chapter.body })),
+    activeChapterTitle: activeChapter.title,
+    activeChapterBody: activeChapter.body,
+    userPrompt,
+    mode: 'brainstorm' as const,
+    contextWeights,
+  };
+
+  const { data, error } = await supabase.functions.invoke<ServerResponse>('ai-rules-writer', { body });
+  if (error) {
+    const detail = await extractFunctionError(error);
+    throw new Error(detail || error.message || 'The AI rules service was unavailable.');
+  }
+  if (!data?.success || typeof data.text !== 'string' || data.text.trim().length === 0) {
+    throw new Error(data?.error || 'The AI returned no ideas. Try again or refine your prompt.');
+  }
+
+  // Strict JSON first — the edge function tells the model to return a JSON
+  // array. Fall back to line-based cleanup when the model emits prose.
+  let ideas: string[] = [];
+  const rawText = data.text.trim();
+  try {
+    const parsed = JSON.parse(rawText);
+    if (Array.isArray(parsed)) {
+      ideas = parsed
+        .filter((entry): entry is string => typeof entry === 'string')
+        .map((entry) => entry.trim())
+        .filter((entry) => entry.length > 0 && entry.length <= 80);
+    }
+  } catch {
+    // Some models wrap JSON in markdown fences — strip and retry once.
+    const fenceMatch = rawText.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (fenceMatch) {
+      try {
+        const parsed = JSON.parse(fenceMatch[1].trim());
+        if (Array.isArray(parsed)) {
+          ideas = parsed
+            .filter((entry): entry is string => typeof entry === 'string')
+            .map((entry) => entry.trim())
+            .filter((entry) => entry.length > 0 && entry.length <= 80);
+        }
+      } catch {
+        // fall through to line parsing
+      }
+    }
+  }
+
+  if (ideas.length === 0) {
+    ideas = parseLooseList(rawText);
+  }
+
+  if (ideas.length === 0) {
+    throw new Error('The AI returned no usable ideas. Try again or refine your prompt.');
+  }
+
+  return { ideas, model: data.model ?? null };
 }

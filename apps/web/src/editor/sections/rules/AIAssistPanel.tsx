@@ -1,9 +1,11 @@
-import { useEffect, useState, type KeyboardEvent } from 'react';
-import { Check, Clock, Loader2, Plus, Sparkles, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Check, Clock, Copy, Loader2, Sparkles } from 'lucide-react';
 
-import type { AIRulesMode } from '../../aiRulesService';
+import type { AIRulesContextWeights, AIRulesMode } from '../../aiRulesService';
 import { loadRecentPrompts, removeRecentPrompt } from '../../aiPromptHistory';
 import type { RulesChapter } from '../../types';
+import { AIAssistContextControls } from './AIAssistContextControls';
+import { AIPromptHistoryPanel } from './AIPromptHistoryPanel';
 import { SERIF_STACK } from './rulebookStyles';
 
 export interface AIDraftState {
@@ -23,6 +25,12 @@ export interface AIDraftState {
      project each render. */
   availableThemes: string[];
   availableArtStyles: string[];
+  contextWeights: AIRulesContextWeights;
+  /* Result list from a Brainstorm Generate. Populated by RulesSection.runAI
+     when mode === 'brainstorm'; rendered as click-to-copy chips inside the
+     AI panel. Cleared when the user switches modes or runs another non-
+     brainstorm generation. */
+  brainstormResults: string[];
 }
 
 interface AIModeOption {
@@ -52,184 +60,13 @@ const AI_MODE_OPTIONS: AIModeOption[] = [
     summary: 'Re-state the same rules with cleaner prose. Existing rules are preserved; only the wording changes.',
     disabledHint: 'Nothing to rewrite yet — write or draft a section first.',
   },
+  {
+    key: 'brainstorm',
+    label: 'Brainstorm',
+    summary: 'Get 20 short ideas to pick from — great for names. Click a chip to copy it. Body text is not touched.',
+    disabledHint: 'Brainstorm is always available.',
+  },
 ];
-
-function ContextChipRow({
-  label,
-  available,
-  selected,
-  onChange,
-  onAppend,
-  addPlaceholder,
-  loading,
-}: {
-  label: string;
-  available: string[];
-  selected: string[];
-  onChange: (next: string[]) => void;
-  /* When provided, an inline "+" affordance lets the user add a new chip
-     to the project's brief AND mark it selected in the same gesture. */
-  onAppend?: (entry: string) => void;
-  addPlaceholder?: string;
-  loading: boolean;
-}) {
-  const [drafting, setDrafting] = useState(false);
-  const [draft, setDraft] = useState('');
-
-  function toggle(entry: string) {
-    if (loading) return;
-    const lower = entry.toLowerCase();
-    const isOn = selected.some((s) => s.toLowerCase() === lower);
-    onChange(isOn ? selected.filter((s) => s.toLowerCase() !== lower) : [...selected, entry]);
-  }
-  const allOn = available.length > 0 && available.every((entry) => selected.some((s) => s.toLowerCase() === entry.toLowerCase()));
-  function toggleAll() {
-    if (loading) return;
-    onChange(allOn ? [] : [...available]);
-  }
-
-  function commitDraft() {
-    const trimmed = draft.trim();
-    if (!trimmed) {
-      setDrafting(false);
-      setDraft('');
-      return;
-    }
-    onAppend?.(trimmed);
-    setDraft('');
-    setDrafting(false);
-  }
-
-  function handleDraftKey(event: KeyboardEvent<HTMLInputElement>) {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      commitDraft();
-    } else if (event.key === 'Escape') {
-      event.preventDefault();
-      setDrafting(false);
-      setDraft('');
-    }
-  }
-
-  return (
-    <div data-layout="aiContextChipRow" data-context-label={label} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-      <span style={{ color: '#3b2412', fontFamily: SERIF_STACK, fontWeight: 700, fontSize: '0.76rem', flexShrink: 0 }}>
-        {label}:
-      </span>
-      {available.length > 0 ? (
-        <button
-          type="button"
-          onClick={toggleAll}
-          disabled={loading}
-          title={allOn ? `Hide all ${label.toLowerCase()} from this generation` : `Send all ${label.toLowerCase()} to the AI`}
-          style={{
-            padding: '0.18rem 0.5rem', borderRadius: '999px',
-            border: '1px dashed rgba(120,95,50,0.35)',
-            background: 'transparent',
-            color: 'rgba(80,55,25,0.7)',
-            fontFamily: SERIF_STACK, fontWeight: 600, fontSize: '0.7rem',
-            cursor: loading ? 'wait' : 'pointer',
-          }}
-        >
-          {allOn ? 'None' : 'All'}
-        </button>
-      ) : null}
-      {available.map((entry) => {
-        const isOn = selected.some((s) => s.toLowerCase() === entry.toLowerCase());
-        return (
-          <button
-            key={entry}
-            type="button"
-            onClick={() => toggle(entry)}
-            disabled={loading}
-            aria-pressed={isOn}
-            style={{
-              padding: '0.22rem 0.6rem', borderRadius: '999px',
-              border: isOn ? '1px solid rgba(13,148,136,0.7)' : '1px solid rgba(120,95,50,0.3)',
-              background: isOn ? 'rgba(13,148,136,0.16)' : 'rgba(255,253,246,0.85)',
-              color: isOn ? '#064e3b' : 'rgba(80,55,25,0.55)',
-              fontFamily: SERIF_STACK, fontWeight: 700, fontSize: '0.74rem',
-              cursor: loading ? 'wait' : 'pointer',
-              textDecoration: isOn ? 'none' : 'line-through',
-              textDecorationColor: 'rgba(120,95,50,0.4)',
-            }}
-          >
-            {entry}
-          </button>
-        );
-      })}
-
-      {onAppend ? (
-        drafting ? (
-          <div data-layout="aiContextChipDraft" /* inline input for a new chip */ style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
-            <input
-              autoFocus
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              onKeyDown={handleDraftKey}
-              onBlur={() => {
-                if (!draft.trim()) {
-                  setDrafting(false);
-                  setDraft('');
-                }
-              }}
-              placeholder={addPlaceholder ?? `Add ${label.toLowerCase()}...`}
-              disabled={loading}
-              spellCheck={false}
-              style={{
-                padding: '0.2rem 0.55rem',
-                borderRadius: '999px',
-                border: '1px solid rgba(13,148,136,0.55)',
-                background: 'rgba(255,253,246,0.95)',
-                color: '#3b2412',
-                fontFamily: SERIF_STACK,
-                fontSize: '0.76rem',
-                minWidth: '140px',
-              }}
-            />
-            <button
-              type="button"
-              onClick={commitDraft}
-              disabled={loading || !draft.trim()}
-              aria-label={`Save new ${label.toLowerCase()}`}
-              title="Add to project"
-              style={{
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                width: '22px', height: '22px', borderRadius: '999px',
-                border: 'none',
-                background: !draft.trim() ? 'rgba(13,148,136,0.35)' : 'linear-gradient(135deg, #064e3b, #0d9488)',
-                color: 'white',
-                cursor: !draft.trim() ? 'not-allowed' : 'pointer',
-              }}
-            >
-              <Check size={12} />
-            </button>
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setDrafting(true)}
-            disabled={loading}
-            title={addPlaceholder ?? `Add a new ${label.toLowerCase()} to this project`}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
-              padding: '0.18rem 0.55rem',
-              borderRadius: '999px',
-              border: '1px dashed rgba(13,148,136,0.55)',
-              background: 'transparent',
-              color: '#0d9488',
-              fontFamily: SERIF_STACK, fontWeight: 700, fontSize: '0.72rem',
-              cursor: loading ? 'wait' : 'pointer',
-            }}
-          >
-            <Plus size={11} />
-            Add
-          </button>
-        )
-      ) : null}
-    </div>
-  );
-}
 
 export function AIAssistPanel({
   chapter,
@@ -255,6 +92,36 @@ export function AIAssistPanel({
   // next time and pick up the newly-saved prompt.
   const [recents, setRecents] = useState<string[]>(() => loadRecentPrompts());
   const [historyOpen, setHistoryOpen] = useState(false);
+  // Track which brainstorm chip was just copied so we can flash a "Copied!"
+  // affordance. Holds the entry text itself — the ideas list is short and
+  // unique enough that string equality is fine here.
+  const [copiedIdea, setCopiedIdea] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!copiedIdea) return;
+    const t = setTimeout(() => setCopiedIdea(null), 1100);
+    return () => clearTimeout(t);
+  }, [copiedIdea]);
+
+  async function copyIdea(idea: string) {
+    try {
+      await navigator.clipboard.writeText(idea);
+    } catch {
+      // navigator.clipboard can fail in non-secure contexts; fall back to
+      // a hidden textarea + document.execCommand so the user still gets
+      // a copy on http://localhost setups without HTTPS.
+      const el = document.createElement('textarea');
+      el.value = idea;
+      el.setAttribute('readonly', '');
+      el.style.position = 'absolute';
+      el.style.left = '-9999px';
+      document.body.appendChild(el);
+      el.select();
+      try { document.execCommand('copy'); } catch { /* give up silently */ }
+      document.body.removeChild(el);
+    }
+    setCopiedIdea(idea);
+  }
 
   // If localStorage changes from another tab, mirror it. Rare in practice
   // but cheap to support.
@@ -267,6 +134,12 @@ export function AIAssistPanel({
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
   }, []);
+
+  useEffect(() => {
+    if (state.loading) return;
+    const t = window.setTimeout(() => setRecents(loadRecentPrompts()), 0);
+    return () => window.clearTimeout(t);
+  }, [state.loading]);
 
   function applyRecent(prompt: string) {
     onUpdateAI({ prompt });
@@ -325,73 +198,14 @@ export function AIAssistPanel({
       </div>
 
       {historyOpen && recents.length > 0 ? (
-        <div
-          data-layout="aiRecentPromptsList"
-          /* Scrollable list of the user's last 10 prompts. Click an item to
-             load it into the textarea; × removes it from history. */
-          style={{
-            border: '1px solid rgba(120,95,50,0.2)',
-            borderRadius: '10px',
-            background: 'rgba(255,253,246,0.95)',
-            maxHeight: '180px',
-            overflowY: 'auto',
-            padding: '0.25rem',
-            display: 'grid',
-            gap: '0.2rem',
-          }}
-        >
-          {recents.map((entry) => (
-            <div
-              key={entry}
-              data-layout="aiRecentPromptRow"
-              style={{ display: 'flex', alignItems: 'flex-start', gap: '0.35rem', borderRadius: '6px' }}
-            >
-              <button
-                type="button"
-                onClick={() => applyRecent(entry)}
-                title="Load this prompt into the textarea"
-                style={{
-                  flex: '1 1 auto', minWidth: 0,
-                  textAlign: 'left',
-                  padding: '0.4rem 0.55rem',
-                  border: 'none',
-                  background: 'transparent',
-                  color: '#3b2412',
-                  fontFamily: SERIF_STACK, fontSize: '0.82rem', lineHeight: 1.35,
-                  cursor: 'pointer',
-                  borderRadius: '6px',
-                  whiteSpace: 'normal',
-                  wordBreak: 'break-word',
-                }}
-                onMouseEnter={(event) => { (event.currentTarget as HTMLButtonElement).style.background = 'rgba(13,148,136,0.10)'; }}
-                onMouseLeave={(event) => { (event.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
-              >
-                {entry.length > 220 ? `${entry.slice(0, 220)}…` : entry}
-              </button>
-              <button
-                type="button"
-                onClick={() => deleteRecent(entry)}
-                aria-label="Remove from history"
-                title="Remove from history"
-                style={{
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  width: '22px', height: '22px', flexShrink: 0,
-                  borderRadius: '999px',
-                  border: 'none', background: 'transparent',
-                  color: 'rgba(120,60,30,0.55)', cursor: 'pointer',
-                  marginTop: '0.25rem',
-                }}
-              >
-                <X size={11} />
-              </button>
-            </div>
-          ))}
-        </div>
+        <AIPromptHistoryPanel prompts={recents} onUse={applyRecent} onDelete={deleteRecent} />
       ) : null}
 
       <div data-layout="aiModeRow" /* draft / expand / rewrite mode toggle */ style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
         {AI_MODE_OPTIONS.map((option) => {
-          const disabled = (option.key !== 'draft' && !bodyHasContent);
+          // brainstorm is always available — it doesn't read or write the
+          // chapter body, so an empty section is fine.
+          const disabled = (option.key === 'expand' || option.key === 'rewrite') && !bodyHasContent;
           const selected = state.mode === option.key;
           return (
             <button
@@ -427,26 +241,19 @@ export function AIAssistPanel({
         })()}
       </div>
 
-      <div data-layout="aiContextChipRows" /* selectable themes + art-styles for this Generate (always shown; add affordance is the entry point even on empty projects) */ style={{ display: 'grid', gap: '0.4rem', padding: '0.5rem 0.6rem', borderRadius: '10px', background: 'rgba(255,253,246,0.55)', border: '1px solid rgba(120,95,50,0.18)' }}>
-        <ContextChipRow
-          label="Themes"
-          available={state.availableThemes}
-          selected={state.selectedThemes}
-          onChange={(next) => onUpdateAI({ selectedThemes: next })}
-          onAppend={onAppendTheme}
-          addPlaceholder="New theme..."
-          loading={state.loading}
-        />
-        <ContextChipRow
-          label="Art styles"
-          available={state.availableArtStyles}
-          selected={state.selectedArtStyles}
-          onChange={(next) => onUpdateAI({ selectedArtStyles: next })}
-          onAppend={onAppendArtStyle}
-          addPlaceholder="New art style..."
-          loading={state.loading}
-        />
-      </div>
+      <AIAssistContextControls
+        selectedThemes={state.selectedThemes}
+        selectedArtStyles={state.selectedArtStyles}
+        availableThemes={state.availableThemes}
+        availableArtStyles={state.availableArtStyles}
+        contextWeights={state.contextWeights}
+        loading={state.loading}
+        onSelectedThemesChange={(next) => onUpdateAI({ selectedThemes: next })}
+        onSelectedArtStylesChange={(next) => onUpdateAI({ selectedArtStyles: next })}
+        onWeightsChange={(contextWeights) => onUpdateAI({ contextWeights })}
+        onAppendTheme={onAppendTheme}
+        onAppendArtStyle={onAppendArtStyle}
+      />
 
       <textarea
         value={state.prompt}
@@ -456,7 +263,9 @@ export function AIAssistPanel({
             ? 'Optional: tell the AI what this section should cover. Leave blank to draft from the rest of your rulebook.'
             : state.mode === 'expand'
               ? 'Optional: what would you like added? Examples, clarifications, an edge case…'
-              : 'Optional: what should change in the rewrite? Tone, structure, brevity…'
+              : state.mode === 'rewrite'
+                ? 'Optional: what should change in the rewrite? Tone, structure, brevity…'
+                : 'What to brainstorm — e.g. "city names", "faction names", "starter items". Leave blank for general names that fit this section.'
         }
         disabled={state.loading}
         spellCheck={false}
@@ -481,6 +290,50 @@ export function AIAssistPanel({
         <code style={{ background: 'rgba(13,148,136,0.1)', padding: '0 0.25rem', borderRadius: '4px', fontStyle: 'normal', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{'<sacred-item>'}</code> &mdash;
         and the AI will fill each one with something fitting the theme.
       </div>
+
+      {state.mode === 'brainstorm' && state.brainstormResults.length > 0 ? (
+        <div
+          data-layout="aiBrainstormResults"
+          /* Flowing chip grid of 20 candidate names. Each chip is a
+             click-to-copy button; a transient "Copied!" replaces the icon
+             for ~1s after a successful copy. Body text is untouched —
+             brainstorm is purely a picker. */
+          style={{
+            display: 'flex', flexWrap: 'wrap', gap: '0.35rem',
+            padding: '0.55rem 0.6rem',
+            borderRadius: '10px',
+            background: 'rgba(255,253,246,0.7)',
+            border: '1px solid rgba(13,148,136,0.35)',
+          }}
+        >
+          <div data-layout="aiBrainstormResultsCaption" /* small caption above the chips */ style={{ width: '100%', color: 'rgba(80,55,25,0.78)', fontSize: '0.74rem', fontStyle: 'italic', fontFamily: SERIF_STACK, marginBottom: '0.15rem' }}>
+            Click any candidate to copy it. Body text is left alone.
+          </div>
+          {state.brainstormResults.map((idea) => {
+            const isCopied = copiedIdea === idea;
+            return (
+              <button
+                key={idea}
+                type="button"
+                onClick={() => copyIdea(idea)}
+                title={isCopied ? 'Copied!' : `Copy "${idea}"`}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+                  padding: '0.28rem 0.6rem', borderRadius: '999px',
+                  border: isCopied ? '1px solid rgba(13,148,136,0.85)' : '1px solid rgba(120,95,50,0.3)',
+                  background: isCopied ? 'rgba(13,148,136,0.2)' : 'rgba(255,253,246,0.95)',
+                  color: '#3b2412',
+                  fontFamily: SERIF_STACK, fontWeight: 600, fontSize: '0.8rem',
+                  cursor: 'pointer',
+                }}
+              >
+                {isCopied ? <Check size={11} style={{ color: '#0d9488' }} /> : <Copy size={11} style={{ color: 'rgba(80,55,25,0.55)' }} />}
+                {idea}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
 
       {state.error ? (
         <div style={{ padding: '0.4rem 0.55rem', borderRadius: '8px', background: 'rgba(254,226,226,0.85)', border: '1px solid rgba(239,68,68,0.25)', color: '#991b1b', fontSize: '0.8rem' }}>
@@ -517,7 +370,9 @@ export function AIAssistPanel({
           }}
         >
           {state.loading ? <Loader2 size={14} style={{ animation: 'spin 1.1s linear infinite' }} /> : <Sparkles size={14} />}
-          {state.loading ? 'Writing…' : 'Generate'}
+          {state.loading
+            ? (state.mode === 'brainstorm' ? 'Brainstorming…' : 'Writing…')
+            : (state.mode === 'brainstorm' ? 'Brainstorm' : 'Generate')}
         </button>
       </div>
     </div>

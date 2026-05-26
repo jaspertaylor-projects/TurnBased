@@ -52,13 +52,6 @@ const ART_STYLE_PRESETS = [
   'Chalkboard sketch',
 ];
 
-function splitBriefField(value: string): string[] {
-  return value
-    .split(',')
-    .map((entry) => entry.trim())
-    .filter((entry) => entry.length > 0);
-}
-
 function joinBriefField(values: string[]): string {
   return values.join(', ');
 }

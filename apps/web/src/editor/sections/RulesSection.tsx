@@ -2,7 +2,11 @@ import { useEffect, useMemo, useState, type MouseEvent as ReactMouseEvent } from
 import { ChevronLeft, ChevronRight, Plus, SpellCheck, X } from 'lucide-react';
 
 import { addChapter, createBlankChapter, removeChapter, splitBriefList, updateChapter } from '../project';
-import { generateRulesChapterText } from '../aiRulesService';
+import {
+  DEFAULT_AI_RULES_CONTEXT_WEIGHTS,
+  brainstormRulesIdeas,
+  generateRulesChapterText,
+} from '../aiRulesService';
 import { saveRecentPrompt } from '../aiPromptHistory';
 import type { EditorProject, EditorRuleConfig, RulesChapter } from '../types';
 import { RulebookPage, type AIDraftState } from './rules/RulebookPage';
@@ -136,14 +140,21 @@ export function RulesSection({
 
   // Clamp spread when chapters shrink (delete) so we never land past the end.
   useEffect(() => {
-    setSpreadIndex((prev) => clampSpread(prev, totalChapters));
+    const t = window.setTimeout(() => {
+      setSpreadIndex((prev) => clampSpread(prev, totalChapters));
+    }, 0);
+    return () => window.clearTimeout(t);
   }, [totalChapters]);
 
   // Drop AI panel state if its target chapter disappears (delete, etc.).
   useEffect(() => {
     if (!aiState) return;
     const stillThere = chapters.some((chapter) => chapter.id === aiState.chapterId);
-    if (!stillThere) setAiState(null);
+    if (!stillThere) {
+      const t = window.setTimeout(() => setAiState(null), 0);
+      return () => window.clearTimeout(t);
+    }
+    return undefined;
   }, [aiState, chapters]);
 
   const leftIndex = spreadIndex * 2;
@@ -239,6 +250,8 @@ export function RulesSection({
       selectedArtStyles: [...availableArtStyles],
       availableThemes,
       availableArtStyles,
+      contextWeights: DEFAULT_AI_RULES_CONTEXT_WEIGHTS,
+      brainstormResults: [],
     });
   }
 
@@ -253,12 +266,31 @@ export function RulesSection({
   async function runAI(chapter: RulesChapter) {
     if (!aiState || aiState.chapterId !== chapter.id || aiState.loading) return;
     const currentState = aiState;
-    setAiState({ ...currentState, loading: true, error: null });
+    // Reset prior brainstorm output on every new run so the chip grid
+    // reflects the current generation, not the previous one.
+    setAiState({ ...currentState, loading: true, error: null, brainstormResults: [] });
     // Save the prompt to global history BEFORE awaiting the network call —
     // a user-typed prompt is worth remembering even if the request fails.
     // Empty prompts are filtered out by saveRecentPrompt itself.
     saveRecentPrompt(currentState.prompt);
     try {
+      if (currentState.mode === 'brainstorm') {
+        // Brainstorm is a pure picker — keep the panel open with the chip
+        // grid populated, and DON'T touch the chapter body or push an Undo
+        // snapshot. The user copies what they want from the chips.
+        const result = await brainstormRulesIdeas({
+          project,
+          activeChapter: chapter,
+          userPrompt: currentState.prompt,
+          themes: currentState.selectedThemes,
+          artStyles: currentState.selectedArtStyles,
+          contextWeights: currentState.contextWeights,
+        });
+        setAiState((prev) => (prev && prev.chapterId === chapter.id
+          ? { ...prev, loading: false, error: null, brainstormResults: result.ideas }
+          : prev));
+        return;
+      }
       const result = await generateRulesChapterText({
         project,
         activeChapter: chapter,
@@ -266,6 +298,7 @@ export function RulesSection({
         mode: currentState.mode,
         themes: currentState.selectedThemes,
         artStyles: currentState.selectedArtStyles,
+        contextWeights: currentState.contextWeights,
       });
       // Snapshot the most recent body just before swapping it out, then
       // replace. The body might differ from the chapter.body we opened the
