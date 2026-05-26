@@ -36,4 +36,5 @@ supabase/.temp
 
 # AI / agent tooling scratch
 .playwright-mcp*
+.playwright-codex/
 .codex

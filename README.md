@@ -176,6 +176,32 @@ scripts/seed-dev-account.sh
 The seed/script logic both live in `supabase/seed.sql` — credentials never
 leave local-dev databases, they're not deployed to hosted Supabase.
 
+### Codex headed browser
+
+For UI work, Codex should use its own headed Chrome profile instead of the
+shared Playwright MCP profile that Claude Code may already have locked. Keep the
+normal dev server on `http://127.0.0.1:3000`, then launch:
+
+```bash
+node scripts/codex-headed-browser.mjs
+```
+
+The script opens a visible Chrome window with a persistent local profile at
+`.playwright-codex/chrome-profile` and remote debugging on port `9223`. Sign in
+there once with the local dev account above; future Codex browser checks can
+reuse that session without disturbing Claude's browser.
+
+Useful overrides:
+
+```bash
+CODEX_BROWSER_URL=http://127.0.0.1:3000 \
+CODEX_BROWSER_DEBUG_PORT=9223 \
+node scripts/codex-headed-browser.mjs
+```
+
+The `.playwright-codex/` directory is ignored by git because it contains local
+browser profile state.
+
 ### Edge function gotcha: validate JWTs explicitly
 
 When writing a new edge function that needs the caller's identity, do NOT
