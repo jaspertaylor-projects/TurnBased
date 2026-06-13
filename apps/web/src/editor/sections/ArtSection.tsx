@@ -10,6 +10,8 @@ import { IconArtworkPreview } from './art/IconArtworkPreview';
 import { PalettePage } from './art/PalettePage';
 import { STUDIO_BG_STYLE, STUDIO_BG_VALUE } from './art/studioBackground';
 import { SubPageShell } from './art/SubPageShell';
+import { getFunctionErrorMessage } from '../aiFunctionErrors';
+import { AIImageGenerationModal, type GeneratedImageAssetPayload } from '../components/AIImageGenerationModal';
 import { supabase } from '../../lib/supabaseClient';
 import { generateId } from '@turnbased/shared-utils';
 
@@ -18,32 +20,6 @@ import { generateId } from '@turnbased/shared-utils';
 export { STUDIO_BG_VALUE };
 
 const STUDIO_BG = STUDIO_BG_STYLE;
-
-async function getFunctionErrorMessage(error: unknown, fallback: string): Promise<string> {
-  const context = typeof error === 'object' && error !== null && 'context' in error
-    ? (error as { context?: unknown }).context
-    : null;
-
-  if (context instanceof Response) {
-    const response = context.clone();
-    try {
-      const payload = await response.json();
-      if (typeof payload?.error === 'string' && payload.error.trim().length > 0) {
-        return payload.error;
-      }
-      if (typeof payload?.message === 'string' && payload.message.trim().length > 0) {
-        return payload.message;
-      }
-    } catch {
-      const text = await context.clone().text().catch(() => '');
-      if (text.trim().length > 0) {
-        return text;
-      }
-    }
-  }
-
-  return error instanceof Error && error.message.trim().length > 0 ? error.message : fallback;
-}
 
 // ── Home tile ──────────────────────────────────────────────────────
 
@@ -130,9 +106,7 @@ function ImagesContent({
   onUpdateImages: (updater: (images: EditorImageAsset[]) => EditorImageAsset[]) => void;
 }) {
   const [isUploading, setIsUploading] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [aiPrompt, setAiPrompt] = useState('');
-  const [showAiInput, setShowAiInput] = useState(false);
+  const [showImageGenerator, setShowImageGenerator] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -160,35 +134,27 @@ function ImagesContent({
     finally { setIsUploading(false); }
   }
 
-  async function handleAiGenerate() {
-    const trimmed = aiPrompt.trim(); if (!trimmed) return;
-    setIsGenerating(true); setError(null);
-    try {
-      const { data, error: genErr } = await supabase.functions.invoke('ai-image-agent', { body: { projectId, prompt: trimmed, modelId: imageModelId } });
-      if (genErr) throw new Error(await getFunctionErrorMessage(genErr, 'Image generation failed'));
-      onUpdateImages((c) => [{
-        id: generateId('img'),
-        name: trimmed.slice(0, 60),
-        r2Key: data?.r2Key ?? `${projectId}/ai-${Date.now()}.png`,
-        imageDataUrl: typeof data?.imageDataUrl === 'string' ? data.imageDataUrl : undefined,
-        mime: data?.mime ?? 'image/png',
-        bytes: data?.sizeBytes ?? 0,
-        aiPrompt: trimmed,
-        tags: [],
-        createdAt: new Date().toISOString(),
-      }, ...c]);
-      setAiPrompt(''); setShowAiInput(false);
-    } catch (err) { setError(err instanceof Error ? err.message : 'Generation failed'); }
-    finally { setIsGenerating(false); }
+  function handleGeneratedImage(asset: GeneratedImageAssetPayload) {
+    onUpdateImages((current) => [{
+      id: generateId('img'),
+      name: asset.name,
+      r2Key: asset.r2Key,
+      imageDataUrl: asset.imageDataUrl,
+      mime: asset.mime,
+      bytes: asset.sizeBytes,
+      aiPrompt: asset.prompt,
+      tags: [],
+      createdAt: new Date().toISOString(),
+    }, ...current]);
   }
 
   return (
     <div style={{ display: 'grid', gap: '0.85rem' }}>
       <div style={{ display: 'flex', gap: '0.4rem' }}>
-        <button type="button" onClick={() => setShowAiInput((v) => !v)} style={{
+        <button type="button" onClick={() => setShowImageGenerator(true)} style={{
           display: 'inline-flex', alignItems: 'center', gap: '0.35rem', borderRadius: '999px', border: 'none',
-          background: showAiInput ? 'rgba(139,92,246,0.15)' : 'linear-gradient(135deg, #6d28d9, #8b5cf6)',
-          color: showAiInput ? '#6d28d9' : 'white', padding: '0.5rem 0.85rem', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer',
+          background: 'linear-gradient(135deg, #6d28d9, #8b5cf6)',
+          color: 'white', padding: '0.5rem 0.85rem', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer',
         }}><Wand2 size={13} /> Generate</button>
         <button type="button" onClick={() => fileInputRef.current?.click()} disabled={isUploading} style={{
           display: 'inline-flex', alignItems: 'center', gap: '0.35rem', borderRadius: '999px', border: 'none',
@@ -198,17 +164,14 @@ function ImagesContent({
         <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUpload(f); e.target.value = ''; }} />
       </div>
 
-      {showAiInput ? (
-        <div style={{ display: 'flex', gap: '0.45rem', padding: '0.65rem', borderRadius: '14px', background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.14)', alignItems: 'center' }}>
-          <Wand2 size={16} style={{ color: '#8b5cf6', flexShrink: 0 }} />
-          <input autoFocus value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleAiGenerate(); }}
-            placeholder="Describe the image..." style={{ ...inputStyle, flex: 1, border: 'none', background: 'rgba(255,255,255,0.8)', padding: '0.5rem 0.7rem', fontSize: '0.82rem' }} />
-          <button type="button" onClick={handleAiGenerate} disabled={isGenerating || !aiPrompt.trim()} style={{
-            borderRadius: '999px', border: 'none', background: isGenerating ? 'rgba(139,92,246,0.3)' : 'linear-gradient(135deg, #6d28d9, #8b5cf6)',
-            color: 'white', padding: '0.45rem 0.8rem', fontWeight: 700, fontSize: '0.76rem', cursor: isGenerating ? 'wait' : 'pointer', flexShrink: 0,
-          }}>{isGenerating ? 'Creating...' : 'Create'}</button>
-        </div>
-      ) : null}
+      <AIImageGenerationModal
+        open={showImageGenerator}
+        projectId={projectId}
+        modelId={imageModelId}
+        title="Generate image"
+        onClose={() => setShowImageGenerator(false)}
+        onGenerated={handleGeneratedImage}
+      />
 
       {error ? (
         <div style={{ padding: '0.6rem 0.8rem', borderRadius: '12px', background: 'rgba(254,242,242,0.95)', border: '1px solid rgba(239,68,68,0.18)', color: '#b91c1c', fontSize: '0.78rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
