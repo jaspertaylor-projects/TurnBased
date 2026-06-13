@@ -19,6 +19,32 @@ export { STUDIO_BG_VALUE };
 
 const STUDIO_BG = STUDIO_BG_STYLE;
 
+async function getFunctionErrorMessage(error: unknown, fallback: string): Promise<string> {
+  const context = typeof error === 'object' && error !== null && 'context' in error
+    ? (error as { context?: unknown }).context
+    : null;
+
+  if (context instanceof Response) {
+    const response = context.clone();
+    try {
+      const payload = await response.json();
+      if (typeof payload?.error === 'string' && payload.error.trim().length > 0) {
+        return payload.error;
+      }
+      if (typeof payload?.message === 'string' && payload.message.trim().length > 0) {
+        return payload.message;
+      }
+    } catch {
+      const text = await context.clone().text().catch(() => '');
+      if (text.trim().length > 0) {
+        return text;
+      }
+    }
+  }
+
+  return error instanceof Error && error.message.trim().length > 0 ? error.message : fallback;
+}
+
 // ── Home tile ──────────────────────────────────────────────────────
 
 function StudioTile({
@@ -122,12 +148,13 @@ function ImagesContent({
       const { data: signData, error: signErr } = await supabase.functions.invoke('assets-manager', {
         body: { action: 'sign-upload', projectId, fileName: file.name, mime: file.type || 'application/octet-stream', sizeBytes: file.size },
       });
-      if (signErr || !signData?.success) throw new Error(signErr?.message || 'Failed to sign upload');
+      if (signErr) throw new Error(await getFunctionErrorMessage(signErr, 'Failed to sign upload'));
+      if (!signData?.success) throw new Error('Failed to sign upload');
       await new Promise((r) => setTimeout(r, 800));
       const { error: finalizeErr } = await supabase.functions.invoke('assets-manager', {
         body: { action: 'finalize-upload', projectId, r2Key: signData.r2Key, mime: file.type || 'application/octet-stream', sizeBytes: file.size },
       });
-      if (finalizeErr) throw new Error(finalizeErr.message || 'Failed to finalize upload');
+      if (finalizeErr) throw new Error(await getFunctionErrorMessage(finalizeErr, 'Failed to finalize upload'));
       onUpdateImages((c) => [{ id: generateId('img'), name: file.name.replace(/\.[^.]+$/, ''), r2Key: signData.r2Key, mime: file.type || 'application/octet-stream', bytes: file.size, tags: [], createdAt: new Date().toISOString() }, ...c]);
     } catch (err) { setError(err instanceof Error ? err.message : 'Upload failed'); }
     finally { setIsUploading(false); }
@@ -138,7 +165,7 @@ function ImagesContent({
     setIsGenerating(true); setError(null);
     try {
       const { data, error: genErr } = await supabase.functions.invoke('ai-image-agent', { body: { projectId, prompt: trimmed, modelId: imageModelId } });
-      if (genErr) throw new Error(genErr.message || 'Image generation failed');
+      if (genErr) throw new Error(await getFunctionErrorMessage(genErr, 'Image generation failed'));
       onUpdateImages((c) => [{
         id: generateId('img'),
         name: trimmed.slice(0, 60),

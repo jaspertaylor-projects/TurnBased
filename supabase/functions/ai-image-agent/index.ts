@@ -15,6 +15,17 @@ const IMAGE_MODEL_COST_CENTS: Record<string, number> = {
 const DEFAULT_IMAGE_MODEL_ID = 'microsoft/mai-image-2.5';
 const OPENROUTER_CHAT_COMPLETIONS_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
+function normalizeImageModelId(value: unknown): string {
+  if (typeof value !== 'string') {
+    return DEFAULT_IMAGE_MODEL_ID;
+  }
+
+  const requestedModelId = value.trim();
+  return Object.prototype.hasOwnProperty.call(IMAGE_MODEL_COST_CENTS, requestedModelId)
+    ? requestedModelId
+    : DEFAULT_IMAGE_MODEL_ID;
+}
+
 function readImageDataUrl(result: Record<string, any>): string {
   const choices = Array.isArray(result?.choices) ? result.choices : [];
   const firstMessage = choices[0]?.message;
@@ -66,39 +77,33 @@ serve(async (req: Request) => {
 
     const body = await req.json();
     const { prompt, projectId } = body;
-    const modelId = typeof body?.modelId === 'string' && body.modelId.trim().length > 0
-      ? body.modelId.trim()
-      : DEFAULT_IMAGE_MODEL_ID;
+    const modelId = normalizeImageModelId(body?.modelId);
 
     if (!prompt || !projectId) throw new Error('Missing input');
     const openRouterApiKey = Deno.env.get('OPENROUTER_API_KEY');
     if (!openRouterApiKey) throw new Error('Missing OPENROUTER_API_KEY for image generation.');
 
-    const { data: project, error: projectError } = await supabaseClient
-      .from('projects')
-      .select('id')
-      .eq('id', projectId)
-      .eq('owner_id', user.id)
-      .single();
-    if (projectError || !project) throw new Error('Project not found or unauthorized');
+    const projectIdString = String(projectId);
+    const isLocalEditorProject = projectIdString.startsWith('project_');
+    const { data: project } = isLocalEditorProject
+      ? { data: null }
+      : await supabaseClient
+        .from('projects')
+        .select('id')
+        .eq('id', projectIdString)
+        .eq('owner_id', user.id)
+        .maybeSingle();
+    if (!project && !isLocalEditorProject) throw new Error('Project not found or unauthorized');
 
-    const providerCostCents = IMAGE_MODEL_COST_CENTS[modelId] ?? IMAGE_MODEL_COST_CENTS[DEFAULT_IMAGE_MODEL_ID];
+    const providerCostCents = IMAGE_MODEL_COST_CENTS[modelId];
     const platformFeeCents = providerCostCents;
     const totalChargedCents = providerCostCents + platformFeeCents;
 
-    // MOCK: Require enough wallet balance for Images.
     const { data: profile } = await supabaseClient.from('profiles').select('*').eq('id', user.id).single();
     if (!profile) throw new Error('Profile not found');
 
     if (profile.wallet_cents < totalChargedCents) {
        throw new Error(`Insufficient wallet balance to generate image ($${(totalChargedCents / 100).toFixed(2)}).`);
-    }
-    const { data: debited, error: debitError } = await supabaseClient.rpc('wallet_debit', {
-      amount_cents: totalChargedCents,
-    });
-    if (debitError) throw new Error(debitError.message);
-    if (!debited) {
-      throw new Error(`Insufficient wallet balance to generate image ($${(totalChargedCents / 100).toFixed(2)}).`);
     }
 
     const openRouterResponse = await fetch(OPENROUTER_CHAT_COMPLETIONS_URL, {
@@ -136,7 +141,7 @@ serve(async (req: Request) => {
 
     const imageDataUrl = readImageDataUrl(openRouterResult ?? {});
     const imageMeta = readDataUrlMetadata(imageDataUrl);
-    const generatedR2Key = `${projectId}/openrouter-ai-gen-${Date.now()}.${imageMeta.mime.split('/')[1] ?? 'png'}`;
+    const generatedR2Key = `${projectIdString}/openrouter-ai-gen-${Date.now()}.${imageMeta.mime.split('/')[1] ?? 'png'}`;
 
     const supabaseAdmin = createClient(
         Deno.env.get('SUPABASE_URL') ?? '',
@@ -152,15 +157,25 @@ serve(async (req: Request) => {
         price_meta: { flat_cost_cents: providerCostCents },
     }, { onConflict: 'provider,model_id' });
 
-    await supabaseAdmin.from('assets').insert({
+    if (project) {
+      await supabaseAdmin.from('assets').insert({
         owner_id: user.id,
-        project_id: projectId,
+        project_id: projectIdString,
         kind: 'image',
         r2_key: generatedR2Key,
         bytes: imageMeta.sizeBytes,
         mime: imageMeta.mime,
-        metadata: { ai_prompt: prompt, openrouter_model_id: modelId }
+        metadata: { ai_prompt: prompt, editor_project_id: projectIdString, openrouter_model_id: modelId }
+      });
+    }
+
+    const { data: debited, error: debitError } = await supabaseClient.rpc('wallet_debit', {
+      amount_cents: totalChargedCents,
     });
+    if (debitError) throw new Error(debitError.message);
+    if (!debited) {
+      throw new Error(`Insufficient wallet balance to generate image ($${(totalChargedCents / 100).toFixed(2)}).`);
+    }
     
     // Log Ledger
     await supabaseAdmin.from('ai_usage_ledger').insert({
@@ -171,7 +186,7 @@ serve(async (req: Request) => {
         provider_cost_cents: providerCostCents,
         platform_fee_cents: platformFeeCents,
         total_charged_cents: totalChargedCents,
-        request_meta: { prompt, surface: 'ai-image-agent' },
+        request_meta: { prompt, editor_project_id: projectIdString, surface: 'ai-image-agent' },
         response_meta: {
           provider_cost_cents: providerCostCents,
           openrouter_usage: openRouterResult?.usage ?? null,
