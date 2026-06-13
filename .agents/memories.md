@@ -48,6 +48,17 @@ exposed in the UI as a control they can change.
   override from the UI are not. If you find yourself writing *"avoid X unless
   Y"*, that's the smell — either expose the toggle in the UI or drop the rule.
 
+### OpenRouter image generation shape
+
+- **Why:** the Art tab image generator was originally a mock and needed the
+  current OpenRouter image response contract.
+- **How to apply:** `ai-image-agent` should call OpenRouter chat completions
+  with `modalities`, then read generated images from
+  `choices[0].message.images[0].image_url.url`. OpenRouter returns image
+  outputs as base64 data URLs, so the Art tab stores an `imageDataUrl` on its
+  local `EditorImageAsset` for immediate preview while the backend asset row
+  records metadata and ledger usage.
+
 ---
 
 ## Tooling references

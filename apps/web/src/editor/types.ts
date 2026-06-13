@@ -213,6 +213,7 @@ export interface EditorImageAsset {
   id: string;
   name: string;
   r2Key: string;
+  imageDataUrl?: string;
   mime: string;
   bytes: number;
   width?: number;

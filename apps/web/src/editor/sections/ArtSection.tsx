@@ -110,6 +110,12 @@ function ImagesContent({
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  function getImagePreviewSource(image: EditorImageAsset): string | null {
+    if (image.imageDataUrl) return image.imageDataUrl;
+    if (image.r2Key.startsWith('data:image/')) return image.r2Key;
+    return null;
+  }
+
   async function handleUpload(file: File) {
     setIsUploading(true); setError(null);
     try {
@@ -133,7 +139,17 @@ function ImagesContent({
     try {
       const { data, error: genErr } = await supabase.functions.invoke('ai-image-agent', { body: { projectId, prompt: trimmed, modelId: imageModelId } });
       if (genErr) throw new Error(genErr.message || 'Image generation failed');
-      onUpdateImages((c) => [{ id: generateId('img'), name: trimmed.slice(0, 60), r2Key: data?.r2Key ?? `${projectId}/ai-${Date.now()}.png`, mime: 'image/png', bytes: data?.sizeBytes ?? 0, aiPrompt: trimmed, tags: [], createdAt: new Date().toISOString() }, ...c]);
+      onUpdateImages((c) => [{
+        id: generateId('img'),
+        name: trimmed.slice(0, 60),
+        r2Key: data?.r2Key ?? `${projectId}/ai-${Date.now()}.png`,
+        imageDataUrl: typeof data?.imageDataUrl === 'string' ? data.imageDataUrl : undefined,
+        mime: data?.mime ?? 'image/png',
+        bytes: data?.sizeBytes ?? 0,
+        aiPrompt: trimmed,
+        tags: [],
+        createdAt: new Date().toISOString(),
+      }, ...c]);
       setAiPrompt(''); setShowAiInput(false);
     } catch (err) { setError(err instanceof Error ? err.message : 'Generation failed'); }
     finally { setIsGenerating(false); }
@@ -179,7 +195,13 @@ function ImagesContent({
           {images.map((image) => (
             <div key={image.id} style={{ borderRadius: '16px', border: '1px solid rgba(15,118,110,0.08)', background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(8px)', overflow: 'hidden' }}>
               <div style={{ aspectRatio: '4 / 3', background: 'linear-gradient(135deg, rgba(240,253,244,0.9), rgba(236,254,255,0.9))', display: 'grid', placeItems: 'center', position: 'relative' }}>
-                {image.aiPrompt ? <Wand2 size={20} style={{ color: '#8b5cf6', opacity: 0.6 }} /> : <ImagePlus size={20} style={{ color: '#0d9488', opacity: 0.6 }} />}
+                {getImagePreviewSource(image) ? (
+                  <img
+                    src={getImagePreviewSource(image) ?? undefined}
+                    alt={image.name || 'Generated game art'}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                  />
+                ) : image.aiPrompt ? <Wand2 size={20} style={{ color: '#8b5cf6', opacity: 0.6 }} /> : <ImagePlus size={20} style={{ color: '#0d9488', opacity: 0.6 }} />}
                 <button type="button" onClick={() => onUpdateImages((c) => c.filter((i) => i.id !== image.id))} title="Remove"
                   style={{ position: 'absolute', top: '0.35rem', right: '0.35rem', width: '24px', height: '24px', borderRadius: '999px', border: 'none', background: 'rgba(0,0,0,0.25)', color: 'white', display: 'grid', placeItems: 'center', cursor: 'pointer' }}><X size={11} /></button>
               </div>
@@ -337,7 +359,13 @@ export function ArtSection({
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', justifyContent: 'center', padding: '0.5rem' }}>
                   {(project.art.images ?? []).slice(0, 6).map((img) => (
                     <div key={img.id} style={{ width: '52px', height: '40px', borderRadius: '10px', background: 'linear-gradient(135deg, rgba(240,253,244,0.9), rgba(236,254,255,0.9))', border: '1px solid rgba(15,118,110,0.08)', display: 'grid', placeItems: 'center' }}>
-                      {img.aiPrompt ? <Wand2 size={13} style={{ color: '#8b5cf6', opacity: 0.7 }} /> : <ImagePlus size={13} style={{ color: '#0d9488', opacity: 0.7 }} />}
+                      {img.imageDataUrl || img.r2Key.startsWith('data:image/') ? (
+                        <img
+                          src={img.imageDataUrl ?? img.r2Key}
+                          alt={img.name || 'Generated game art'}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '10px', display: 'block' }}
+                        />
+                      ) : img.aiPrompt ? <Wand2 size={13} style={{ color: '#8b5cf6', opacity: 0.7 }} /> : <ImagePlus size={13} style={{ color: '#0d9488', opacity: 0.7 }} />}
                     </div>
                   ))}
                   {imageCount > 6 ? <span style={{ fontSize: '0.7rem', color: '#0d9488', fontWeight: 600, alignSelf: 'center' }}>+{imageCount - 6}</span> : null}

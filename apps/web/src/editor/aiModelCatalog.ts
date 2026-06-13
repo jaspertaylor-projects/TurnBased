@@ -45,28 +45,28 @@ export const RULES_WRITER_MODEL_OPTIONS: AIModelOption[] = [
 
 export const IMAGE_GENERATION_MODEL_OPTIONS: AIModelOption[] = [
   {
-    id: 'fal-diffusion-mock',
-    label: 'Fal Diffusion Mock',
-    provider: 'fal',
+    id: 'microsoft/mai-image-2.5',
+    label: 'MAI Image 2.5',
+    provider: 'openrouter',
     task: 'imageGeneration',
-    description: 'Local mock image route for development.',
+    description: 'Balanced OpenRouter image model for board-game art assets.',
+    priceMeta: { flatCostCents: 2 },
+  },
+  {
+    id: 'google/gemini-2.5-flash-image',
+    label: 'Gemini 2.5 Flash Image',
+    provider: 'openrouter',
+    task: 'imageGeneration',
+    description: 'Fast OpenRouter model for quick image ideation.',
     priceMeta: { flatCostCents: 3 },
   },
   {
-    id: 'fal-flux-schnell-mock',
-    label: 'Fal Flux Schnell Mock',
-    provider: 'fal',
+    id: 'black-forest-labs/flux.2-pro',
+    label: 'Flux 2 Pro',
+    provider: 'openrouter',
     task: 'imageGeneration',
-    description: 'Fast image-generation placeholder route.',
-    priceMeta: { flatCostCents: 3 },
-  },
-  {
-    id: 'recraft-image-mock',
-    label: 'Recraft Image Mock',
-    provider: 'fal',
-    task: 'imageGeneration',
-    description: 'Illustration-oriented placeholder route.',
-    priceMeta: { flatCostCents: 4 },
+    description: 'High-quality OpenRouter image model for polished game art.',
+    priceMeta: { flatCostCents: 5 },
   },
 ];
 
