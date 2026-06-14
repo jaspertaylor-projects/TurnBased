@@ -23,3 +23,76 @@ order a physical prototype.  Make a playable online version of their game, and p
 3.  Online economy 
     1. To be designed later, but keep in mind that we will need to be able to have robust user accounts of different types (designer/playtester/user ) etc.   
 
+
+## Version Control Branching Map Plan
+
+This section captures the agreed direction for the editor version-control page
+so another agent can continue cleanly if work is interrupted.
+
+The version-control page should become a visual branching map on a grassy
+fantasy backdrop. Each version checkpoint is a space/node on the map. The user
+selects the current checkpoint by dragging a meeple marker onto a node. The
+meeple should use the existing app favicon asset at
+`apps/web/public/favicon.png`.
+
+Use a local version graph as the primary UI source of truth. Each graph node
+should store enough data for branch switching to work even without remote git:
+
+- branch/version name
+- numbered commit label
+- commit SHA or local SHA
+- parent commit SHA
+- project snapshot
+- workspace files
+- sync status such as `local`, `synced`, or `sync_failed`
+- optional remote branch name
+- optional real remote SHA
+
+The local graph must let the user move backward, forward, and across branches
+by selecting nodes on the map. Restoring a node should restore that node's
+project snapshot and workspace files. Prefer a confirmation before destructive
+restores so accidental drops do not silently replace the workspace.
+
+Branch/version naming should be user-friendly. The project title remains the
+game name, and a subline beneath it should show the active version name, for
+example:
+
+`My Super Game`
+
+`version: initial musings`
+
+Saving on a version should create numbered commits using the active version
+name:
+
+- `initial musings 1`
+- `initial musings 2`
+- `initial musings 3`
+
+Creating a new version such as `powerful spells` should create a new branch in
+the local graph from the currently selected node. Its commits should then be
+numbered independently:
+
+- `powerful spells 1`
+- `powerful spells 2`
+
+There should be a save icon in the editor sidebar to the right of the project
+name. Clicking it should commit the whole current workspace to the active
+version branch. To guarantee that every save produces a distinct file change
+and SHA, update a per-project/version marker file such as
+`versions/<branch>.json` with the branch name, version number, timestamp, and
+current node id.
+
+Remote git through `git-proxy` is desirable, but should be treated as a backing
+sync/provenance layer rather than the thing required for the UI to work. The
+recommended implementation is hybrid:
+
+- create/update the local graph immediately for responsive branch switching
+- when signed in and a remote project exists, call `git-proxy` to create the
+  corresponding real branch/commit
+- store returned remote branch/SHA on the local graph node
+- if remote sync fails, keep the local node and mark it `sync_failed`
+- allow retrying remote sync later
+
+Do not rewrite history. If the user restores an older node, edits, and then
+saves, prompt them to create a new branch/version from that node rather than
+silently replacing the old branch's forward history.
