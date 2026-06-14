@@ -89,6 +89,19 @@ exposed in the UI as a control they can change.
   aged-parchment palette (greens, tans, `#5b3a16`/`#7c5a3a` ink, `#b45309`
   accents).
 
+### Sidebar version control is a dropdown switcher (no + button)
+
+- **Why:** the user wanted the game-name/version area cleaned up — the branch
+  icon should switch versions, and the standalone "+" new-version button was
+  redundant.
+- **How to apply:** in `EditorSidebar`, the version line is a single pill
+  (`data-layout="editorVersionSwitcher"`: branch icon + active version name +
+  chevron) that toggles a dropdown (`editorVersionMenu`) listing every saved
+  version (branch); selecting one calls `onSwitchVersion`, which restores that
+  branch's head commit (`handleSwitchVersion` in `Editor.tsx`, computed from
+  per-branch head SHAs). The "New version" action lives at the bottom of that
+  dropdown. Do **not** re-add a separate "+" button next to the version label.
+
 ### Editor "Notice" status lives in the sidebar header
 
 - **Why:** the transient save/error notice used to float over the editor
