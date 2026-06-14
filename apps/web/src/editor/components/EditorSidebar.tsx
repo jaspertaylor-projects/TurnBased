@@ -1,6 +1,6 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { useState } from 'react';
-import { GitBranch, Save } from 'lucide-react';
+import { GitBranch, Plus, Save } from 'lucide-react';
 
 import { SECTION_OPTIONS } from '../constants';
 import type { EditorSection } from '../constants';
@@ -94,30 +94,82 @@ export function EditorSidebar({
         boxShadow: 'none',
       }}
     >
-      <div style={{ marginBottom: '0.7rem' }}>
+      <div
+        data-layout="editorProjectHeader"
+        /* project header keeps the game title, active version, and save control as one identity block */
+        style={{
+          marginBottom: '0.7rem',
+          paddingBottom: '0.68rem',
+          borderBottom: '1px solid rgba(15,118,110,0.12)',
+        }}
+      >
         <div
           data-layout="editorProjectNameRow"
           /* project name row with a save icon beside it for one-click version commits */
           style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 32px', gap: '0.35rem', alignItems: 'start' }}
         >
-          <input
-            value={project.name}
-            onChange={(event) => onRenameProject(event.target.value)}
-            aria-label="Project name"
-            style={{
-              width: '100%',
-              border: 'none',
-              borderBottom: '1px solid rgba(15,118,110,0.12)',
-              background: 'transparent',
-              color: '#064e3b',
-              fontSize: '1rem',
-              fontWeight: 800,
-              lineHeight: 1.25,
-              padding: '0 0 0.45rem 0',
-              borderRadius: 0,
-              boxSizing: 'border-box',
-            }}
-          />
+          <div
+            data-layout="editorProjectTitleStack"
+            /* title stack makes the active version read as a subtitle under the game name */
+            style={{ display: 'grid', gap: '0.18rem', minWidth: 0 }}
+          >
+            <input
+              value={project.name}
+              onChange={(event) => onRenameProject(event.target.value)}
+              aria-label="Project name"
+              style={{
+                width: '100%',
+                border: 'none',
+                background: 'transparent',
+                color: '#064e3b',
+                fontSize: '1rem',
+                fontWeight: 800,
+                lineHeight: 1.18,
+                padding: 0,
+                borderRadius: 0,
+                boxSizing: 'border-box',
+              }}
+            />
+            <div
+              data-layout="editorVersionSubtitle"
+              /* active version subtitle belongs to the project title rather than the section nav */
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.3rem',
+                minWidth: 0,
+                color: '#0f766e',
+                fontSize: '0.74rem',
+                lineHeight: 1.25,
+              }}
+            >
+              <GitBranch size={12} />
+              <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                version: {activeVersionName}
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsCreatingVersion((value) => !value)}
+                aria-label="Create new version"
+                title="Create new version"
+                style={{
+                  width: 19,
+                  height: 19,
+                  marginLeft: 'auto',
+                  borderRadius: '999px',
+                  border: '1px solid rgba(15,118,110,0.14)',
+                  background: 'rgba(255,255,255,0.72)',
+                  color: '#0d9488',
+                  display: 'grid',
+                  placeItems: 'center',
+                  cursor: 'pointer',
+                  padding: 0,
+                }}
+              >
+                <Plus size={12} />
+              </button>
+            </div>
+          </div>
           <button
             type="button"
             onClick={onSaveVersion}
@@ -138,68 +190,49 @@ export function EditorSidebar({
             <Save size={15} />
           </button>
         </div>
-        <div
-          data-layout="editorVersionSubline"
-          /* version subline shows the active branch and exposes new-version creation */
-          style={{ display: 'grid', gap: '0.35rem', marginTop: '0.35rem', color: '#0f766e', fontSize: '0.76rem' }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', minWidth: 0 }}>
-            <GitBranch size={12} />
-            <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              version: {activeVersionName}
-            </span>
+        {isCreatingVersion ? (
+          <div
+            data-layout="editorNewVersionForm"
+            /* compact inline form for naming a new local version branch */
+            style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: '0.3rem', marginTop: '0.55rem' }}
+          >
+            <input
+              value={nextVersionName}
+              onChange={(event) => setNextVersionName(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') submitVersionName();
+                if (event.key === 'Escape') setIsCreatingVersion(false);
+              }}
+              placeholder="powerful spells"
+              aria-label="New version name"
+              style={{
+                minWidth: 0,
+                borderRadius: '9px',
+                border: '1px solid rgba(15,118,110,0.16)',
+                padding: '0.34rem 0.45rem',
+                color: '#064e3b',
+                fontSize: '0.74rem',
+              }}
+            />
             <button
               type="button"
-              onClick={() => setIsCreatingVersion((value) => !value)}
-              style={{ marginLeft: 'auto', border: 'none', background: 'transparent', color: '#0d9488', fontWeight: 800, cursor: 'pointer', fontSize: '0.72rem' }}
+              onClick={submitVersionName}
+              disabled={!nextVersionName.trim()}
+              style={{
+                borderRadius: '9px',
+                border: 'none',
+                background: nextVersionName.trim() ? '#0d9488' : 'rgba(13,148,136,0.25)',
+                color: 'white',
+                padding: '0.34rem 0.5rem',
+                fontWeight: 800,
+                cursor: nextVersionName.trim() ? 'pointer' : 'default',
+                fontSize: '0.72rem',
+              }}
             >
-              new
+              Add
             </button>
           </div>
-          {isCreatingVersion ? (
-            <div
-              data-layout="editorNewVersionForm"
-              /* compact inline form for naming a new local version branch */
-              style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: '0.3rem' }}
-            >
-              <input
-                value={nextVersionName}
-                onChange={(event) => setNextVersionName(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') submitVersionName();
-                  if (event.key === 'Escape') setIsCreatingVersion(false);
-                }}
-                placeholder="powerful spells"
-                aria-label="New version name"
-                style={{
-                  minWidth: 0,
-                  borderRadius: '9px',
-                  border: '1px solid rgba(15,118,110,0.16)',
-                  padding: '0.34rem 0.45rem',
-                  color: '#064e3b',
-                  fontSize: '0.74rem',
-                }}
-              />
-              <button
-                type="button"
-                onClick={submitVersionName}
-                disabled={!nextVersionName.trim()}
-                style={{
-                  borderRadius: '9px',
-                  border: 'none',
-                  background: nextVersionName.trim() ? '#0d9488' : 'rgba(13,148,136,0.25)',
-                  color: 'white',
-                  padding: '0.34rem 0.5rem',
-                  fontWeight: 800,
-                  cursor: nextVersionName.trim() ? 'pointer' : 'default',
-                  fontSize: '0.72rem',
-                }}
-              >
-                Add
-              </button>
-            </div>
-          ) : null}
-        </div>
+        ) : null}
       </div>
 
       <div style={{ display: 'grid', gap: '0.15rem' }}>
