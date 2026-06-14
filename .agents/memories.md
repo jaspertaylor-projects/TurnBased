@@ -59,6 +59,16 @@ exposed in the UI as a control they can change.
   local `EditorImageAsset` for immediate preview while the backend asset row
   records metadata and ledger usage.
 
+### Version map layout is a framed surface
+
+- **Why:** the branching version map became visually messy when the header,
+  active commit card, New Version button, nodes, and meeple were all absolute
+  overlays inside the same canvas.
+- **How to apply:** keep `VersionsSection` as a header / scrollable map body /
+  footer frame. Put branch lanes, paths, commit nodes, and the favicon meeple
+  inside the scrollable canvas only; keep status and actions in the pinned
+  frame regions so they do not cover map spaces.
+
 ---
 
 ## Tooling references
