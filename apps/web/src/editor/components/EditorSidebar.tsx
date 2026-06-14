@@ -1,6 +1,6 @@
 import type { Dispatch, SetStateAction } from 'react';
-import { useState } from 'react';
-import { GitBranch, Plus, Save, Sparkles, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Check, ChevronDown, GitBranch, Plus, Save, Sparkles, X } from 'lucide-react';
 
 import { SECTION_OPTIONS } from '../constants';
 import type { EditorSection } from '../constants';
@@ -49,7 +49,9 @@ export function EditorSidebar({
   onOpenComponentEditor,
   onRenameProject,
   activeVersionName,
+  versionOptions,
   onSaveVersion,
+  onSwitchVersion,
   onCreateVersion,
   notice,
   onDismissNotice,
@@ -58,6 +60,9 @@ export function EditorSidebar({
   activeSection: EditorSection;
   setActiveSection: Dispatch<SetStateAction<EditorSection>>;
   activeVersionName: string;
+  /** All saved versions (branches) with the active one flagged, for the
+   * version-switch dropdown opened from the branch icon. */
+  versionOptions: Array<{ name: string; isActive: boolean }>;
   /**
    * Opens the component editor section. Always lands on the intermediate
    * gallery view — the plus-icon and inline outline list were removed since
@@ -66,22 +71,39 @@ export function EditorSidebar({
   onOpenComponentEditor: () => void;
   onRenameProject: (name: string) => void;
   onSaveVersion: () => void;
+  onSwitchVersion: (name: string) => void;
   onCreateVersion: (name: string) => void;
   /** Transient status line (save confirmations, errors). Rendered as a small
    * dismissible chip tucked into the header so it never covers the canvas. */
   notice: string | null;
   onDismissNotice: () => void;
 }) {
+  const [isVersionMenuOpen, setIsVersionMenuOpen] = useState(false);
   const [isCreatingVersion, setIsCreatingVersion] = useState(false);
   const [nextVersionName, setNextVersionName] = useState('');
+
+  function closeVersionMenu() {
+    setIsVersionMenuOpen(false);
+    setIsCreatingVersion(false);
+    setNextVersionName('');
+  }
 
   function submitVersionName() {
     const trimmed = nextVersionName.trim();
     if (!trimmed) return;
     onCreateVersion(trimmed);
-    setNextVersionName('');
-    setIsCreatingVersion(false);
+    closeVersionMenu();
   }
+
+  // Close the version dropdown on Escape for keyboard parity with click-away.
+  useEffect(() => {
+    if (!isVersionMenuOpen) return undefined;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeVersionMenu();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isVersionMenuOpen]);
 
   return (
     <aside
@@ -102,8 +124,9 @@ export function EditorSidebar({
     >
       <div
         data-layout="editorProjectHeader"
-        /* project header keeps the game title, active version, and save control as one identity block */
+        /* project header keeps the game title, version switcher, and save control as one identity block */
         style={{
+          position: 'relative',
           marginBottom: '0.7rem',
           paddingBottom: '0.68rem',
           borderBottom: '1px solid rgba(15,118,110,0.12)',
@@ -112,70 +135,26 @@ export function EditorSidebar({
         <div
           data-layout="editorProjectNameRow"
           /* project name row with a save icon beside it for one-click version commits */
-          style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 32px', gap: '0.35rem', alignItems: 'start' }}
+          style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 32px', gap: '0.35rem', alignItems: 'center' }}
         >
-          <div
-            data-layout="editorProjectTitleStack"
-            /* title stack makes the active version read as a subtitle under the game name */
-            style={{ display: 'grid', gap: '0.18rem', minWidth: 0 }}
-          >
-            <input
-              value={project.name}
-              onChange={(event) => onRenameProject(event.target.value)}
-              aria-label="Project name"
-              style={{
-                width: '100%',
-                border: 'none',
-                background: 'transparent',
-                color: '#064e3b',
-                fontSize: '1rem',
-                fontWeight: 800,
-                lineHeight: 1.18,
-                padding: 0,
-                borderRadius: 0,
-                boxSizing: 'border-box',
-              }}
-            />
-            <div
-              data-layout="editorVersionSubtitle"
-              /* active version subtitle belongs to the project title rather than the section nav */
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.3rem',
-                minWidth: 0,
-                color: '#0f766e',
-                fontSize: '0.74rem',
-                lineHeight: 1.25,
-              }}
-            >
-              <GitBranch size={12} />
-              <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                version: {activeVersionName}
-              </span>
-              <button
-                type="button"
-                onClick={() => setIsCreatingVersion((value) => !value)}
-                aria-label="Create new version"
-                title="Create new version"
-                style={{
-                  width: 19,
-                  height: 19,
-                  marginLeft: 'auto',
-                  borderRadius: '999px',
-                  border: '1px solid rgba(15,118,110,0.14)',
-                  background: 'rgba(255,255,255,0.72)',
-                  color: '#0d9488',
-                  display: 'grid',
-                  placeItems: 'center',
-                  cursor: 'pointer',
-                  padding: 0,
-                }}
-              >
-                <Plus size={12} />
-              </button>
-            </div>
-          </div>
+          <input
+            value={project.name}
+            onChange={(event) => onRenameProject(event.target.value)}
+            aria-label="Project name"
+            style={{
+              width: '100%',
+              border: 'none',
+              background: 'transparent',
+              color: '#064e3b',
+              fontSize: '1rem',
+              fontWeight: 800,
+              lineHeight: 1.18,
+              padding: 0,
+              borderRadius: 0,
+              boxSizing: 'border-box',
+              minWidth: 0,
+            }}
+          />
           <button
             type="button"
             onClick={onSaveVersion}
@@ -196,48 +175,195 @@ export function EditorSidebar({
             <Save size={15} />
           </button>
         </div>
-        {isCreatingVersion ? (
-          <div
-            data-layout="editorNewVersionForm"
-            /* compact inline form for naming a new local version branch */
-            style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: '0.3rem', marginTop: '0.55rem' }}
-          >
-            <input
-              value={nextVersionName}
-              onChange={(event) => setNextVersionName(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') submitVersionName();
-                if (event.key === 'Escape') setIsCreatingVersion(false);
-              }}
-              placeholder="powerful spells"
-              aria-label="New version name"
-              style={{
-                minWidth: 0,
-                borderRadius: '9px',
-                border: '1px solid rgba(15,118,110,0.16)',
-                padding: '0.34rem 0.45rem',
-                color: '#064e3b',
-                fontSize: '0.74rem',
-              }}
+
+        <button
+          type="button"
+          data-layout="editorVersionSwitcher"
+          /* version-control pill: opens the version-switch dropdown (and the
+             new-version action lives inside it — there is no separate +) */
+          onClick={() => setIsVersionMenuOpen((value) => !value)}
+          aria-haspopup="listbox"
+          aria-expanded={isVersionMenuOpen}
+          title="Switch version"
+          style={{
+            marginTop: '0.42rem',
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.34rem',
+            minWidth: 0,
+            borderRadius: '999px',
+            border: '1px solid rgba(15,118,110,0.16)',
+            background: isVersionMenuOpen ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.6)',
+            color: '#0f766e',
+            fontSize: '0.74rem',
+            fontWeight: 600,
+            lineHeight: 1.2,
+            padding: '0.3rem 0.5rem',
+            cursor: 'pointer',
+            boxSizing: 'border-box',
+          }}
+        >
+          <GitBranch size={13} style={{ flex: '0 0 auto' }} />
+          <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {activeVersionName}
+          </span>
+          <ChevronDown
+            size={13}
+            style={{ flex: '0 0 auto', marginLeft: 'auto', transition: 'transform 0.15s', transform: isVersionMenuOpen ? 'rotate(180deg)' : 'none' }}
+          />
+        </button>
+
+        {isVersionMenuOpen ? (
+          <>
+            <div
+              data-layout="editorVersionMenuBackdrop"
+              /* invisible click-away layer that dismisses the dropdown */
+              onClick={closeVersionMenu}
+              style={{ position: 'fixed', inset: 0, zIndex: 40 }}
             />
-            <button
-              type="button"
-              onClick={submitVersionName}
-              disabled={!nextVersionName.trim()}
+            <div
+              data-layout="editorVersionMenu"
+              /* version-switch dropdown: pick a saved version, or start a new one */
+              role="listbox"
               style={{
-                borderRadius: '9px',
-                border: 'none',
-                background: nextVersionName.trim() ? '#0d9488' : 'rgba(13,148,136,0.25)',
-                color: 'white',
-                padding: '0.34rem 0.5rem',
-                fontWeight: 800,
-                cursor: nextVersionName.trim() ? 'pointer' : 'default',
-                fontSize: '0.72rem',
+                position: 'absolute',
+                top: 'calc(100% - 0.4rem)',
+                left: 0,
+                right: 0,
+                zIndex: 50,
+                display: 'grid',
+                gap: '0.12rem',
+                padding: '0.35rem',
+                borderRadius: '14px',
+                border: '1px solid rgba(15,118,110,0.16)',
+                background: 'rgba(255,255,255,0.98)',
+                boxShadow: '0 18px 40px rgba(6,78,59,0.18)',
+                maxHeight: '50vh',
+                overflowY: 'auto',
               }}
             >
-              Add
-            </button>
-          </div>
+              <div
+                data-layout="editorVersionMenuLabel"
+                /* small section label above the version list */
+                style={{ padding: '0.15rem 0.4rem 0.2rem', fontSize: '0.62rem', fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#0f766e' }}
+              >
+                Switch version
+              </div>
+              {versionOptions.length === 0 ? (
+                <div style={{ padding: '0.3rem 0.45rem', fontSize: '0.74rem', color: '#0f766e' }}>
+                  No saved versions yet.
+                </div>
+              ) : (
+                versionOptions.map((option) => (
+                  <button
+                    key={option.name}
+                    type="button"
+                    role="option"
+                    aria-selected={option.isActive}
+                    onClick={() => {
+                      if (!option.isActive) onSwitchVersion(option.name);
+                      closeVersionMenu();
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                      width: '100%',
+                      textAlign: 'left',
+                      borderRadius: '10px',
+                      border: 'none',
+                      background: option.isActive ? 'rgba(16,185,129,0.14)' : 'transparent',
+                      color: option.isActive ? '#064e3b' : '#0f766e',
+                      fontSize: '0.78rem',
+                      fontWeight: option.isActive ? 800 : 600,
+                      padding: '0.4rem 0.45rem',
+                      cursor: 'pointer',
+                      minWidth: 0,
+                    }}
+                  >
+                    <GitBranch size={13} style={{ flex: '0 0 auto' }} />
+                    <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {option.name}
+                    </span>
+                    {option.isActive ? <Check size={13} style={{ flex: '0 0 auto', marginLeft: 'auto', color: '#0d9488' }} /> : null}
+                  </button>
+                ))
+              )}
+
+              <div style={{ height: 1, background: 'rgba(15,118,110,0.12)', margin: '0.2rem 0.2rem' }} />
+
+              {isCreatingVersion ? (
+                <div
+                  data-layout="editorNewVersionForm"
+                  /* compact inline form for naming a new local version branch */
+                  style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: '0.3rem', padding: '0.15rem 0.2rem 0.25rem' }}
+                >
+                  <input
+                    value={nextVersionName}
+                    onChange={(event) => setNextVersionName(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') submitVersionName();
+                      if (event.key === 'Escape') closeVersionMenu();
+                    }}
+                    placeholder="powerful spells"
+                    aria-label="New version name"
+                    autoFocus
+                    style={{
+                      minWidth: 0,
+                      borderRadius: '9px',
+                      border: '1px solid rgba(15,118,110,0.16)',
+                      padding: '0.34rem 0.45rem',
+                      color: '#064e3b',
+                      fontSize: '0.74rem',
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={submitVersionName}
+                    disabled={!nextVersionName.trim()}
+                    style={{
+                      borderRadius: '9px',
+                      border: 'none',
+                      background: nextVersionName.trim() ? '#0d9488' : 'rgba(13,148,136,0.25)',
+                      color: 'white',
+                      padding: '0.34rem 0.5rem',
+                      fontWeight: 800,
+                      cursor: nextVersionName.trim() ? 'pointer' : 'default',
+                      fontSize: '0.72rem',
+                    }}
+                  >
+                    Add
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  data-layout="editorNewVersionAction"
+                  /* opens the inline name form for a fresh version branch */
+                  onClick={() => setIsCreatingVersion(true)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    width: '100%',
+                    textAlign: 'left',
+                    borderRadius: '10px',
+                    border: 'none',
+                    background: 'transparent',
+                    color: '#0d9488',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    padding: '0.4rem 0.45rem',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <Plus size={14} style={{ flex: '0 0 auto' }} />
+                  New version
+                </button>
+              )}
+            </div>
+          </>
         ) : null}
 
         {notice ? (

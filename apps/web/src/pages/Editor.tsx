@@ -37,6 +37,7 @@ import type { CatalogComponentSelection } from '../editor/sections/rules/Compone
 import {
   commitActiveProjectVersion,
   createProjectVersionBranch,
+  DEFAULT_VERSION_BRANCH_NAME,
   getProjectGitStatus,
   getProjectVersionGraph,
   restoreProjectFromCommit,
@@ -167,6 +168,21 @@ export const Editor = () => {
   const gitStatus = getProjectGitStatus(currentProject, currentRuntime);
   const versionGraph = getProjectVersionGraph(currentProject.id);
 
+  // Map each version (branch) to its head commit so the sidebar dropdown can
+  // switch versions. Commits arrive newest-first, so the first one seen per
+  // branch is its head.
+  const branchHeadShas = new Map<string, string>();
+  versionGraph.commits.forEach((commit) => {
+    const branchName = commit.branchName ?? DEFAULT_VERSION_BRANCH_NAME;
+    if (!branchHeadShas.has(branchName)) {
+      branchHeadShas.set(branchName, commit.commitSha);
+    }
+  });
+  const versionOptions = Array.from(branchHeadShas.keys()).map((name) => ({
+    name,
+    isActive: name === versionGraph.activeBranchName,
+  }));
+
   function commitProject(nextProject: EditorProject) {
     setProject(nextProject);
     setEditorNotice(null);
@@ -202,6 +218,21 @@ export const Editor = () => {
       );
     } catch (error) {
       setEditorNotice(error instanceof Error ? error.message : 'Unable to create that version branch.');
+    }
+  }
+
+  function handleSwitchVersion(branchName: string) {
+    const headSha = branchHeadShas.get(branchName);
+    if (!headSha || headSha === versionGraph.activeCommitSha) {
+      return;
+    }
+    try {
+      const restoredProject = restoreProjectFromCommit(currentProject.id, headSha);
+      resetProjectHistory(restoredProject);
+      setSelectedComponentId(null);
+      setEditorNotice(`Switched to ${branchName}.`);
+    } catch (error) {
+      setEditorNotice(error instanceof Error ? error.message : 'Unable to switch versions.');
     }
   }
 
@@ -508,7 +539,9 @@ export const Editor = () => {
         onOpenComponentEditor={openComponentEditor}
         onRenameProject={(name) => commitProject(renameProject(currentProject, name))}
         activeVersionName={versionGraph.activeBranchName}
+        versionOptions={versionOptions}
         onSaveVersion={handleSaveVersion}
+        onSwitchVersion={handleSwitchVersion}
         onCreateVersion={handleCreateVersion}
         notice={editorNotice}
         onDismissNotice={() => setEditorNotice(null)}
