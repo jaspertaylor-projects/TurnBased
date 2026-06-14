@@ -3,6 +3,7 @@ import { ImagePlus, Loader2, Sparkles, Wand2, X } from 'lucide-react';
 
 import { supabase } from '../../lib/supabaseClient';
 import { getFunctionErrorMessage } from '../aiFunctionErrors';
+import { IMAGE_GENERATION_MODEL_OPTIONS } from '../aiModelCatalog';
 import { inputStyle } from '../styles';
 
 export interface GeneratedImageAssetPayload {
@@ -15,12 +16,25 @@ export interface GeneratedImageAssetPayload {
   modelId?: string;
 }
 
+export interface AIImagePromptContextOption {
+  id: string;
+  label: string;
+  kind: 'theme' | 'style';
+  value: string;
+}
+
+function normalizeImageModelId(value: string): string {
+  const ids = new Set(IMAGE_GENERATION_MODEL_OPTIONS.map((option) => option.id));
+  return ids.has(value) ? value : IMAGE_GENERATION_MODEL_OPTIONS[0].id;
+}
+
 export function AIImageGenerationModal({
   open,
   projectId,
   modelId,
   title = 'Generate image',
   initialPrompt = '',
+  contextOptions = [],
   onClose,
   onGenerated,
 }: {
@@ -29,18 +43,23 @@ export function AIImageGenerationModal({
   modelId: string;
   title?: string;
   initialPrompt?: string;
+  contextOptions?: AIImagePromptContextOption[];
   onClose: () => void;
   onGenerated: (asset: GeneratedImageAssetPayload) => void;
 }) {
   const [prompt, setPrompt] = useState(initialPrompt);
+  const [selectedModelId, setSelectedModelId] = useState(modelId);
+  const [selectedContextIds, setSelectedContextIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setPrompt(initialPrompt);
+    setSelectedModelId(normalizeImageModelId(modelId));
+    setSelectedContextIds(contextOptions.map((option) => option.id));
     setError(null);
-  }, [initialPrompt, open]);
+  }, [contextOptions, initialPrompt, modelId, open]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -55,28 +74,55 @@ export function AIImageGenerationModal({
 
   if (!open) return null;
 
+  const selectedModel = IMAGE_GENERATION_MODEL_OPTIONS.find((option) => option.id === selectedModelId)
+    ?? IMAGE_GENERATION_MODEL_OPTIONS[0];
+
+  const selectedContext = contextOptions.filter((option) => selectedContextIds.includes(option.id));
+
+  function buildPromptWithContext(trimmedPrompt: string): string {
+    if (selectedContext.length === 0) {
+      return trimmedPrompt;
+    }
+
+    const contextLines = selectedContext.map((option) => (
+      option.kind === 'theme'
+        ? `Theme: ${option.value}`
+        : `Style - ${option.label}: ${option.value}`
+    ));
+    return `${trimmedPrompt}\n\nProject art direction:\n${contextLines.map((line) => `- ${line}`).join('\n')}`;
+  }
+
+  function toggleContext(id: string) {
+    setSelectedContextIds((current) => (
+      current.includes(id)
+        ? current.filter((value) => value !== id)
+        : [...current, id]
+    ));
+  }
+
   async function handleGenerate() {
     const trimmed = prompt.trim();
     if (!trimmed || isGenerating) return;
+    const finalPrompt = buildPromptWithContext(trimmed);
 
     setIsGenerating(true);
     setError(null);
     try {
       const { data, error: generationError } = await supabase.functions.invoke('ai-image-agent', {
-        body: { projectId, prompt: trimmed, modelId },
+        body: { projectId, prompt: finalPrompt, modelId: selectedModelId },
       });
       if (generationError) {
         throw new Error(await getFunctionErrorMessage(generationError, 'Image generation failed'));
       }
 
       onGenerated({
-        prompt: trimmed,
+        prompt: finalPrompt,
         name: trimmed.slice(0, 60),
         r2Key: data?.r2Key ?? `${projectId}/ai-${Date.now()}.png`,
         imageDataUrl: typeof data?.imageDataUrl === 'string' ? data.imageDataUrl : undefined,
         mime: data?.mime ?? 'image/png',
         sizeBytes: data?.sizeBytes ?? 0,
-        modelId: typeof data?.model === 'string' ? data.model : modelId,
+        modelId: typeof data?.model === 'string' ? data.model : selectedModelId,
       });
       onClose();
     } catch (err) {
@@ -212,6 +258,84 @@ export function AIImageGenerationModal({
           </label>
 
           <div
+            data-layout="aiImageModelPicker"
+            /* model picker lets each modal invocation override the project default model */
+            style={{ display: 'grid', gap: '0.45rem', color: '#064e3b', fontWeight: 800 }}
+          >
+            <label htmlFor="ai-image-model-select">Image model</label>
+            <select
+              id="ai-image-model-select"
+              value={selectedModelId}
+              onChange={(event) => setSelectedModelId(event.target.value)}
+              disabled={isGenerating}
+              style={{
+                ...inputStyle,
+                borderRadius: '12px',
+                padding: '0.65rem 0.75rem',
+                cursor: isGenerating ? 'wait' : 'pointer',
+              }}
+            >
+              {IMAGE_GENERATION_MODEL_OPTIONS.map((option) => (
+                <option key={option.id} value={option.id}>{option.label}</option>
+              ))}
+            </select>
+            <span style={{ color: '#0f766e', fontSize: '0.78rem', fontWeight: 500, lineHeight: 1.45 }}>
+              {selectedModel.description}
+            </span>
+          </div>
+
+          {contextOptions.length > 0 ? (
+            <div
+              data-layout="aiImageContextPicker"
+              /* project art direction picker exposes exactly which theme/style context is added to the prompt */
+              style={{ display: 'grid', gap: '0.55rem' }}
+            >
+              <div style={{ color: '#064e3b', fontWeight: 800 }}>Project context</div>
+              <div
+                data-layout="aiImageContextControls"
+                /* wrapping checkbox controls for project theme and style references */
+                style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem' }}
+              >
+                {contextOptions.map((option) => {
+                  const selected = selectedContextIds.includes(option.id);
+                  return (
+                    <label
+                      key={option.id}
+                      data-layout="aiImageContextToggle"
+                      /* individual checkbox chip toggles one visible piece of art direction */
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.38rem',
+                        maxWidth: '100%',
+                        borderRadius: '999px',
+                        border: selected ? '1px solid rgba(124,58,237,0.45)' : '1px solid rgba(15,118,110,0.16)',
+                        background: selected ? 'rgba(139,92,246,0.12)' : 'rgba(255,255,255,0.82)',
+                        color: selected ? '#6d28d9' : '#064e3b',
+                        padding: '0.42rem 0.68rem',
+                        fontSize: '0.78rem',
+                        fontWeight: 800,
+                        cursor: isGenerating ? 'wait' : 'pointer',
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        disabled={isGenerating}
+                        onChange={() => toggleContext(option.id)}
+                        style={{ accentColor: '#7c3aed' }}
+                      />
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {option.kind === 'theme' ? 'Theme' : 'Style'}: {option.label}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+
+          <div
             data-layout="aiImageModalHint"
             /* small reusable status strip that shows the active model route */
             style={{
@@ -228,7 +352,7 @@ export function AIImageGenerationModal({
           >
             <ImagePlus size={15} />
             <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              OpenRouter model: {modelId}
+              OpenRouter model: {selectedModelId}
             </span>
           </div>
 

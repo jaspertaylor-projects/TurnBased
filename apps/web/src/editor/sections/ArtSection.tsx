@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from 'react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { Sparkles, BookImage, Hexagon, ImagePlus, Palette, Upload, Wand2, X, Plus } from 'lucide-react';
 import { inputStyle } from '../styles';
 import { PROJECT_PALETTE_LABELS, PROJECT_PALETTE_ORDER } from '../projectPalette';
@@ -11,7 +11,7 @@ import { PalettePage } from './art/PalettePage';
 import { STUDIO_BG_STYLE, STUDIO_BG_VALUE } from './art/studioBackground';
 import { SubPageShell } from './art/SubPageShell';
 import { getFunctionErrorMessage } from '../aiFunctionErrors';
-import { AIImageGenerationModal, type GeneratedImageAssetPayload } from '../components/AIImageGenerationModal';
+import { AIImageGenerationModal, type AIImagePromptContextOption, type GeneratedImageAssetPayload } from '../components/AIImageGenerationModal';
 import { supabase } from '../../lib/supabaseClient';
 import { generateId } from '@turnbased/shared-utils';
 
@@ -98,11 +98,12 @@ function StudioTile({
 // ── Images sub-page content ────────────────────────────────────────
 
 function ImagesContent({
-  projectId, images, imageModelId, onUpdateImages,
+  projectId, images, imageModelId, contextOptions, onUpdateImages,
 }: {
   projectId: string;
   images: EditorImageAsset[];
   imageModelId: string;
+  contextOptions: AIImagePromptContextOption[];
   onUpdateImages: (updater: (images: EditorImageAsset[]) => EditorImageAsset[]) => void;
 }) {
   const [isUploading, setIsUploading] = useState(false);
@@ -169,6 +170,7 @@ function ImagesContent({
         projectId={projectId}
         modelId={imageModelId}
         title="Generate image"
+        contextOptions={contextOptions}
         onClose={() => setShowImageGenerator(false)}
         onGenerated={handleGeneratedImage}
       />
@@ -240,6 +242,38 @@ export function ArtSection({
   const assetCount = project.art.recurringAssets.length;
   const iconCount = project.art.icons.length;
   const imageCount = (project.art.images ?? []).length;
+  const imagePromptContextOptions = useMemo<AIImagePromptContextOption[]>(() => {
+    const options: AIImagePromptContextOption[] = [];
+    const theme = (project.art.theme.trim() || project.brief.theme.trim());
+    if (theme.length > 0) {
+      options.push({
+        id: 'project-theme',
+        kind: 'theme',
+        label: theme,
+        value: theme,
+      });
+    }
+    const briefStyle = project.brief.artStyle.trim();
+    if (briefStyle.length > 0) {
+      options.push({
+        id: 'brief-art-style',
+        kind: 'style',
+        label: briefStyle,
+        value: briefStyle,
+      });
+    }
+    project.art.definedArtStyles.forEach((style) => {
+      const label = style.name.trim() || 'Untitled style';
+      const description = style.description.trim();
+      options.push({
+        id: `style-${style.id}`,
+        kind: 'style',
+        label,
+        value: description.length > 0 ? description : label,
+      });
+    });
+    return options;
+  }, [project.art.definedArtStyles, project.art.theme, project.brief.artStyle, project.brief.theme]);
 
   // ── Home ──
   if (page === 'home') {
@@ -476,6 +510,7 @@ export function ArtSection({
   return (
     <SubPageShell title="Images" icon={<ImagePlus size={22} />} onBack={() => setPage('home')}>
       <ImagesContent projectId={projectId} images={project.art.images ?? []} imageModelId={project.settings.aiModels.imageGeneration}
+        contextOptions={imagePromptContextOptions}
         onUpdateImages={(updater) => onUpdateArt((art) => ({ ...art, images: updater(art.images ?? []) }))} />
     </SubPageShell>
   );
