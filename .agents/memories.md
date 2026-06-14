@@ -69,6 +69,36 @@ exposed in the UI as a control they can change.
   inside the scrollable canvas only; keep status and actions in the pinned
   frame regions so they do not cover map spaces.
 
+### Version map is a fantasy adventure map
+
+- **Why:** the user wants the versions tab to *feel* like travelling through a
+  fantasy map, not a flat git graph. Each commit is a "camp" location, each
+  branch is a "trail", saving plants a new camp, and the favicon meeple is the
+  traveller you drag from camp to camp to restore a version.
+- **How to apply:** the static terrain (hills, pine/round trees, a lake,
+  meadow flowers, a compass rose) lives in
+  `apps/web/src/editor/sections/versions/MapDecorations.tsx` as a purely
+  decorative `FantasyMapDecorations` SVG layer (aria-hidden, no pointer
+  events). Scenery placement must be deterministic — seed from the element
+  index with a `Math.sin` hash, never `Math.random`, so the map does not
+  jitter on re-render when the meeple moves. `VersionsSection` draws winding
+  layered-stroke dirt trails (dark underlay + tan surface + dashed cream
+  centreline) between camp markers, renders camps as numbered map-pin
+  medallions on parchment plaques, names trails with wooden signposts at the
+  trailhead, and stands the meeple on the active camp. Keep the cozy-forest +
+  aged-parchment palette (greens, tans, `#5b3a16`/`#7c5a3a` ink, `#b45309`
+  accents).
+
+### Editor "Notice" status lives in the sidebar header
+
+- **Why:** the transient save/error notice used to float over the editor
+  canvas (a centered panel), which covered content. The user asked for it to
+  be a small tucked-away area instead.
+- **How to apply:** `editorNotice` is passed from `Editor.tsx` into
+  `EditorSidebar` as `notice` + `onDismissNotice`. The sidebar renders it as a
+  small dismissible chip (`data-layout="editorNoticeChip"`) under the project
+  header. Do **not** re-add floating notice panels in the editor viewport.
+
 ---
 
 ## Tooling references
@@ -95,6 +125,33 @@ the same Chrome user-data-dir.
   - If MCP starts conflicting again, confirm every `playwright` entry under
     `~/.claude.json` still has `--isolated` in its args list. A backup of the
     pre-change config lives at `~/.claude.json.bak-20260525-163425`.
+
+### Codex headed browser workflow
+
+For TurnBased UI work, Codex should prefer the repo's headed-browser scripts
+over one-off Playwright snippets.
+
+- **Why:** the user wants Codex to be able to see and operate a visible browser
+  with fewer repeated approval prompts. A previous ad-hoc `node -e` Playwright
+  command worked technically but could not get a reusable approval rule, which
+  made the workflow noisy and brittle.
+- **How to apply:**
+  - Keep the app running locally, usually at `http://127.0.0.1:3000`.
+  - Launch or reuse the visible persistent Chrome with:
+    `node scripts/codex-headed-browser.mjs`
+  - For read-only checks, use:
+    `node scripts/codex-browser-inspect.mjs <url-or-hash>`
+    `node scripts/codex-browser-screenshot.mjs <url-or-hash> <name.png>`
+  - For simple browser interactions, use the approved stable helper:
+    `node scripts/codex-browser-action.mjs <action> ...`
+    Examples: `create-project`, `open '#/settings'`, `click-text`, and
+    `fill-label`.
+  - Do not fall back to ad-hoc `node -e` Playwright automation unless the
+    helper genuinely cannot express the needed action. If the helper is
+    missing a common action, extend `scripts/codex-browser-action.mjs` and ask
+    for approval on that stable script prefix instead.
+  - The local dev login is `dev@turnbased.local` / `dev-local-only`; the
+    persistent Codex profile lives under `.playwright-codex/chrome-profile`.
 
 ---
 

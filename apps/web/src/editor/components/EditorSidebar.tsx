@@ -1,6 +1,6 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { useState } from 'react';
-import { GitBranch, Plus, Save } from 'lucide-react';
+import { GitBranch, Plus, Save, Sparkles, X } from 'lucide-react';
 
 import { SECTION_OPTIONS } from '../constants';
 import type { EditorSection } from '../constants';
@@ -51,6 +51,8 @@ export function EditorSidebar({
   activeVersionName,
   onSaveVersion,
   onCreateVersion,
+  notice,
+  onDismissNotice,
 }: {
   project: EditorProject;
   activeSection: EditorSection;
@@ -65,6 +67,10 @@ export function EditorSidebar({
   onRenameProject: (name: string) => void;
   onSaveVersion: () => void;
   onCreateVersion: (name: string) => void;
+  /** Transient status line (save confirmations, errors). Rendered as a small
+   * dismissible chip tucked into the header so it never covers the canvas. */
+  notice: string | null;
+  onDismissNotice: () => void;
 }) {
   const [isCreatingVersion, setIsCreatingVersion] = useState(false);
   const [nextVersionName, setNextVersionName] = useState('');
@@ -230,6 +236,53 @@ export function EditorSidebar({
               }}
             >
               Add
+            </button>
+          </div>
+        ) : null}
+
+        {notice ? (
+          <div
+            data-layout="editorNoticeChip"
+            /* small dismissible status chip tucked under the project header so
+               transient save/error notices live in the sidebar instead of
+               floating over the canvas */
+            style={{
+              marginTop: '0.6rem',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '0.4rem',
+              padding: '0.4rem 0.5rem',
+              borderRadius: '12px',
+              background: 'rgba(255,247,237,0.92)',
+              border: '1px solid rgba(249,115,22,0.22)',
+              color: '#9a3412',
+              fontSize: '0.72rem',
+              lineHeight: 1.3,
+              boxShadow: '0 6px 14px rgba(124,45,18,0.1)',
+            }}
+          >
+            <Sparkles size={13} style={{ flex: '0 0 auto', marginTop: 1, color: '#c2410c' }} />
+            <span style={{ minWidth: 0, flex: '1 1 auto', wordBreak: 'break-word' }}>{notice}</span>
+            <button
+              type="button"
+              onClick={onDismissNotice}
+              aria-label="Dismiss notice"
+              title="Dismiss"
+              style={{
+                flex: '0 0 auto',
+                width: 16,
+                height: 16,
+                borderRadius: '999px',
+                border: 'none',
+                background: 'transparent',
+                color: '#c2410c',
+                display: 'grid',
+                placeItems: 'center',
+                cursor: 'pointer',
+                padding: 0,
+              }}
+            >
+              <X size={12} />
             </button>
           </div>
         ) : null}

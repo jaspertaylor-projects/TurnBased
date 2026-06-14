@@ -24,7 +24,6 @@ import type { EditorProject } from '../editor/types';
 import { DEFAULT_EDITOR_SECTION, SECTION_OPTIONS } from '../editor/constants';
 import type { EditorSection } from '../editor/constants';
 import { readProjectIdFromHash } from '../editor/helpers';
-import { panelStyle, sectionTitleStyle } from '../editor/styles';
 import { EditorSidebar } from '../editor/components/EditorSidebar';
 import { VisualsSection } from '../editor/sections/VisualsSection';
 import { ComponentGallery } from '../editor/sections/ComponentGallery';
@@ -511,6 +510,8 @@ export const Editor = () => {
         activeVersionName={versionGraph.activeBranchName}
         onSaveVersion={handleSaveVersion}
         onCreateVersion={handleCreateVersion}
+        notice={editorNotice}
+        onDismissNotice={() => setEditorNotice(null)}
       />
 
       <div
@@ -529,29 +530,11 @@ export const Editor = () => {
         }}
       >
         {isCanvasSection ? (
-          <>
-            {renderActiveSection()}
-            {editorNotice && activeSection !== 'art' && (
-              <div style={{
-                position: 'absolute',
-                top: 12,
-                left: '50%',
-                transform: 'translateX(-50%)',
-                ...panelStyle,
-                background: 'rgba(255,247,237,0.94)',
-                border: '1px solid rgba(249,115,22,0.18)',
-                zIndex: 100,
-                maxWidth: '60%',
-              }}>
-                <p style={{ ...sectionTitleStyle, marginBottom: '0.25rem', color: '#c2410c' }}>Notice</p>
-                <p style={{ margin: 0, color: '#9a3412' }}>{editorNotice}</p>
-              </div>
-            )}
-          </>
+          renderActiveSection()
         ) : (
           <div style={{
             display: 'grid',
-            gridTemplateRows: 'auto auto minmax(0, 1fr)',
+            gridTemplateRows: 'auto minmax(0, 1fr)',
             gap: '0.85rem',
             padding: '0.75rem 2.5rem 1rem 2.5rem',
             height: '100%',
@@ -563,13 +546,6 @@ export const Editor = () => {
                 {currentSectionMeta.label.toLowerCase()}
               </span>
             </div>
-
-            {editorNotice && (
-              <div style={{ ...panelStyle, background: 'rgba(255,247,237,0.94)', border: '1px solid rgba(249,115,22,0.18)' }}>
-                <p style={{ ...sectionTitleStyle, marginBottom: '0.25rem', color: '#c2410c' }}>Notice</p>
-                <p style={{ margin: 0, color: '#9a3412' }}>{editorNotice}</p>
-              </div>
-            )}
 
             {renderActiveSection()}
           </div>
