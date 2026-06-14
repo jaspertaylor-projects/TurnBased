@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { Compass, Flag, MapPin, Plus, Scroll } from 'lucide-react';
 
 import type { ProjectGitCommitRecord, ProjectGitStatus, ProjectVersionGraph } from '../git';
@@ -33,6 +34,23 @@ function shortSha(value: string | null | undefined): string {
   return value ? value.slice(0, 8) : 'no commit';
 }
 
+/** Tracks the live pixel size of a scroll surface so the terrain can fill the
+ * whole visible map even when the branch graph itself is small. */
+function useSurfaceSize(): [React.RefObject<HTMLDivElement>, { width: number; height: number }] {
+  const ref = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState({ width: 0, height: 0 });
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return undefined;
+    const update = () => setSize({ width: element.clientWidth, height: element.clientHeight });
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+  return [ref, size];
+}
+
 export function VersionsSection({
   gitStatus,
   versionGraph,
@@ -45,21 +63,27 @@ export function VersionsSection({
   onRestoreCommit: (commitSha: string) => void;
 }) {
   const branches = groupCommitsByBranch(versionGraph.commits);
+  const [scrollRef, surfaceSize] = useSurfaceSize();
 
   // Map geometry. Each branch is a trail-lane running left→right; each commit
-  // is a location marker the traveler can walk to. Coordinates feed both the
-  // node layout and the winding trail paths drawn beneath them.
+  // is a location marker the traveller can walk to. The HUD banners float over
+  // the top/bottom, so the trail starts well clear of them.
   const nodePositions = new Map<string, { x: number; y: number }>();
   const rowHeight = 158;
   const colWidth = 178;
   const nodeWidth = 138;
   const nodeHeight = 104;
-  const topPadding = 96;
+  const topPadding = 132;
   const leftPadding = 196;
   const branchRows = Math.max(branches.length, 1);
   const longestBranch = Math.max(1, ...branches.map((branch) => branch.commits.length));
-  const mapWidth = Math.max(720, leftPadding + longestBranch * colWidth + 120);
-  const mapHeight = Math.max(440, topPadding + branchRows * rowHeight + 96);
+  const graphWidth = leftPadding + longestBranch * colWidth + 120;
+  const graphHeight = topPadding + branchRows * rowHeight + 150;
+
+  // The drawable canvas is at least as large as the visible surface so terrain
+  // fills the whole page; it grows past the viewport when the graph is larger.
+  const mapWidth = Math.max(surfaceSize.width || 720, graphWidth);
+  const mapHeight = Math.max(surfaceSize.height || 440, graphHeight);
 
   branches.forEach((branch, branchIndex) => {
     branch.commits.forEach((commit, commitIndex) => {
@@ -86,120 +110,33 @@ export function VersionsSection({
 
   return (
     <div
-      data-layout="versionMapShell"
-      /* version map shell owns a pinned banner header, the scrollable fantasy map, and a pinned footer */
+      data-layout="versionMapSurface"
+      /* the entire section IS the fantasy map: a full-bleed meadow that the
+         HUD banners float over — no nested card framing */
       style={{
-        height: '100%',
+        position: 'relative',
+        flex: '1 1 auto',
         minHeight: 0,
-        display: 'flex',
-        flexDirection: 'column',
+        width: '100%',
         overflow: 'hidden',
-        borderRadius: '18px',
-        border: '1px solid rgba(101,67,33,0.28)',
         background: `
-          radial-gradient(circle at 18% 16%, rgba(214,243,221,0.92), transparent 34%),
-          radial-gradient(circle at 80% 30%, rgba(254,243,199,0.55), transparent 30%),
-          linear-gradient(180deg, rgba(240,253,244,0.96), rgba(187,247,208,0.74) 52%, rgba(22,101,52,0.24))
+          radial-gradient(circle at 16% 18%, rgba(220,252,231,0.95), transparent 38%),
+          radial-gradient(circle at 84% 70%, rgba(190,242,100,0.3), transparent 36%),
+          radial-gradient(circle at 50% 0%, rgba(186,230,253,0.5), transparent 30%),
+          linear-gradient(180deg, rgba(236,253,245,0.98), rgba(190,227,176,0.96) 60%, rgba(150,196,140,0.96))
         `,
-        boxShadow: 'inset 0 0 80px rgba(22,101,52,0.12)',
       }}
     >
       <div
-        data-layout="versionMapHeader"
-        /* banner header reads like a quest title carved over the map */
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '1rem',
-          flexWrap: 'wrap',
-          padding: '0.85rem 1.1rem 0.78rem',
-          borderBottom: '1px solid rgba(101,67,33,0.18)',
-          background: 'linear-gradient(180deg, rgba(255,251,235,0.82), rgba(255,248,225,0.42))',
-          flex: '0 0 auto',
-        }}
-      >
-        <div
-          data-layout="versionMapTitleBlock"
-          /* title block pairs a wax-seal compass mark with the quest line */
-          style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0 }}
-        >
-          <span
-            data-layout="versionMapSeal"
-            /* compass wax-seal medallion anchoring the map identity */
-            style={{
-              width: 34,
-              height: 34,
-              borderRadius: '999px',
-              display: 'grid',
-              placeItems: 'center',
-              color: '#fdf6e3',
-              background: 'radial-gradient(circle at 32% 28%, #b45309, #7c2d12)',
-              boxShadow: '0 6px 14px rgba(124,45,18,0.32), inset 0 -3px 6px rgba(0,0,0,0.25)',
-              flex: '0 0 auto',
-            }}
-          >
-            <Compass size={18} />
-          </span>
-          <div style={{ display: 'grid', gap: '0.12rem', minWidth: 0 }}>
-            <strong style={{ color: '#5b3a16', fontSize: '1.02rem', letterSpacing: '0.01em' }}>The Version Map</strong>
-            <span style={{ color: '#7c5a3a', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '0.32rem' }}>
-              <Flag size={12} /> Trail: {versionGraph.activeBranchName} · Camp {shortSha(versionGraph.activeCommitSha)}
-            </span>
-          </div>
-        </div>
-        <div
-          data-layout="versionMapStatusPill"
-          /* travel-status pill mirrors whether the camp has unsaved footprints */
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.4rem',
-            padding: '0.32rem 0.7rem',
-            borderRadius: '999px',
-            fontSize: '0.78rem',
-            fontWeight: 800,
-            color: gitStatus.hasChanges ? '#9a3412' : '#15803d',
-            background: gitStatus.hasChanges ? 'rgba(251,191,36,0.22)' : 'rgba(187,247,208,0.6)',
-            border: `1px solid ${gitStatus.hasChanges ? 'rgba(180,83,9,0.35)' : 'rgba(21,128,61,0.3)'}`,
-          }}
-        >
-          <MapPin size={13} />
-          {gitStatus.hasChanges
-            ? `${gitStatus.changedPaths.length || 1} unsaved step${gitStatus.changedPaths.length === 1 ? '' : 's'}`
-            : 'Camp secured'}
-        </div>
-      </div>
-
-      <div
+        ref={scrollRef}
         data-layout="versionMapScroll"
-        /* scrollable map body gives long branching trails room without covering footer controls */
-        style={{
-          flex: '1 1 auto',
-          minHeight: 0,
-          overflow: 'auto',
-          padding: '1rem',
-          scrollbarGutter: 'stable',
-        }}
+        /* the only scroll region: pan the map for long branching trails */
+        style={{ position: 'absolute', inset: 0, overflow: 'auto' }}
       >
         <div
           data-layout="versionMapCanvas"
-          /* aged-parchment meadow canvas owns terrain, winding trails, location markers, and the meeple */
-          style={{
-            position: 'relative',
-            width: mapWidth,
-            height: mapHeight,
-            borderRadius: '22px',
-            border: '2px solid rgba(120,80,40,0.4)',
-            overflow: 'hidden',
-            background: `
-              radial-gradient(circle at 16% 20%, rgba(220,252,231,0.95), transparent 36%),
-              radial-gradient(circle at 84% 70%, rgba(190,242,100,0.3), transparent 34%),
-              radial-gradient(circle at 50% 0%, rgba(186,230,253,0.5), transparent 30%),
-              linear-gradient(180deg, rgba(236,253,245,0.96), rgba(190,227,176,0.92) 60%, rgba(150,196,140,0.92))
-            `,
-            boxShadow: 'inset 0 0 0 6px rgba(255,251,235,0.5), inset 0 18px 60px rgba(6,78,59,0.1)',
-          }}
+          /* full-size drawable meadow owning terrain, winding trails, camps, and the meeple */
+          style={{ position: 'relative', width: mapWidth, height: mapHeight }}
         >
           {/* decorative terrain layer sits behind every trail and marker */}
           <FantasyMapDecorations width={mapWidth} height={mapHeight} />
@@ -253,7 +190,7 @@ export function VersionsSection({
               /* themed empty state invites the user to set their first camp */
               style={{
                 position: 'absolute',
-                top: '40%',
+                top: '42%',
                 left: '50%',
                 transform: 'translate(-50%, -50%)',
                 width: 'min(440px, 70%)',
@@ -428,7 +365,7 @@ export function VersionsSection({
                 transform: 'translateX(-50%)',
                 display: 'grid',
                 justifyItems: 'center',
-                zIndex: 9,
+                zIndex: 6,
                 pointerEvents: 'none',
               }}
             >
@@ -462,24 +399,101 @@ export function VersionsSection({
       </div>
 
       <div
-        data-layout="versionMapFooter"
-        /* footer keeps the current camp details and the new-trail action pinned to the viewport */
+        data-layout="versionMapBanner"
+        /* quest-banner HUD floating over the top of the map (does not scroll) */
         style={{
-          flex: '0 0 auto',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: '1rem',
-          padding: '0.78rem 1.1rem 1rem',
-          borderTop: '1px solid rgba(101,67,33,0.18)',
-          background: 'linear-gradient(180deg, rgba(255,251,235,0.5), rgba(255,248,225,0.36))',
+          flexWrap: 'wrap',
+          padding: '0.7rem 1.1rem 1.2rem',
+          background: 'linear-gradient(180deg, rgba(255,251,235,0.92), rgba(255,248,225,0.4) 70%, transparent)',
+          backdropFilter: 'blur(2px)',
+          pointerEvents: 'none',
+        }}
+      >
+        <div
+          data-layout="versionMapTitleBlock"
+          /* title block pairs a wax-seal compass mark with the quest line */
+          style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0, pointerEvents: 'auto' }}
+        >
+          <span
+            data-layout="versionMapSeal"
+            /* compass wax-seal medallion anchoring the map identity */
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: '999px',
+              display: 'grid',
+              placeItems: 'center',
+              color: '#fdf6e3',
+              background: 'radial-gradient(circle at 32% 28%, #b45309, #7c2d12)',
+              boxShadow: '0 6px 14px rgba(124,45,18,0.32), inset 0 -3px 6px rgba(0,0,0,0.25)',
+              flex: '0 0 auto',
+            }}
+          >
+            <Compass size={18} />
+          </span>
+          <div style={{ display: 'grid', gap: '0.12rem', minWidth: 0 }}>
+            <strong style={{ color: '#5b3a16', fontSize: '1.02rem', letterSpacing: '0.01em' }}>The Version Map</strong>
+            <span style={{ color: '#7c5a3a', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '0.32rem' }}>
+              <Flag size={12} /> Trail: {versionGraph.activeBranchName} · Camp {shortSha(versionGraph.activeCommitSha)}
+            </span>
+          </div>
+        </div>
+        <div
+          data-layout="versionMapStatusPill"
+          /* travel-status pill mirrors whether the camp has unsaved footprints */
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.4rem',
+            padding: '0.32rem 0.7rem',
+            borderRadius: '999px',
+            fontSize: '0.78rem',
+            fontWeight: 800,
+            pointerEvents: 'auto',
+            color: gitStatus.hasChanges ? '#9a3412' : '#15803d',
+            background: gitStatus.hasChanges ? 'rgba(251,191,36,0.32)' : 'rgba(187,247,208,0.7)',
+            border: `1px solid ${gitStatus.hasChanges ? 'rgba(180,83,9,0.4)' : 'rgba(21,128,61,0.35)'}`,
+            boxShadow: '0 4px 12px rgba(92,58,22,0.12)',
+          }}
+        >
+          <MapPin size={13} />
+          {gitStatus.hasChanges
+            ? `${gitStatus.changedPaths.length || 1} unsaved step${gitStatus.changedPaths.length === 1 ? '' : 's'}`
+            : 'Camp secured'}
+        </div>
+      </div>
+
+      <div
+        data-layout="versionMapHud"
+        /* current-camp + new-version HUD floating over the bottom of the map (does not scroll) */
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '1rem',
+          padding: '1.3rem 1.1rem 0.85rem',
+          background: 'linear-gradient(0deg, rgba(255,251,235,0.92), rgba(255,248,225,0.4) 70%, transparent)',
+          backdropFilter: 'blur(2px)',
+          pointerEvents: 'none',
         }}
       >
         {activeCommit ? (
           <div
             data-layout="versionActiveCamp"
             /* current-camp summary explains where the traveler is standing */
-            style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: '0.55rem', color: '#5b3a16' }}
+            style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: '0.55rem', color: '#5b3a16', pointerEvents: 'auto' }}
           >
             <MapPin size={16} color="#b45309" />
             <div style={{ minWidth: 0, display: 'grid', gap: '0.12rem' }}>
@@ -495,7 +509,7 @@ export function VersionsSection({
           <div
             data-layout="versionActiveCampEmpty"
             /* empty footer message appears before the first camp exists */
-            style={{ color: '#7c5a3a', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+            style={{ color: '#7c5a3a', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '0.4rem', pointerEvents: 'auto' }}
           >
             <Scroll size={15} /> No camp set yet
           </div>
@@ -504,7 +518,7 @@ export function VersionsSection({
         <button
           type="button"
           onClick={() => {
-            const branchName = window.prompt('Name this new trail (version branch)');
+            const branchName = window.prompt('Name this new version');
             if (branchName?.trim()) onCreateVersion(branchName);
           }}
           style={{
@@ -519,11 +533,12 @@ export function VersionsSection({
             padding: '0.6rem 1rem',
             fontWeight: 900,
             cursor: 'pointer',
+            pointerEvents: 'auto',
             boxShadow: '0 12px 24px rgba(124,45,18,0.24)',
           }}
         >
           <Plus size={15} />
-          Blaze new trail
+          New version
         </button>
       </div>
     </div>

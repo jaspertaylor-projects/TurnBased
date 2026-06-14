@@ -529,7 +529,7 @@ export const Editor = () => {
           boxSizing: 'border-box',
         }}
       >
-        {isCanvasSection ? (
+        {isCanvasSection || activeSection === 'versions' ? (
           renderActiveSection()
         ) : (
           <div style={{
