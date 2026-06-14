@@ -13,7 +13,6 @@ import {
   updateProjectArt,
   appendBriefList,
   updateProjectBrief,
-  updateProjectDescription,
   updateProjectRules,
   updateProjectSettings,
 } from '../editor/project';
@@ -35,7 +34,14 @@ import { ArtSection, STUDIO_BG_VALUE } from '../editor/sections/ArtSection';
 import { RulesSection } from '../editor/sections/RulesSection';
 import { StatsSection } from '../editor/sections/StatsSection';
 import type { BuiltInComponentType, ComponentInstanceModel } from '@turnbased/engine-components';
-import { commitProjectVersion, getProjectGitStatus, listProjectGitCommits, restoreProjectFromCommit } from '../editor/git';
+import type { CatalogComponentSelection } from '../editor/sections/rules/ComponentPicker';
+import {
+  commitActiveProjectVersion,
+  createProjectVersionBranch,
+  getProjectGitStatus,
+  getProjectVersionGraph,
+  restoreProjectFromCommit,
+} from '../editor/git';
 import { createWorkspaceFiles } from '../editor/shipping';
 import { saveProjectWorkspace } from '../editor/workspace';
 import { GrassBackdrop } from '../components/GrassBackdrop';
@@ -43,16 +49,6 @@ import { GrassBackdrop } from '../components/GrassBackdrop';
 const GRASS_BACKDROP_HEIGHT = 55;
 
 const PENDING_EDITOR_NOTICE_KEY = 'turnbased.creator.pendingEditorNotice';
-const SUPPORT_ZONE_COMPONENT_TYPES = new Set([
-  'space',
-  'zone',
-  'track',
-  'deck',
-  'hand',
-  'discard',
-  'bag',
-  'score-track',
-]);
 
 // Component types that represent physical, designable game objects.
 // These appear in the Component Gallery. `tile` and `deck` are now authorable
@@ -93,7 +89,6 @@ export const Editor = () => {
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
   const [paletteOwnerId] = useState<string | null>('player_one');
   const [editorNotice, setEditorNotice] = useState<string | null>(null);
-  const [commitMessage, setCommitMessage] = useState('Checkpoint workspace');
 
   useEffect(() => {
     const syncRoute = () => {
@@ -169,18 +164,46 @@ export const Editor = () => {
   const currentProject = project;
   const currentRuntime = runtime;
   const currentSectionMeta = SECTION_OPTIONS.find((section) => section.id === activeSection) ?? SECTION_OPTIONS[0];
-  const boardInstances = currentProject.rootInstanceIds.filter((instanceId) => currentProject.instances[instanceId]?.componentType === 'board');
-  const topLevelSupportZones = currentProject.rootInstanceIds.filter((instanceId) => {
-    const componentType = currentProject.instances[instanceId]?.componentType;
-    return componentType ? SUPPORT_ZONE_COMPONENT_TYPES.has(componentType) : false;
-  });
   const componentOutlineIds = listComponentOutlineIds(currentProject);
   const gitStatus = getProjectGitStatus(currentProject, currentRuntime);
-  const gitHistory = listProjectGitCommits(currentProject.id);
+  const versionGraph = getProjectVersionGraph(currentProject.id);
 
   function commitProject(nextProject: EditorProject) {
     setProject(nextProject);
     setEditorNotice(null);
+  }
+
+  async function handleSaveVersion() {
+    try {
+      const result = await commitActiveProjectVersion(currentProject, currentRuntime);
+      if (result.project !== currentProject) {
+        setProject(result.project);
+      }
+      setEditorNotice(
+        result.remoteError
+          ? `Saved locally. Remote sync is unavailable right now: ${result.remoteError}`
+          : `Saved ${result.commit.message}.`,
+      );
+    } catch (error) {
+      setEditorNotice(error instanceof Error ? error.message : 'Unable to save this version.');
+    }
+  }
+
+  async function handleCreateVersion(branchName: string) {
+    try {
+      const result = await createProjectVersionBranch(currentProject, currentRuntime, branchName);
+      if (result.project !== currentProject) {
+        setProject(result.project);
+      }
+      setActiveSection('versions');
+      setEditorNotice(
+        result.remoteError
+          ? `Created "${branchName}" locally. Remote sync is unavailable right now: ${result.remoteError}`
+          : `Created "${branchName}".`,
+      );
+    } catch (error) {
+      setEditorNotice(error instanceof Error ? error.message : 'Unable to create that version branch.');
+    }
   }
 
   function handleAddComponent(
@@ -222,6 +245,54 @@ export const Editor = () => {
     return result.instanceId ?? null;
   }
 
+  function handleAddCatalogComponent(selection: CatalogComponentSelection) {
+    handleAddComponent(selection.type, null, {
+      focusNewComponent: false,
+      initializeComponent: (instance) => ({
+        ...instance,
+        displayName: selection.componentName,
+        notes: selection.gameDescription,
+        properties: {
+          ...instance.properties,
+          label: selection.componentName,
+          catalogSlug: selection.productSlug,
+          catalogVariantId: selection.variantId,
+          catalogProductTitle: selection.productTitle,
+          catalogVariantTitle: selection.variantTitle,
+          ...(selection.physicalWidthMm ? { physicalWidthMm: selection.physicalWidthMm } : {}),
+          ...(selection.physicalHeightMm ? { physicalHeightMm: selection.physicalHeightMm } : {}),
+          ...(selection.maxCards ? { maxCards: selection.maxCards } : {}),
+        },
+      }),
+    });
+  }
+
+  function handleUpdateCatalogComponent(instanceId: string, selection: CatalogComponentSelection) {
+    const current = currentProject.instances[instanceId];
+    if (!current) return;
+    if (current.componentType !== selection.type) {
+      setEditorNotice('Choose a catalog item from the same component genre.');
+      return;
+    }
+
+    updateComponent(instanceId, (instance) => ({
+      ...instance,
+      displayName: selection.componentName,
+      notes: selection.gameDescription,
+      properties: {
+        ...instance.properties,
+        label: selection.componentName,
+        catalogSlug: selection.productSlug,
+        catalogVariantId: selection.variantId,
+        catalogProductTitle: selection.productTitle,
+        catalogVariantTitle: selection.variantTitle,
+        ...(selection.physicalWidthMm ? { physicalWidthMm: selection.physicalWidthMm } : {}),
+        ...(selection.physicalHeightMm ? { physicalHeightMm: selection.physicalHeightMm } : {}),
+        ...(selection.maxCards ? { maxCards: selection.maxCards } : {}),
+      },
+    }));
+  }
+
   function updateComponent(
     instanceId: string,
     updater: (instance: ComponentInstanceModel) => ComponentInstanceModel,
@@ -242,12 +313,6 @@ export const Editor = () => {
     options: {
       targetParentId?: string | null;
       focus?: boolean;
-      // Offset applied to the new clone's frame.x/y so a pasted copy doesn't
-      // sit exactly on top of the original. Applied inline so the duplicate
-      // and the frame nudge commit atomically in a single project update —
-      // otherwise a follow-up updateComponent call reads a stale
-      // currentProject (React state hasn't flushed yet) and clobbers the
-      // duplicate.
       frameOffset?: { x: number; y: number };
     } = {},
   ): string | null {
@@ -281,9 +346,6 @@ export const Editor = () => {
   }
 
   function openComponentEditor() {
-    // Clicking "component editor" in the sidebar always lands the user on the
-    // intermediate gallery view — `selectedComponentId = null` triggers the
-    // gallery in `renderActiveSection` (see the `component_editor` case).
     setActiveSection('component_editor');
     setSelectedComponentId(null);
   }
@@ -313,10 +375,8 @@ export const Editor = () => {
               ...brief,
               artStyle: appendBriefList(brief.artStyle, style),
             })))}
-            /* Catalog picks made from the rulebook reuse the same gallery
-               add path so a picked board / deck / tile shows up in the
-               Component Editor with its standard default placement. */
-            onAddCatalogComponent={(type) => { handleAddComponent(type, null, { focusNewComponent: false }); }}
+            onAddCatalogComponent={handleAddCatalogComponent}
+            onUpdateCatalogComponent={handleUpdateCatalogComponent}
             onUpdateInstanceNotes={(instanceId, notes) => updateComponent(instanceId, (instance) => ({
               ...instance,
               notes,
@@ -326,6 +386,10 @@ export const Editor = () => {
               displayName,
             }))}
             onRemoveInstance={removeComponent}
+            onUpdateIconDescription={(iconId, description) => commitProject(updateProjectArt(currentProject, (art) => ({
+              ...art,
+              icons: art.icons.map((icon) => icon.id === iconId ? { ...icon, description } : icon),
+            })))}
           />
         );
       case 'stats':
@@ -333,6 +397,7 @@ export const Editor = () => {
           <StatsSection
             project={currentProject}
             onUpdateBrief={(updater) => commitProject(updateProjectBrief(currentProject, updater))}
+            onRenameProject={(name) => commitProject(renameProject(currentProject, name))}
           />
         );
       case 'art':
@@ -370,25 +435,8 @@ export const Editor = () => {
         return (
           <VersionsSection
             gitStatus={gitStatus}
-            gitHistory={gitHistory}
-            commitMessage={commitMessage}
-            onCommitMessageChange={setCommitMessage}
-            onCreateCommit={async () => {
-              try {
-                const result = await commitProjectVersion(currentProject, currentRuntime, commitMessage);
-                if (result.project !== currentProject) {
-                  setProject(result.project);
-                }
-                setCommitMessage('Checkpoint workspace');
-                setEditorNotice(
-                  result.remoteError
-                    ? `Workspace committed locally. Remote sync is unavailable right now: ${result.remoteError}`
-                    : 'Workspace committed to version history.',
-                );
-              } catch (error) {
-                setEditorNotice(error instanceof Error ? error.message : 'Unable to create a version checkpoint.');
-              }
-            }}
+            versionGraph={versionGraph}
+            onCreateVersion={handleCreateVersion}
             onRestoreCommit={(commitSha) => {
               try {
                 const restoredProject = restoreProjectFromCommit(currentProject.id, commitSha);
@@ -410,10 +458,6 @@ export const Editor = () => {
         );
       case 'component_editor':
       default:
-        // Intermediate gallery view: shown whenever no component is selected.
-        // Selecting a card (or creating a new component) calls back into
-        // `selectComponent` / `createTopLevelComponent`, which set
-        // `selectedComponentId` and drop us into the per-component editor.
         if (!resolvedSelectedComponentId) {
           return (
             <ComponentGallery
@@ -447,11 +491,6 @@ export const Editor = () => {
     }
   }
 
-  // For canvas-based sections (component editor, art, rules), the page
-  // container must stretch children to fill the full viewport height and
-  // avoid wrapping. Rules joins this list so the rulebook spread can fill
-  // the available viewport height rather than being squeezed by the
-  // non-canvas grid wrapper.
   const isCanvasSection = activeSection === 'component_editor' || activeSection === 'art' || activeSection === 'rules';
 
   return (
@@ -467,20 +506,13 @@ export const Editor = () => {
         project={currentProject}
         activeSection={activeSection}
         setActiveSection={setActiveSection}
-        boardCount={boardInstances.length}
-        supportZoneCount={topLevelSupportZones.length}
-        componentCount={Object.keys(currentProject.instances).length}
         onOpenComponentEditor={openComponentEditor}
         onRenameProject={(name) => commitProject(renameProject(currentProject, name))}
-        onUpdateDescription={(description) => commitProject(updateProjectDescription(currentProject, description))}
+        activeVersionName={versionGraph.activeBranchName}
+        onSaveVersion={handleSaveVersion}
+        onCreateVersion={handleCreateVersion}
       />
 
-      {/* editorViewport — single container for ALL section content (canvas and non-canvas).
-          Everything that isn't the navbar or the sidebar renders inside this div.
-          The viewport reserves bottom padding so the persistent GrassBackdrop at
-          the bottom of the editor doesn't cover section content. The grass is
-          absolutely positioned, so the reserved padding is the space sections
-          can't draw into. */}
       <div
         id="editor-viewport"
         data-layout="editorViewport"
