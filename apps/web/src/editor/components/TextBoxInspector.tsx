@@ -4,7 +4,7 @@ import type { PaletteColorOption } from '@turnbased/engine-ui';
 
 import { NumericInput } from '../../components/NumericInput';
 import { resolveProjectPaletteColorValue } from '../projectPalette';
-import { inputStyle, labelStyle } from '../styles';
+import { tabletopField as inputStyle, tabletopLabel as labelStyle } from '../theme/tabletop';
 import type { EditorProject } from '../types';
 import { InspectorAccordion, InspectorColorField } from './InspectorControls';
 import {

@@ -9,7 +9,7 @@ import type {
 import { createPlayerId } from '@turnbased/shared-types';
 
 import { InspectorAccordion, InspectorAppearanceControls } from '../../components/InspectorControls';
-import { labelStyle, textareaStyle } from '../../styles';
+import { tabletopLabel as labelStyle, tabletopTextarea as textareaStyle } from '../../theme/tabletop';
 import type { EditorProject } from '../../types';
 import type { listProjectPaletteOptions } from '../../projectPalette';
 import { formatLength } from '../../units';

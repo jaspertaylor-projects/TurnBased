@@ -527,11 +527,17 @@ export const Editor = () => {
   return (
     <div className="editor-shell" style={{
       display: 'grid',
-      gridTemplateColumns: '236px minmax(0, 1fr)',
+      gridTemplateColumns: '232px minmax(0, 1fr)',
       height: '100%',
       minHeight: 0,
       overflow: 'hidden',
-      background: activeSection === 'art' ? STUDIO_BG_VALUE : ambientRoom,
+      // The walnut "lamplit room" backdrop is reserved for the component
+      // editor — every other section keeps its own cozy feel.
+      background: activeSection === 'art'
+        ? STUDIO_BG_VALUE
+        : activeSection === 'component_editor'
+          ? ambientRoom
+          : undefined,
     }}>
       <EditorSidebar
         project={currentProject}

@@ -9,7 +9,7 @@ import type {
   GridCellCoordinate,
 } from '@turnbased/engine-components';
 
-import { inputStyle } from '../../styles';
+import { tabletopField as inputStyle } from '../../theme/tabletop';
 import {
   buildImageFilterCss,
   buildImageTintStyle,

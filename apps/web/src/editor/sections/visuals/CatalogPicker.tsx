@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type { ComponentInstanceModel } from '@turnbased/engine-components';
 
-import { labelStyle } from '../../styles';
+import { tabletopLabel as labelStyle } from '../../theme/tabletop';
 import {
   extractDeckSizeOptions,
   extractShapes,

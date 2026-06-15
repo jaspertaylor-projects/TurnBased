@@ -23,7 +23,7 @@ import {
   isBoardGridComponentType,
 } from '../../boardLayout';
 import { resolveBoardGridLayout } from '@turnbased/engine-ui';
-import { labelStyle, textareaStyle } from '../../styles';
+import { tabletopLabel as labelStyle, tabletopTextarea as textareaStyle } from '../../theme/tabletop';
 import type { EditorProject } from '../../types';
 import type { listProjectPaletteOptions } from '../../projectPalette';
 import { compactInputStyle, getPresetFamily } from './boardEditorUtils';

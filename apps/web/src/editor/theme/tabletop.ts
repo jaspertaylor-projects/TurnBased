@@ -5,9 +5,13 @@
  * cards, brass fittings, ink) so the editor reads as one crafted object instead
  * of a web form.
  *
- * Keep new editor chrome referencing these tokens rather than hard-coding
- * hexes, so a palette tweak propagates everywhere.
+ * SCOPE: this material language is intentionally confined to the **component
+ * editor**. Other editor sections keep the cozy-forest palette (see
+ * `editor/styles.ts`). When styling component-editor inspectors, use the
+ * `tabletop*` CSSProperties exports at the bottom of this file instead of the
+ * shared cozy primitives.
  */
+import type { CSSProperties } from 'react';
 
 export const tabletop = {
   // ── Wood (desk / frame / sidebar) ──────────────────────────────────
@@ -112,3 +116,60 @@ export const ambientRoom = `
 export const cardShadow = '0 2px 4px rgba(36,22,8,0.18), 0 14px 30px rgba(36,22,8,0.28)';
 /** Inset shadow for "carved into wood / sunken field" inputs. */
 export const sunkenShadow = 'inset 0 1px 2px rgba(36,22,8,0.22), inset 0 0 0 1px rgba(255,255,255,0.35)';
+
+// ── Component-editor inspector styles (parchment + brass + ink) ───────
+// These mirror the shape of the cozy primitives in editor/styles.ts but in
+// the tabletop material language. Component-editor inspector files import
+// them (often aliased to inputStyle/labelStyle/etc.) so the rest of the app
+// keeps its cozy look.
+
+export const tabletopPanel: CSSProperties = {
+  background: parchmentSurface,
+  border: `1px solid ${tabletop.parchment.edge}`,
+  borderRadius: '16px',
+  boxShadow: cardShadow,
+  padding: '1rem',
+};
+
+export const tabletopSectionTitle: CSSProperties = {
+  fontSize: '0.72rem',
+  fontWeight: 800,
+  letterSpacing: '0.14em',
+  textTransform: 'uppercase',
+  color: tabletop.brass.deep,
+  margin: '0 0 0.7rem 0',
+};
+
+export const tabletopLabel: CSSProperties = {
+  display: 'grid',
+  gap: '0.35rem',
+  color: tabletop.ink.soft,
+  fontSize: '0.82rem',
+  fontWeight: 600,
+};
+
+export const tabletopField: CSSProperties = {
+  width: '100%',
+  padding: '0.72rem 0.82rem',
+  borderRadius: '10px',
+  border: `1px solid ${tabletop.parchment.edge}`,
+  boxSizing: 'border-box',
+  color: tabletop.ink.strong,
+  backgroundColor: tabletop.parchment.sunken,
+  boxShadow: sunkenShadow,
+  fontWeight: 600,
+};
+
+export const tabletopTextarea: CSSProperties = {
+  ...tabletopField,
+  minHeight: '92px',
+  resize: 'vertical',
+  fontWeight: 500,
+  lineHeight: 1.5,
+};
+
+export const tabletopMuted: CSSProperties = {
+  margin: 0,
+  color: tabletop.ink.soft,
+  lineHeight: 1.6,
+};

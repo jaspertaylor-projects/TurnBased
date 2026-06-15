@@ -12,7 +12,7 @@ import {
 import type { PaletteColorOption } from '@turnbased/engine-ui';
 
 import { NumericInput } from '../../components/NumericInput';
-import { inputStyle, labelStyle } from '../styles';
+import { tabletopField as inputStyle, tabletopLabel as labelStyle } from '../theme/tabletop';
 import type { EditorImageAsset, EditorProject } from '../types';
 import { AIImageGenerationModal, type GeneratedImageAssetPayload } from './AIImageGenerationModal';
 import { buildImagePromptContextOptions } from './imagePromptContext';

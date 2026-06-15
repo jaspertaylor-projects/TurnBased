@@ -6,8 +6,7 @@ import type { BoardSurfaceTextureId } from '@turnbased/engine-components';
 import { ProjectColorPicker, getBoardSurfaceTextureStyle } from '@turnbased/engine-ui';
 import type { PaletteColorOption } from '@turnbased/engine-ui';
 
-import { inputStyle, labelStyle } from '../styles';
-import { tabletop } from '../theme/tabletop';
+import { tabletop, tabletopField as inputStyle, tabletopLabel as labelStyle } from '../theme/tabletop';
 
 interface InspectorAccordionProps {
   title: string;

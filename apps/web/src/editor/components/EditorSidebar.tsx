@@ -9,7 +9,6 @@ import type { LucideIcon } from 'lucide-react';
 import { SECTION_OPTIONS } from '../constants';
 import type { EditorSection } from '../constants';
 import { panelStyle } from '../styles';
-import { tabletop } from '../theme/tabletop';
 import type { EditorProject } from '../types';
 
 const SECTION_ICONS: Record<EditorSection, LucideIcon> = {
@@ -39,30 +38,23 @@ function SectionButton({
       style={{
         position: 'relative',
         textAlign: 'left',
-        padding: '0.5rem 0.6rem 0.5rem 0.7rem',
-        borderRadius: '11px',
-        border: active ? `1px solid ${tabletop.brass.base}` : '1px solid transparent',
-        background: active
-          ? 'linear-gradient(180deg, rgba(216,185,119,0.32), rgba(184,146,78,0.18))'
-          : 'transparent',
-        color: active ? tabletop.ink.strong : tabletop.ink.soft,
+        padding: '0.5rem 0.6rem 0.5rem 0.6rem',
+        borderRadius: '12px',
+        border: 'none',
+        background: active ? 'rgba(16,185,129,0.14)' : 'transparent',
+        color: active ? '#064e3b' : '#0f766e',
         display: 'flex',
         alignItems: 'center',
         gap: '0.55rem',
         fontSize: '0.9rem',
-        fontWeight: active ? 800 : 600,
+        fontWeight: active ? 700 : 500,
         minWidth: 0,
         cursor: 'pointer',
-        boxShadow: active ? 'inset 0 1px 0 rgba(255,255,255,0.4)' : 'none',
       }}
-      onMouseEnter={(e) => { if (!active) (e.currentTarget as HTMLElement).style.background = 'rgba(184,146,78,0.10)'; }}
+      onMouseEnter={(e) => { if (!active) (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.07)'; }}
       onMouseLeave={(e) => { if (!active) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
     >
-      {/* brass rail marks the active section like a tab on a binder */}
-      {active ? (
-        <span aria-hidden style={{ position: 'absolute', left: 0, top: 6, bottom: 6, width: 3, borderRadius: 999, background: tabletop.brass.deep }} />
-      ) : null}
-      <Icon size={16} style={{ flexShrink: 0, color: active ? tabletop.brass.deep : tabletop.ink.faint }} />
+      <Icon size={16} style={{ flexShrink: 0, color: active ? '#0f766e' : '#14b8a6' }} />
       <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
         {label.toLowerCase()}
       </span>
@@ -146,8 +138,8 @@ export function EditorSidebar({
         borderLeft: 'none',
         borderTop: 'none',
         borderBottom: 'none',
-        borderRight: `2px solid ${tabletop.brass.deep}`,
-        boxShadow: '6px 0 18px rgba(36,22,8,0.22)',
+        borderRight: '1px solid rgba(15,118,110,0.12)',
+        boxShadow: 'none',
       }}
     >
       <div
@@ -157,7 +149,7 @@ export function EditorSidebar({
           position: 'relative',
           marginBottom: '0.7rem',
           paddingBottom: '0.68rem',
-          borderBottom: `1px solid ${tabletop.parchment.edge}`,
+          borderBottom: '1px solid rgba(15,118,110,0.12)',
         }}
       >
         <div

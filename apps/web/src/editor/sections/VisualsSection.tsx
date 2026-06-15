@@ -542,7 +542,7 @@ export function VisualsSection({
 
   return (
     // visualsSectionRoot — top bar + two-column grid (canvas + inspector)
-    <div data-layout="visualsSectionRoot" style={{ display: 'grid', gridTemplateRows: 'auto minmax(0, 1fr)', gap: 10, height: '100%', minHeight: 0, overflow: 'hidden', padding: '10px 16px 14px 14px', boxSizing: 'border-box' }}>
+    <div data-layout="visualsSectionRoot" className="tabletop-surface" style={{ display: 'grid', gridTemplateRows: 'auto minmax(0, 1fr)', gap: 10, height: '100%', minHeight: 0, overflow: 'hidden', padding: '10px 16px 14px 14px', boxSizing: 'border-box' }}>
       {/* componentEditorTopBar — label on left, view toggles on right */}
       <div data-layout="componentEditorTopBar" style={{
         display: 'flex',

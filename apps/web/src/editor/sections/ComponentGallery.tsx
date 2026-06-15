@@ -278,7 +278,7 @@ interface ComponentGalleryProps {
 
 export function ComponentGallery({ project, componentOutlineIds, onSelectComponent, onCreateComponent }: ComponentGalleryProps) {
   return (
-    <div data-layout="componentGalleryPage" /* intermediate view between sidebar and per-component editor */ style={pageStyle}>
+    <div data-layout="componentGalleryPage" className="tabletop-surface" /* intermediate view between sidebar and per-component editor */ style={pageStyle}>
       <div data-layout="componentGalleryHeading" style={headingRowStyle}>
         <div>
           <div style={{ color: tabletop.brass.light, fontSize: '0.74rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.16em' }}>Component Editor</div>

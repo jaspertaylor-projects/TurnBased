@@ -15,8 +15,7 @@ import { renderComponentIcon } from '../../componentMeta';
 import { InspectorAccordion, InspectorAppearanceControls } from '../../components/InspectorControls';
 import { BOARD_SURFACE_HEIGHT, BOARD_SURFACE_WIDTH } from '../../boardLayout';
 import type { CanonicalGeometry } from '../../boardLayout';
-import { mutedTextStyle } from '../../styles';
-import { tabletop, parchmentSurface, woodBar } from '../../theme/tabletop';
+import { tabletop, parchmentSurface, woodBar, tabletopMuted as mutedTextStyle } from '../../theme/tabletop';
 import type { EditorProject } from '../../types';
 import type { listProjectPaletteOptions } from '../../projectPalette';
 
