@@ -166,6 +166,40 @@ over one-off Playwright snippets.
   - The local dev login is `dev@turnbased.local` / `dev-local-only`; the
     persistent Codex profile lives under `.playwright-codex/chrome-profile`.
 
+### Editor restores the committed version snapshot, not raw localStorage
+
+When verifying the editor in a browser, the editor restores the project from the
+committed **version snapshot** (e.g. "initial musings"), NOT directly from the
+raw `localStorage` key `turnbased.creator.projects`.
+
+- **Why:** seeding a project/component into `localStorage` while the editor is
+  already mounted shows nothing — neither new instances nor changed property
+  values appear, and even a full reload restores the snapshot. This wasted real
+  debugging time during the image-component work until the cause was found.
+- **How to apply:**
+  - Seed into storage BEFORE the editor first loads the project, or (more
+    reliable) add/edit through the real UI — the board's "Add Subcomponent →
+    Text / Image" buttons, inspector controls, drag/resize all autosave and
+    render correctly.
+  - Vite serves app modules as source: import factories in the page for setup,
+    e.g. `await import('/src/editor/project.ts')` (`createBlankProject`,
+    `addProjectComponent`) and `'/src/editor/storage.ts'`.
+  - The board is `KonvaBoardSurface` (`window.Konva.stages[0]`) under the
+    `component_editor` tab; open it by clicking a component gallery card. Konva
+    drag/resize via synthetic events needs ~80ms after mousedown before the
+    mousemoves — the window listener attaches in a React effect post-commit.
+
+### Board image + text components have dedicated inspectors
+
+The board's `image-area` and `text-box` leaves use dedicated inspectors
+(`editor/components/ImageInspector.tsx`, `TextBoxInspector.tsx`) wired into
+`BoardItemInspector`, not the generic property grid. Image styling is resolved
+through the shared `editor/components/imageAreaStyle.ts` so the canvas render and
+inspector preview match. Image sources are upload/drop/paste + Art library + AI
+generate (deliberately no raw-URL field). The Konva surface draws 8-point
+selection handles (`RESIZE_HANDLE_SPECS`); arrows nudge, Alt+arrows resize, Shift
+on a corner locks aspect. See `.agents/architecture.md` §4 for the full map.
+
 ---
 
 ## Maintenance

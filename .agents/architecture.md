@@ -141,6 +141,26 @@ manifest (in `engine-components`), the editor inspector (in
 `editor/sections/visuals/`), and the runtime expansion logic
 (`editor/runtime.ts`) must all be updated together.
 
+**Leaf authoring inspectors.** Rich leaf types get a dedicated inspector
+component rendered by `BoardItemInspector` instead of the generic property
+grid:
+
+- `editor/components/ImageInspector.tsx` (`image-area`) — image sources
+  (upload / drag-drop / paste, project Art library, AI generate via
+  `AIImageGenerationModal`) plus fit + focal-point crop, opacity, corner
+  radius, shadow, filters/tint. Styling is resolved through the shared
+  `editor/components/imageAreaStyle.ts` so the board render
+  (`renderImageAreaContent`) and the inspector preview stay identical.
+- `editor/components/TextBoxInspector.tsx` (`text-box`) — typography
+  (thematic fonts loaded in `index.css`, weight, letter-spacing, alignment,
+  inset) + project-icon insertion.
+
+**Canvas manipulation.** The Konva board surface (`packages/engine-ui`)
+draws an 8-point selection frame on the selected item (`RESIZE_HANDLE_SPECS`
++ `KonvaResizeHandles`). Handle presses call `onResizeHandle`, routed through
+`useBoardInteraction.handleBoardItemPointerDown` with forced edges. Keyboard:
+arrows nudge (Shift ×10), Alt+arrows resize, Shift on a corner locks aspect.
+
 ## 5. AI builder integration
 
 `Build with AI` posts the user's pre-build brief to a Supabase edge function
