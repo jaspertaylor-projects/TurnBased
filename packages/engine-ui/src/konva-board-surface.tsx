@@ -81,12 +81,13 @@ const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 40;
 /** Physical bleed margin in mm — matches supplier spec (36/300 inch). */
 const CLIP_BLEED_MM = (36 / 300) * 25.4;
-/** At zoom=1 the board fills this fraction of the viewport. Leaves room
- *  around the board for the bleed hatch area and optional ruler strips. */
-const FIT_PADDING = 0.86;
-const TOOLBAR_H = 34;
-const SCROLLBAR_THICKNESS = 7;
-const SCROLLBAR_INSET = 4;
+/** At zoom=1 the board fills this fraction of the safe area (leaving room for
+ *  the bleed hatch + optional rulers). Exported so the editor's pointer-mapping
+ *  and centering math stays in lockstep with the render. */
+export const FIT_PADDING = 0.86;
+export const TOOLBAR_H = 34;
+export const SCROLLBAR_THICKNESS = 7;
+export const SCROLLBAR_INSET = 4;
 /** Extra scroll room beyond board edges, as fraction of viewport size. */
 const PAN_OVERRUN = 0.4;
 

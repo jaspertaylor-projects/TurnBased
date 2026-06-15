@@ -1,5 +1,6 @@
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import type { ComponentInstanceModel } from '@turnbased/engine-components';
+import { FIT_PADDING, TOOLBAR_H, SCROLLBAR_THICKNESS, SCROLLBAR_INSET } from '@turnbased/engine-ui';
 
 import {
   BOARD_SURFACE_HEIGHT,
@@ -8,6 +9,11 @@ import {
   isLeafComponentType,
   isMovableComponentType,
 } from '../../boardLayout';
+
+// Safe-area insets, kept identical to KonvaBoardSurface so pointer-mapping and
+// centering match the actual render exactly.
+const SAFE_RIGHT_INSET = SCROLLBAR_THICKNESS + SCROLLBAR_INSET * 2;
+const SAFE_BOTTOM_INSET = TOOLBAR_H + SCROLLBAR_THICKNESS + SCROLLBAR_INSET * 2;
 import type { CanonicalGeometry } from '../../boardLayout';
 import { getResizeEdgesForBox } from './boardEditorUtils';
 
@@ -117,12 +123,9 @@ export function getEffectiveScale(
   // Must match KonvaBoardSurface's safe-area math: it reserves space for
   // the bottom toolbar + horizontal scrollbar and the right vertical
   // scrollbar, then fits the board inside safeW x safeH at FIT_PADDING.
-  const FIT_PAD = 0.70;
-  const SAFE_RIGHT_INSET = 14 + 4 * 2;
-  const SAFE_BOTTOM_INSET = 34 + 14 + 4 * 2;
   const safeW = Math.max(1, viewportMetrics.width - SAFE_RIGHT_INSET);
   const safeH = Math.max(1, viewportMetrics.height - SAFE_BOTTOM_INSET);
-  const bs = Math.min((safeW * FIT_PAD) / boardRenderWidth, (safeH * FIT_PAD) / boardRenderHeight);
+  const bs = Math.min((safeW * FIT_PADDING) / boardRenderWidth, (safeH * FIT_PADDING) / boardRenderHeight);
   const eff = bs * zoom;
   return { scale: eff, originX: viewportMetrics.left + panX, originY: viewportMetrics.top + panY };
 }
@@ -254,11 +257,9 @@ export function computeCenteredPan(
   boardRenderWidth: number,
   boardRenderHeight: number,
 ): { panX: number; panY: number } {
-  const SAFE_RIGHT_INSET = 14 + 4 * 2;
-  const SAFE_BOTTOM_INSET = 34 + 14 + 4 * 2;
   const safeW = Math.max(1, viewportMetrics.width - SAFE_RIGHT_INSET);
   const safeH = Math.max(1, viewportMetrics.height - SAFE_BOTTOM_INSET);
-  const bs = Math.min((safeW * 0.70) / boardRenderWidth, (safeH * 0.70) / boardRenderHeight);
+  const bs = Math.min((safeW * FIT_PADDING) / boardRenderWidth, (safeH * FIT_PADDING) / boardRenderHeight);
   return {
     panX: (safeW - boardRenderWidth * bs) / 2,
     // Center within the full viewport height (not just safe area) so the

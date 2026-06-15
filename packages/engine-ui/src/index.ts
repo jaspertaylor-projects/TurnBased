@@ -32,6 +32,10 @@ export {
 } from './board-surface';
 export {
   KonvaBoardSurface,
+  FIT_PADDING,
+  TOOLBAR_H,
+  SCROLLBAR_THICKNESS,
+  SCROLLBAR_INSET,
 } from './konva-board-surface';
 export {
   getBoardSurfaceTextureStyle,
