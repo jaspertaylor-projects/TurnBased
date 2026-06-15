@@ -69,6 +69,9 @@ export interface UseBoardInteractionResult {
     event: ReactMouseEvent<HTMLDivElement>;
     geom: CanonicalGeometry;
     frame: { x: number; y: number; width: number; height: number };
+    /** When set (e.g. from a selection handle press), resize is constrained to
+     *  these edges instead of being inferred from the pointer position. */
+    forcedEdges?: { left: boolean; right: boolean; top: boolean; bottom: boolean };
   }) => void;
   handleBoardItemPointerMove: (args: {
     event: ReactMouseEvent<HTMLDivElement>;
@@ -151,12 +154,14 @@ export function useBoardInteraction(params: UseBoardInteractionParams): UseBoard
     event,
     geom,
     frame,
+    forcedEdges,
   }: {
     child: ComponentInstanceModel;
     childId: string;
     event: ReactMouseEvent<HTMLDivElement>;
     geom: CanonicalGeometry;
     frame: { x: number; y: number; width: number; height: number };
+    forcedEdges?: { left: boolean; right: boolean; top: boolean; bottom: boolean };
   }) {
     const pointer = getPointerClientPosition(event);
     if (!pointer) {
@@ -170,7 +175,10 @@ export function useBoardInteraction(params: UseBoardInteractionParams): UseBoard
     }
 
     const itemViewportRect = getViewportRectForSurfaceFrame(frame, eff);
-    const resizeEdges = getPointerPositionWithinRenderedItem(event, frame)
+    // A handle press dictates the edges directly; otherwise infer them from
+    // where inside the item the pointer landed.
+    const resizeEdges = forcedEdges
+      ?? getPointerPositionWithinRenderedItem(event, frame)
       ?? (itemViewportRect
         ? getResizeEdgesForRect(pointer.x, pointer.y, itemViewportRect)
         : {
@@ -428,6 +436,21 @@ export function useBoardInteraction(params: UseBoardInteractionParams): UseBoard
             }, interaction.surfaceWidth, interaction.surfaceHeight);
 
             if (!isBoardGridComponentType(instance.componentType)) {
+              // Hold Shift on a corner handle to preserve the original aspect
+              // ratio — height is driven from the new width, re-anchoring the
+              // top edge when resizing upward.
+              const edges = interaction.resizeEdges;
+              const isCorner = Boolean(edges && (edges.left || edges.right) && (edges.top || edges.bottom));
+              if (event.shiftKey && isCorner) {
+                const aspect = interaction.startFrame.width / Math.max(interaction.startFrame.height, 1);
+                const lockedHeight = resizedFrame.width / Math.max(aspect, 0.0001);
+                const anchoredBottom = interaction.startFrame.y + interaction.startFrame.height;
+                return {
+                  ...resizedFrame,
+                  height: lockedHeight,
+                  y: edges?.top ? anchoredBottom - lockedHeight : resizedFrame.y,
+                };
+              }
               return resizedFrame;
             }
 
@@ -511,6 +534,42 @@ export function useBoardInteraction(params: UseBoardInteractionParams): UseBoard
         return;
       }
 
+      // Arrow keys nudge the selected item; Shift = ×10 step; Alt resizes
+      // (←/→ width, ↑/↓ height) instead of moving.
+      if (
+        resolvedSelectedBoardChildId
+        && (event.key === 'ArrowUp' || event.key === 'ArrowDown' || event.key === 'ArrowLeft' || event.key === 'ArrowRight')
+      ) {
+        event.preventDefault();
+        const step = event.shiftKey ? 10 : 1;
+        const dx = event.key === 'ArrowLeft' ? -step : event.key === 'ArrowRight' ? step : 0;
+        const dy = event.key === 'ArrowUp' ? -step : event.key === 'ArrowDown' ? step : 0;
+        const resizing = event.altKey;
+        const geom = canonicalGeometries[resolvedSelectedBoardChildId];
+        onUpdateComponent(resolvedSelectedBoardChildId, (instance) => {
+          const base: ComponentFrame | null = instance.frame
+            ?? (geom
+              ? {
+                x: geom.localX,
+                y: geom.localY,
+                width: geom.localWidth,
+                height: geom.localHeight,
+                rotation: 0,
+                background: geom.background ?? 'transparent',
+                borderColor: geom.borderColor ?? 'transparent',
+                borderWidth: geom.borderWidth ?? 0,
+                borderRadius: geom.borderRadius ?? 0,
+              }
+              : null);
+          if (!base) return instance;
+          if (resizing) {
+            return { ...instance, frame: { ...base, width: Math.max(4, base.width + dx), height: Math.max(4, base.height + dy) } };
+          }
+          return { ...instance, frame: { ...base, x: Math.max(0, base.x + dx), y: Math.max(0, base.y + dy) } };
+        });
+        return;
+      }
+
       const isMeta = event.metaKey || event.ctrlKey;
       if (isMeta && (event.key === 'c' || event.key === 'C')) {
         if (resolvedSelectedBoardChildId) {
@@ -556,7 +615,7 @@ export function useBoardInteraction(params: UseBoardInteractionParams): UseBoard
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [resolvedSelectedBoardChildId, onRemoveComponent, onDuplicateComponent, instances, currentSurfaceId]);
+  }, [resolvedSelectedBoardChildId, onRemoveComponent, onDuplicateComponent, onUpdateComponent, instances, currentSurfaceId, canonicalGeometries]);
 
   // ── Ctrl key cursor toggle (rotate hint) ───────────────────────────
 

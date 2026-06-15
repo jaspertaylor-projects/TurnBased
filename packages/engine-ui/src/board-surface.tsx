@@ -54,7 +54,38 @@ export interface BoardSurfaceItem {
   onDragOver?: DragEventHandler<HTMLDivElement>;
   onDrop?: DragEventHandler<HTMLDivElement>;
   onResizeMouseDown?: MouseEventHandler<HTMLSpanElement>;
+  /** Press a selection handle to start a resize constrained to those edges.
+   *  The event carries the native pointer (`evt`) so the host can read
+   *  clientX/clientY and modifier keys. */
+  onResizeHandle?: (edges: ResizeHandleEdges, event: { evt: MouseEvent }) => void;
 }
+
+/** Which sides a handle-driven resize is anchored to. */
+export interface ResizeHandleEdges {
+  left: boolean;
+  right: boolean;
+  top: boolean;
+  bottom: boolean;
+}
+
+/** The eight standard selection handles, with their edge anchoring and the
+ *  resize cursor each should show. Positions are fractions of the item box. */
+export const RESIZE_HANDLE_SPECS: ReadonlyArray<{
+  key: string;
+  fx: number;
+  fy: number;
+  edges: ResizeHandleEdges;
+  cursor: string;
+}> = [
+  { key: 'nw', fx: 0, fy: 0, edges: { left: true, right: false, top: true, bottom: false }, cursor: 'nwse-resize' },
+  { key: 'n', fx: 0.5, fy: 0, edges: { left: false, right: false, top: true, bottom: false }, cursor: 'ns-resize' },
+  { key: 'ne', fx: 1, fy: 0, edges: { left: false, right: true, top: true, bottom: false }, cursor: 'nesw-resize' },
+  { key: 'e', fx: 1, fy: 0.5, edges: { left: false, right: true, top: false, bottom: false }, cursor: 'ew-resize' },
+  { key: 'se', fx: 1, fy: 1, edges: { left: false, right: true, top: false, bottom: true }, cursor: 'nwse-resize' },
+  { key: 's', fx: 0.5, fy: 1, edges: { left: false, right: false, top: false, bottom: true }, cursor: 'ns-resize' },
+  { key: 'sw', fx: 0, fy: 1, edges: { left: true, right: false, top: false, bottom: true }, cursor: 'nesw-resize' },
+  { key: 'w', fx: 0, fy: 0.5, edges: { left: true, right: false, top: false, bottom: false }, cursor: 'ew-resize' },
+];
 
 export interface BoardSurfaceProps {
   items: readonly BoardSurfaceItem[];

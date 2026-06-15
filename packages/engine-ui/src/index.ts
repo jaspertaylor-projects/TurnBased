@@ -28,6 +28,7 @@ export {
 } from './board-grid';
 export {
   BoardSurface,
+  RESIZE_HANDLE_SPECS,
 } from './board-surface';
 export {
   KonvaBoardSurface,
@@ -59,6 +60,7 @@ export type {
 export type {
   BoardSurfaceItem,
   BoardSurfaceProps,
+  ResizeHandleEdges,
 } from './board-surface';
 export type {
   KonvaBoardSurfaceProps,

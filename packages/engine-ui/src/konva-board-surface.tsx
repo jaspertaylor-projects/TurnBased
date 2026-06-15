@@ -12,6 +12,7 @@ import useImage from 'use-image';
 
 import type { BoardSurfaceAppearance } from './board-surface-style';
 import type { BoardSurfaceItem } from './board-surface';
+import { RESIZE_HANDLE_SPECS } from './board-surface';
 
 // ─── Types & helpers ────────────────────────────────────────────────────────
 
@@ -162,6 +163,65 @@ function KonvaItemBackground({ item }: { item: BoardSurfaceItem }) {
       {img && <Rect width={w} height={h} fillPatternImage={img} fillPatternOpacity={item.textureOpacity ?? 0.3} cornerRadius={noCr} />}
       {item.selected && <Rect width={w} height={h} stroke="#10b981" strokeWidth={Math.max(2, sw + 1)} cornerRadius={noCr} shadowColor="rgba(16,185,129,0.45)" shadowBlur={12} listening={false} />}
       <Rect width={w} height={h} stroke={sc} strokeWidth={hasClip ? 0 : sw} cornerRadius={noCr} />
+    </Group>
+  );
+}
+
+// ─── Selection resize handles ────────────────────────────────────────────────
+
+/**
+ * Eight draggable resize handles (4 corners + 4 edge midpoints) plus a thin
+ * selection frame, drawn on the currently-selected item. Handle sizes are
+ * divided by `scale` so they stay a constant ~9px on screen regardless of
+ * board zoom. Pressing a handle starts an edge-constrained resize via
+ * `item.onResizeHandle`; cancelBubble stops the parent group's move handler
+ * from also firing.
+ */
+function KonvaResizeHandles({ item, scale }: { item: BoardSurfaceItem; scale: number }) {
+  if (!item.onResizeHandle) return null;
+  const onResizeHandle = item.onResizeHandle;
+  const w = item.width;
+  const h = item.height;
+  const hs = 9 / Math.max(scale, 0.0001); // handle box size in board units
+  const ring = 1.5 / Math.max(scale, 0.0001);
+
+  return (
+    <Group listening>
+      {/* selectionFrame — crisp outline that reads as "this is selected" */}
+      <Rect
+        x={0}
+        y={0}
+        width={w}
+        height={h}
+        stroke="#0d9488"
+        strokeWidth={ring}
+        listening={false}
+      />
+      {RESIZE_HANDLE_SPECS.map((spec) => {
+        const cx = spec.fx * w;
+        const cy = spec.fy * h;
+        return (
+          <Rect
+            key={spec.key}
+            x={cx - hs / 2}
+            y={cy - hs / 2}
+            width={hs}
+            height={hs}
+            cornerRadius={hs * 0.25}
+            fill="#ffffff"
+            stroke="#0d9488"
+            strokeWidth={ring}
+            shadowColor="rgba(6,78,59,0.35)"
+            shadowBlur={hs * 0.4}
+            onMouseEnter={(e) => { const stage = e.target.getStage(); if (stage) stage.container().style.cursor = spec.cursor; }}
+            onMouseLeave={(e) => { const stage = e.target.getStage(); if (stage) stage.container().style.cursor = ''; }}
+            onMouseDown={(e) => {
+              e.cancelBubble = true;
+              onResizeHandle(spec.edges, e as unknown as { evt: MouseEvent });
+            }}
+          />
+        );
+      })}
     </Group>
   );
 }
@@ -612,6 +672,7 @@ export function KonvaBoardSurface({
                         </Html>
                       );
                     })()}
+                    {item.selected ? <KonvaResizeHandles item={item} scale={scale} /> : null}
                   </Group>
                 );
               })}

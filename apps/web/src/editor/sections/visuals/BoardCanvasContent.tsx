@@ -55,6 +55,7 @@ export interface BuildSurfaceItemParams {
     event: ReactMouseEvent<HTMLDivElement>;
     geom: CanonicalGeometry;
     frame: { x: number; y: number; width: number; height: number };
+    forcedEdges?: { left: boolean; right: boolean; top: boolean; bottom: boolean };
   }) => void;
   handleBoardItemPointerMove: (args: {
     event: ReactMouseEvent<HTMLDivElement>;
@@ -150,6 +151,16 @@ export function buildSurfaceItem(
       handleBoardItemPointerMove({
         event,
         frame: projectedFrame,
+      });
+    },
+    onResizeHandle: (edges, event) => {
+      handleBoardItemPointerDown({
+        child,
+        childId,
+        event: event as unknown as ReactMouseEvent<HTMLDivElement>,
+        geom,
+        frame: projectedFrame,
+        forcedEdges: edges,
       });
     },
     // Double-clicking a text-box enters inline editing mode.
