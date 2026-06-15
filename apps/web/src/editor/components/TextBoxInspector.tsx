@@ -216,7 +216,7 @@ export function TextBoxInspector({
 
   return (
     <>
-      <InspectorAccordion title="Text" defaultOpen>
+      <InspectorAccordion title="Text">
         <div style={{ display: 'grid', gap: '0.6rem' }}>
           {/* True WYSIWYG preview — mirrors TextBoxContent's typography
               (font, size, color, alignment, leading-trim) so creators edit
@@ -274,7 +274,7 @@ export function TextBoxInspector({
         </div>
       </InspectorAccordion>
 
-      <InspectorAccordion title="Typography & Alignment" defaultOpen>
+      <InspectorAccordion title="Typography & Alignment">
         <div style={{ display: 'grid', gap: '0.6rem' }}>
           <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'flex-end' }}>
             <CommandButton title="Bold (Ctrl/Cmd+B)" active={formatState.bold} onClick={() => applyCommand('bold')}>

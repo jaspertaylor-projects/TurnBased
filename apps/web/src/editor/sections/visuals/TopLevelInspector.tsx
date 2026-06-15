@@ -84,7 +84,7 @@ export function TopLevelInspector({
 
   return (
     <>
-      <InspectorAccordion title="Info" defaultOpen>
+      <InspectorAccordion title="Info">
         <label style={labelStyle}>
           Display Name
           <input
@@ -213,7 +213,7 @@ export function TopLevelInspector({
       </InspectorAccordion>
 
       {hasCatalog ? (
-        <InspectorAccordion title="General" defaultOpen>
+        <InspectorAccordion title="General">
           <CatalogPicker
             componentType={componentType as 'tile' | 'board' | 'deck'}
             instanceId={selectedTopLevelComponentId}

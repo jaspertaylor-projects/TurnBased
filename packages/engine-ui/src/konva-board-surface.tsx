@@ -82,7 +82,7 @@ const CLIP_BLEED_MM = (36 / 300) * 25.4;
  *  around the board for the bleed hatch area and optional ruler strips. */
 const FIT_PADDING = 0.70;
 const TOOLBAR_H = 34;
-const SCROLLBAR_THICKNESS = 14;
+const SCROLLBAR_THICKNESS = 9;
 const SCROLLBAR_INSET = 4;
 /** Extra scroll room beyond board edges, as fraction of viewport size. */
 const PAN_OVERRUN = 0.4;

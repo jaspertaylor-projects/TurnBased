@@ -225,7 +225,7 @@ export function ImageInspector({
 
   return (
     <>
-      <InspectorAccordion title="Image" defaultOpen>
+      <InspectorAccordion title="Image">
         <div style={{ display: 'grid', gap: '0.6rem' }}>
           {/* imageDropZone — preview + paste/drop target for the source image */}
           <div
@@ -356,7 +356,7 @@ export function ImageInspector({
         </div>
       </InspectorAccordion>
 
-      <InspectorAccordion title="Fit & Crop" defaultOpen>
+      <InspectorAccordion title="Fit & Crop">
         <div style={{ display: 'grid', gap: '0.6rem' }}>
           <SegmentedControl<ImageObjectFit>
             value={resolved.objectFit}

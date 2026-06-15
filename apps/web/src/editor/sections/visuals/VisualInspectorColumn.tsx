@@ -239,7 +239,7 @@ export function VisualInspectorColumn({
       </div>
 
       {/* inspectorScrollArea — scrollable property editors and subcomponent palette */}
-      <div data-layout="inspectorScrollArea" className="inspector-scroll-area" style={{ minHeight: 0, overflowY: 'scroll', overflowX: 'hidden', padding: '0 0.85rem 0.85rem 0.85rem', display: 'grid', gap: '0.45rem', alignContent: 'start', scrollbarGutter: 'stable', scrollbarColor: 'rgba(15,118,110,0.55) rgba(15,118,110,0.08)', scrollbarWidth: 'thin' }}>
+      <div data-layout="inspectorScrollArea" className="inspector-scroll-area" style={{ minHeight: 0, overflowY: 'auto', overflowX: 'hidden', padding: '0 0.85rem 0.85rem 0.85rem', display: 'grid', gap: '0.45rem', alignContent: 'start', scrollbarGutter: 'stable', scrollbarColor: 'rgba(138,106,51,0.4) transparent', scrollbarWidth: 'thin' }}>
 
       {selectedBoardChild && resolvedSelectedBoardChildId ? (() => {
         const selectedParent = selectedBoardChild.parentId ? project.instances[String(selectedBoardChild.parentId)] : null;
@@ -354,7 +354,7 @@ export function VisualInspectorColumn({
       )}
 
       {boardPresetGroups.length > 0 && selectedBoardChild?.componentType !== 'text-box' ? (
-        <InspectorAccordion title="Add Subcomponent" defaultOpen>
+        <InspectorAccordion title="Add Subcomponent">
           {/* presetGroupList — list of preset groups for adding subcomponents */}
           <div data-layout="presetGroupList" style={{ display: 'grid', gap: '0.35rem' }}>
             {boardPresetGroups.map((group) => {

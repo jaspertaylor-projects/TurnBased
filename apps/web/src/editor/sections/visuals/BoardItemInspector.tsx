@@ -381,7 +381,7 @@ export function BoardItemInspector({
 
         return (
           <>
-            <InspectorAccordion title="Info" defaultOpen>
+            <InspectorAccordion title="Info">
               {presets.length > 0 ? (
                 <label style={labelStyle}>
                   Type
@@ -532,7 +532,7 @@ export function BoardItemInspector({
                 : 1;
 
               return (
-                <InspectorAccordion title="Size" defaultOpen>
+                <InspectorAccordion title="Size">
                   <label style={labelStyle}>
                     Cell Size
                     <NumericInput

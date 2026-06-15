@@ -175,8 +175,8 @@ main {
 }
 
 *::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
 }
 
 *::-webkit-scrollbar-track {
@@ -184,9 +184,10 @@ main {
 }
 
 *::-webkit-scrollbar-thumb {
-  background-color: rgba(15, 118, 110, 0.32);
+  background-color: rgba(15, 118, 110, 0.26);
   /* Transparent border + background-clip lets the thumb float inside the
-     gutter with a soft inset, instead of looking flush against the edge. */
+     gutter with a soft inset, instead of looking flush against the edge.
+     With an 8px gutter this leaves a slender ~4px thumb. */
   border: 2px solid transparent;
   background-clip: padding-box;
   border-radius: 999px;
