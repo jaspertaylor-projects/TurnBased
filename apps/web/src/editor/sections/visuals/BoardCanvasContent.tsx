@@ -133,12 +133,9 @@ export function buildSurfaceItem(
       : geom.borderRadius,
     clipPath: geom.clipPath ?? null,
     rotation: child.frame?.rotation ?? 0,
-    // Text boxes and images fill their frame edge-to-edge (no inset gutter
-    // showing the item background around them). Grids keep a 12px inset so the
-    // outermost hexes don't get clipped by the rounded frame corners.
-    padding: child.componentType === 'text-box' || child.componentType === 'image-area'
-      ? 0
-      : isBoardGridComponentType(child.componentType) ? 12 : undefined,
+    // Every item fills its frame edge-to-edge — no inset gutter showing the
+    // item background around the content.
+    padding: 0,
     selected: isSelected,
     onClick: () => {
       if (selectedBoardChildId !== childId) {

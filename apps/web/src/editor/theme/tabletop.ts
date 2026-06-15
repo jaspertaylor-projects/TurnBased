@@ -15,15 +15,16 @@ import type { CSSProperties } from 'react';
 
 export const tabletop = {
   // ── Wood (desk / frame / sidebar) ──────────────────────────────────
-  // Olive-walnut: warm wood with a green undertone so the table sits inside
-  // the app's cozy-forest world instead of reading as a separate brown box.
+  // Desaturated warm-taupe. Kept low-saturation on purpose: this is a
+  // colour-critical work surface, so the frame stays close to neutral and
+  // doesn't bias the component colours the creator is judging.
   wood: {
-    deepest: '#1b1d0f',
-    deep: '#2a2c16',
-    base: '#42421f',
-    mid: '#565427',
-    light: '#736d36',
-    highlight: '#8f8748',
+    deepest: '#211f1a',
+    deep: '#322f28',
+    base: '#4a463c',
+    mid: '#5d5749',
+    light: '#79715f',
+    highlight: '#948b76',
   },
 
   // ── Felt / baize (play surface under the board) ────────────────────
@@ -106,13 +107,13 @@ export const woodPanel = `
   linear-gradient(180deg, ${tabletop.wood.mid}, ${tabletop.wood.base} 55%, ${tabletop.wood.deep})
 `;
 
-/** The ambient editor backdrop: a cozy, dim forest clearing at dusk — deep
- *  mossy greens with a warm lamplit glow up top, so the lit table and
- *  parchment cards pop while still feeling part of the forest. */
+/** The ambient editor backdrop: a calm, dim, near-neutral warm-charcoal so
+ *  the colours on the board read true (a coloured backdrop would bias colour
+ *  judgement). A faint warm glow up top keeps it cozy rather than clinical. */
 export const ambientRoom = `
-  radial-gradient(120% 95% at 50% -10%, rgba(168,158,86,0.20), rgba(0,0,0,0) 55%),
-  radial-gradient(150% 130% at 50% 115%, rgba(8,16,10,0.55), rgba(0,0,0,0) 60%),
-  linear-gradient(165deg, #2a3a23, #16241a 60%, #101d15)
+  radial-gradient(120% 95% at 50% -10%, rgba(210,196,168,0.12), rgba(0,0,0,0) 55%),
+  radial-gradient(150% 130% at 50% 115%, rgba(0,0,0,0.5), rgba(0,0,0,0) 60%),
+  linear-gradient(165deg, #383229, #26221c 60%, #1d1a15)
 `;
 
 /** Soft drop shadow tuned for parchment cards resting on the desk. */

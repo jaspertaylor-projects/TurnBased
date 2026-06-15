@@ -88,9 +88,9 @@ const cardPreviewStyle: CSSProperties = {
   placeItems: 'center',
   aspectRatio: '4 / 3',
   borderRadius: '12px',
-  background: 'linear-gradient(160deg, #35624b, #274838 60%, #1f3a2c)',
+  background: 'linear-gradient(160deg, #4a4742, #3a3732 60%, #2c2925)',
   border: `1px solid ${tabletop.brass.deep}`,
-  boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.35), inset 0 0 0 3px rgba(31,58,44,0.5)',
+  boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.35), inset 0 0 0 3px rgba(34,32,28,0.5)',
 };
 
 const createCardStyle: CSSProperties = {

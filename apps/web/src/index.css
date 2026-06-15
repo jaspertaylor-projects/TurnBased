@@ -175,8 +175,8 @@ main {
 }
 
 *::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 11px;
+  height: 11px;
 }
 
 *::-webkit-scrollbar-track {
@@ -184,22 +184,22 @@ main {
 }
 
 *::-webkit-scrollbar-thumb {
-  background-color: rgba(15, 118, 110, 0.26);
-  /* Transparent border + background-clip lets the thumb float inside the
-     gutter with a soft inset, instead of looking flush against the edge.
-     With an 8px gutter this leaves a slender ~4px thumb. */
-  border: 2px solid transparent;
+  background-color: rgba(15, 118, 110, 0.22);
+  /* Transparent border + background-clip floats a slim thumb inside the
+     gutter. A wide gutter (11px) with a 4px border leaves a discreet ~3px
+     thumb with comfortable breathing room, so it reads delicate not chunky. */
+  border: 4px solid transparent;
   background-clip: padding-box;
   border-radius: 999px;
   transition: background-color 160ms ease;
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(6, 78, 59, 0.55);
+  background-color: rgba(6, 78, 59, 0.45);
 }
 
 *::-webkit-scrollbar-thumb:active {
-  background-color: rgba(6, 78, 59, 0.7);
+  background-color: rgba(6, 78, 59, 0.6);
 }
 
 *::-webkit-scrollbar-corner {

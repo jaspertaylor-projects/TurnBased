@@ -65,16 +65,18 @@ export interface KonvaBoardSurfaceProps {
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
-/** Deep mossy wood behind everything — the dim, lamplit corner of the forest. */
-const CANVAS_BG = '#1b2114';
-/** Olive-walnut desk surface: a soft warm top light, a grounding bottom
- *  vignette, a faint plank grain, then a mossy green overlay over the real
- *  wood texture so the table reads as forest wood rather than dark mahogany. */
-const WOOD_SURFACE_IMAGE = "radial-gradient(120% 90% at 50% -8%, rgba(244,228,170,0.14), rgba(0,0,0,0) 52%), radial-gradient(140% 140% at 50% 120%, rgba(8,16,10,0.55), rgba(0,0,0,0) 60%), repeating-linear-gradient(93deg, rgba(0,0,0,0.06) 0 2px, rgba(255,255,255,0.015) 2px 6px), linear-gradient(160deg, rgba(86,90,44,0.5), rgba(40,48,26,0.72)), url('/textures/wood_texture.png')";
+/** Deep neutral charcoal behind everything — calm and colour-neutral. */
+const CANVAS_BG = '#211f1a';
+/** Desaturated warm-taupe desk surface: a soft warm top light, a grounding
+ *  bottom vignette, a faint plank grain, then a near-neutral grey overlay over
+ *  the real wood texture so the table stays warm but doesn't bias board colours. */
+const WOOD_SURFACE_IMAGE = "radial-gradient(120% 90% at 50% -8%, rgba(232,222,200,0.12), rgba(0,0,0,0) 52%), radial-gradient(140% 140% at 50% 120%, rgba(0,0,0,0.55), rgba(0,0,0,0) 60%), repeating-linear-gradient(93deg, rgba(0,0,0,0.06) 0 2px, rgba(255,255,255,0.015) 2px 6px), linear-gradient(160deg, rgba(92,86,74,0.5), rgba(46,42,36,0.72)), url('/textures/wood_texture.png')";
 const WOOD_SURFACE_SIZE = 'cover, cover, auto, cover, 520px auto';
 const WOOD_SURFACE_REPEAT = 'no-repeat, no-repeat, repeat, no-repeat, repeat';
-/** Deep forest felt play-mat the board rests on. */
-const FELT_SURFACE = "radial-gradient(110% 85% at 50% 30%, rgba(180,230,200,0.12), rgba(0,0,0,0) 60%), radial-gradient(140% 130% at 50% 112%, rgba(0,0,0,0.42), rgba(0,0,0,0) 62%), repeating-linear-gradient(45deg, rgba(0,0,0,0.05) 0 1px, rgba(255,255,255,0.02) 1px 3px), repeating-linear-gradient(-45deg, rgba(0,0,0,0.04) 0 1px, rgba(255,255,255,0.015) 1px 3px), linear-gradient(160deg, #35624b, #274838 55%, #1f3a2c)";
+/** Neutral charcoal-grey desk mat the board rests on. Deliberately desaturated
+ *  so the board's own colours read true against it (a coloured mat would bias
+ *  the creator's colour judgement). */
+const FELT_SURFACE = "radial-gradient(110% 85% at 50% 30%, rgba(255,255,255,0.06), rgba(0,0,0,0) 60%), radial-gradient(140% 130% at 50% 112%, rgba(0,0,0,0.42), rgba(0,0,0,0) 62%), repeating-linear-gradient(45deg, rgba(0,0,0,0.05) 0 1px, rgba(255,255,255,0.02) 1px 3px), repeating-linear-gradient(-45deg, rgba(0,0,0,0.04) 0 1px, rgba(255,255,255,0.015) 1px 3px), linear-gradient(160deg, #4a4742, #3a3732 55%, #2c2925)";
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 40;
 /** Physical bleed margin in mm — matches supplier spec (36/300 inch). */
@@ -83,7 +85,7 @@ const CLIP_BLEED_MM = (36 / 300) * 25.4;
  *  around the board for the bleed hatch area and optional ruler strips. */
 const FIT_PADDING = 0.86;
 const TOOLBAR_H = 34;
-const SCROLLBAR_THICKNESS = 9;
+const SCROLLBAR_THICKNESS = 7;
 const SCROLLBAR_INSET = 4;
 /** Extra scroll room beyond board edges, as fraction of viewport size. */
 const PAN_OVERRUN = 0.4;
@@ -310,7 +312,7 @@ function OverlayScrollbar({
         zIndex: 4,
         borderRadius: SCROLLBAR_THICKNESS,
         transition: 'opacity 0.2s',
-        opacity: active ? 1 : 0.5,
+        opacity: active ? 1 : 0.32,
         ...(isH
           ? { bottom: TOOLBAR_H + SCROLLBAR_INSET, left: SCROLLBAR_INSET, width: trackLength, height: SCROLLBAR_THICKNESS }
           : { right: SCROLLBAR_INSET, top: SCROLLBAR_INSET, width: SCROLLBAR_THICKNESS, height: trackLength }),
@@ -328,7 +330,7 @@ function OverlayScrollbar({
         style={{
           position: 'absolute',
           borderRadius: SCROLLBAR_THICKNESS,
-          background: active ? 'rgba(16,185,129,0.55)' : 'rgba(15,118,110,0.35)',
+          background: active ? 'rgba(245,242,235,0.6)' : 'rgba(235,232,225,0.4)',
           transition: dragging ? 'none' : 'background 0.2s, opacity 0.2s',
           cursor: 'pointer',
           ...(isH
@@ -578,8 +580,8 @@ export function KonvaBoardSurface({
               height: boardPxH + bleed * 2 + rulerOuter + matPad * 2,
               background: FELT_SURFACE,
               borderRadius: 18,
-              border: '1px solid rgba(184,146,78,0.35)',
-              boxShadow: '0 30px 70px rgba(0,0,0,0.55), 0 8px 18px rgba(0,0,0,0.42), inset 0 0 0 6px rgba(31,58,44,0.55), inset 0 0 0 7px rgba(184,146,78,0.30), inset 0 0 60px rgba(0,0,0,0.40)',
+              border: '1px solid rgba(184,146,78,0.32)',
+              boxShadow: '0 30px 70px rgba(0,0,0,0.55), 0 8px 18px rgba(0,0,0,0.42), inset 0 0 0 6px rgba(34,32,28,0.55), inset 0 0 0 7px rgba(184,146,78,0.26), inset 0 0 60px rgba(0,0,0,0.40)',
               pointerEvents: 'none',
               zIndex: 0,
             }}
