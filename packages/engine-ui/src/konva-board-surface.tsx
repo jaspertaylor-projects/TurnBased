@@ -65,11 +65,12 @@ export interface KonvaBoardSurfaceProps {
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
-/** Deep walnut behind everything — the dim, lamplit corner of the gaming room. */
-const CANVAS_BG = '#241608';
-/** Warm walnut desk surface: a soft top light, a grounding bottom vignette, a
- *  faint plank grain, then the real wood texture for fibre detail. */
-const WOOD_SURFACE_IMAGE = "radial-gradient(120% 90% at 50% -8%, rgba(255,214,150,0.16), rgba(0,0,0,0) 52%), radial-gradient(140% 140% at 50% 120%, rgba(0,0,0,0.55), rgba(0,0,0,0) 60%), repeating-linear-gradient(93deg, rgba(0,0,0,0.06) 0 2px, rgba(255,255,255,0.015) 2px 6px), linear-gradient(160deg, rgba(96,61,31,0.55), rgba(51,33,15,0.72)), url('/textures/wood_texture.png')";
+/** Deep mossy wood behind everything — the dim, lamplit corner of the forest. */
+const CANVAS_BG = '#1b2114';
+/** Olive-walnut desk surface: a soft warm top light, a grounding bottom
+ *  vignette, a faint plank grain, then a mossy green overlay over the real
+ *  wood texture so the table reads as forest wood rather than dark mahogany. */
+const WOOD_SURFACE_IMAGE = "radial-gradient(120% 90% at 50% -8%, rgba(244,228,170,0.14), rgba(0,0,0,0) 52%), radial-gradient(140% 140% at 50% 120%, rgba(8,16,10,0.55), rgba(0,0,0,0) 60%), repeating-linear-gradient(93deg, rgba(0,0,0,0.06) 0 2px, rgba(255,255,255,0.015) 2px 6px), linear-gradient(160deg, rgba(86,90,44,0.5), rgba(40,48,26,0.72)), url('/textures/wood_texture.png')";
 const WOOD_SURFACE_SIZE = 'cover, cover, auto, cover, 520px auto';
 const WOOD_SURFACE_REPEAT = 'no-repeat, no-repeat, repeat, no-repeat, repeat';
 /** Deep forest felt play-mat the board rests on. */
@@ -80,7 +81,7 @@ const MAX_ZOOM = 40;
 const CLIP_BLEED_MM = (36 / 300) * 25.4;
 /** At zoom=1 the board fills this fraction of the viewport. Leaves room
  *  around the board for the bleed hatch area and optional ruler strips. */
-const FIT_PADDING = 0.70;
+const FIT_PADDING = 0.86;
 const TOOLBAR_H = 34;
 const SCROLLBAR_THICKNESS = 9;
 const SCROLLBAR_INSET = 4;
@@ -562,7 +563,7 @@ export function KonvaBoardSurface({
         // Match the ruler dimensions declared in the unitsRuler block.
         const rulerOuter = showUnits ? 30 + 4 : 0; // RULER_W + RULER_GAP
         const pad = 18;
-        const matPad = pad + 14; // a little extra felt margin around the mat
+        const matPad = pad + 4; // a little extra felt margin around the mat
         return (
           <div
             data-layout="workMat"

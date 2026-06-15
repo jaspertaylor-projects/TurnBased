@@ -565,7 +565,10 @@ export const Editor = () => {
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
-          paddingBottom: `${GRASS_BACKDROP_HEIGHT}px`,
+          // The component editor is its own wooden table that runs to the
+          // bottom edge — skip the grass band there so the working surface
+          // gets the full height (and grass-under-wood doesn't read oddly).
+          paddingBottom: activeSection === 'component_editor' ? 0 : `${GRASS_BACKDROP_HEIGHT}px`,
           boxSizing: 'border-box',
         }}
       >
@@ -591,7 +594,7 @@ export const Editor = () => {
           </div>
         )}
 
-        <GrassBackdrop height={GRASS_BACKDROP_HEIGHT} />
+        {activeSection === 'component_editor' ? null : <GrassBackdrop height={GRASS_BACKDROP_HEIGHT} />}
       </div>
     </div>
   );

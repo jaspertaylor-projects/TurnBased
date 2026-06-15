@@ -542,7 +542,7 @@ export function VisualsSection({
 
   return (
     // visualsSectionRoot — top bar + two-column grid (canvas + inspector)
-    <div data-layout="visualsSectionRoot" className="tabletop-surface" style={{ display: 'grid', gridTemplateRows: 'auto minmax(0, 1fr)', gap: 10, height: '100%', minHeight: 0, overflow: 'hidden', padding: '10px 16px 14px 14px', boxSizing: 'border-box' }}>
+    <div data-layout="visualsSectionRoot" className="tabletop-surface" style={{ display: 'grid', gridTemplateRows: 'auto minmax(0, 1fr)', gap: 8, height: '100%', minHeight: 0, overflow: 'hidden', padding: '8px 12px 10px 12px', boxSizing: 'border-box' }}>
       {/* componentEditorTopBar — label on left, view toggles on right */}
       <div data-layout="componentEditorTopBar" style={{
         display: 'flex',
@@ -649,7 +649,7 @@ export function VisualsSection({
         </div>
       </div>
       {/* visualsSectionBody — canvas + inspector */}
-      <div data-layout="visualsSectionBody" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 340px)', gap: 14, minHeight: 0, overflow: 'hidden' }}>
+      <div data-layout="visualsSectionBody" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 332px)', gap: 10, minHeight: 0, overflow: 'hidden' }}>
         {/* canvasColumn — breadcrumb path bar + canvas, fills left column */}
         <div data-layout="canvasColumn" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, height: '100%', overflow: 'hidden', gap: 6 }}>
 

@@ -15,13 +15,15 @@ import type { CSSProperties } from 'react';
 
 export const tabletop = {
   // ── Wood (desk / frame / sidebar) ──────────────────────────────────
+  // Olive-walnut: warm wood with a green undertone so the table sits inside
+  // the app's cozy-forest world instead of reading as a separate brown box.
   wood: {
-    deepest: '#241608',
-    deep: '#33210f',
-    base: '#4a3018',
-    mid: '#603d1f',
-    light: '#7d5630',
-    highlight: '#9a6e3f',
+    deepest: '#1b1d0f',
+    deep: '#2a2c16',
+    base: '#42421f',
+    mid: '#565427',
+    light: '#736d36',
+    highlight: '#8f8748',
   },
 
   // ── Felt / baize (play surface under the board) ────────────────────
@@ -104,12 +106,13 @@ export const woodPanel = `
   linear-gradient(180deg, ${tabletop.wood.mid}, ${tabletop.wood.base} 55%, ${tabletop.wood.deep})
 `;
 
-/** The ambient editor backdrop: a warm, lamplit room of dark wood so the lit
- *  table and parchment cards pop. */
+/** The ambient editor backdrop: a cozy, dim forest clearing at dusk — deep
+ *  mossy greens with a warm lamplit glow up top, so the lit table and
+ *  parchment cards pop while still feeling part of the forest. */
 export const ambientRoom = `
-  radial-gradient(120% 95% at 50% -10%, rgba(120,86,48,0.30), rgba(0,0,0,0) 55%),
-  radial-gradient(150% 130% at 50% 115%, rgba(0,0,0,0.55), rgba(0,0,0,0) 60%),
-  linear-gradient(165deg, ${tabletop.wood.deep}, ${tabletop.wood.deepest})
+  radial-gradient(120% 95% at 50% -10%, rgba(168,158,86,0.20), rgba(0,0,0,0) 55%),
+  radial-gradient(150% 130% at 50% 115%, rgba(8,16,10,0.55), rgba(0,0,0,0) 60%),
+  linear-gradient(165deg, #2a3a23, #16241a 60%, #101d15)
 `;
 
 /** Soft drop shadow tuned for parchment cards resting on the desk. */
