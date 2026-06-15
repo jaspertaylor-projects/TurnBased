@@ -4,7 +4,15 @@ import { resolveProjectPaletteColorValue } from '../projectPalette';
 import type { EditorIconAsset, EditorProject } from '../types';
 import { IconTile } from './IconTile';
 
-export type TextBoxFontFamily = 'sans' | 'serif' | 'display' | 'mono';
+export type TextBoxFontFamily =
+  | 'sans'
+  | 'serif'
+  | 'display'
+  | 'mono'
+  | 'fantasy'
+  | 'storybook'
+  | 'hand'
+  | 'rounded';
 export type TextBoxTextAlign = 'left' | 'center' | 'right';
 export type TextBoxVerticalAlign = 'start' | 'center' | 'end';
 
@@ -13,6 +21,8 @@ export interface ResolvedTextBoxProperties {
   fontFamily: TextBoxFontFamily;
   fontSize: number;
   lineHeight: number;
+  letterSpacing: number;
+  fontWeight: number;
   textColor: string;
   textAlign: TextBoxTextAlign;
   verticalAlign: TextBoxVerticalAlign;
@@ -27,7 +37,25 @@ export const TEXT_BOX_FONT_OPTIONS: Array<{ value: TextBoxFontFamily; label: str
   { value: 'serif', label: 'Serif' },
   { value: 'display', label: 'Display' },
   { value: 'mono', label: 'Mono' },
+  { value: 'fantasy', label: 'Fantasy (Cinzel)' },
+  { value: 'storybook', label: 'Storybook (Cormorant)' },
+  { value: 'hand', label: 'Handwritten (Caveat)' },
+  { value: 'rounded', label: 'Rounded (Quicksand)' },
 ];
+
+/** Weight presets exposed in the inspector, mapped to numeric CSS weights. */
+export const TEXT_BOX_WEIGHT_OPTIONS: Array<{ value: number; label: string }> = [
+  { value: 300, label: 'Light' },
+  { value: 400, label: 'Regular' },
+  { value: 500, label: 'Medium' },
+  { value: 600, label: 'Semibold' },
+  { value: 700, label: 'Bold' },
+  { value: 900, label: 'Black' },
+];
+
+const VALID_FONT_FAMILIES = new Set<TextBoxFontFamily>([
+  'sans', 'serif', 'display', 'mono', 'fantasy', 'storybook', 'hand', 'rounded',
+]);
 
 export const TEXT_BOX_TEXT_ALIGN_OPTIONS: Array<{ value: TextBoxTextAlign; label: string }> = [
   { value: 'left', label: 'Left' },
@@ -46,6 +74,10 @@ export const FONT_FAMILY_MAP: Record<TextBoxFontFamily, string> = {
   serif: 'Georgia, "Times New Roman", serif',
   display: '"Alegreya Sans SC", "Trebuchet MS", "Segoe UI", sans-serif',
   mono: '"JetBrains Mono", "SFMono-Regular", Consolas, monospace',
+  fantasy: '"Cinzel", Georgia, "Times New Roman", serif',
+  storybook: '"Cormorant Garamond", Georgia, serif',
+  hand: '"Caveat", "Segoe Script", "Comic Sans MS", cursive',
+  rounded: '"Quicksand", "Trebuchet MS", "Segoe UI", sans-serif',
 };
 
 const SAFE_TEXT_TAGS = new Set([
@@ -322,13 +354,21 @@ export function resolveTextBoxProperties(properties: Record<string, unknown>): R
 
   return {
     contentHtml: typeof properties.contentHtml === 'string' ? properties.contentHtml : '<p>Text box</p>',
-    fontFamily: fontFamily === 'serif' || fontFamily === 'display' || fontFamily === 'mono' ? fontFamily : 'sans',
+    fontFamily: typeof fontFamily === 'string' && VALID_FONT_FAMILIES.has(fontFamily as TextBoxFontFamily)
+      ? (fontFamily as TextBoxFontFamily)
+      : 'sans',
     fontSize: typeof properties.fontSize === 'number' && Number.isFinite(properties.fontSize)
       ? Math.max(10, Math.min(properties.fontSize, 96))
       : 22,
     lineHeight: typeof properties.lineHeight === 'number' && Number.isFinite(properties.lineHeight)
       ? Math.max(1, Math.min(properties.lineHeight, 2.4))
       : 1.4,
+    letterSpacing: typeof properties.letterSpacing === 'number' && Number.isFinite(properties.letterSpacing)
+      ? Math.max(-2, Math.min(properties.letterSpacing, 20))
+      : 0,
+    fontWeight: typeof properties.fontWeight === 'number' && Number.isFinite(properties.fontWeight)
+      ? Math.max(100, Math.min(properties.fontWeight, 900))
+      : 400,
     textColor: typeof properties.textColor === 'string' && properties.textColor.trim().length > 0
       ? properties.textColor
       : '#064e3b',
@@ -372,6 +412,8 @@ export function TextBoxContent({
         fontFamily: FONT_FAMILY_MAP[resolved.fontFamily],
         fontSize: `${resolved.fontSize}px`,
         lineHeight: resolved.lineHeight,
+        letterSpacing: `${resolved.letterSpacing}px`,
+        fontWeight: resolved.fontWeight,
         textAlign: resolved.textAlign,
         overflow: 'hidden',
         overflowWrap: 'anywhere',

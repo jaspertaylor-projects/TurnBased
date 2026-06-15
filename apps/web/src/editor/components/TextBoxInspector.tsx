@@ -11,6 +11,7 @@ import {
   FONT_FAMILY_MAP,
   ProjectInlineIcon,
   TEXT_BOX_FONT_OPTIONS,
+  TEXT_BOX_WEIGHT_OPTIONS,
   getProjectIconToken,
   resolveTextBoxProperties,
 } from './TextBoxContent';
@@ -255,6 +256,8 @@ export function TextBoxInspector({
                 fontFamily: FONT_FAMILY_MAP[resolved.fontFamily],
                 fontSize: `${resolved.fontSize}px`,
                 lineHeight: resolved.lineHeight,
+                letterSpacing: `${resolved.letterSpacing}px`,
+                fontWeight: resolved.fontWeight,
                 textAlign: resolved.textAlign,
                 overflowWrap: 'anywhere',
                 textBoxTrim: 'trim-both',
@@ -362,15 +365,47 @@ export function TextBoxInspector({
                 ...current,
                 fontFamily: event.target.value,
               }))}
-              style={compactInputStyle}
+              style={{ ...compactInputStyle, fontFamily: FONT_FAMILY_MAP[resolved.fontFamily] }}
             >
               {TEXT_BOX_FONT_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
+                <option key={option.value} value={option.value} style={{ fontFamily: FONT_FAMILY_MAP[option.value] }}>
                   {option.label}
                 </option>
               ))}
             </select>
           </label>
+
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <label style={{ ...labelStyle, flex: 1, minWidth: 0 }}>
+              Weight
+              <select
+                value={resolved.fontWeight}
+                onChange={(event) => onUpdateProperties((current) => ({
+                  ...current,
+                  fontWeight: Number(event.target.value),
+                }))}
+                style={compactInputStyle}
+              >
+                {TEXT_BOX_WEIGHT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+            <label style={{ ...labelStyle, flex: 1, minWidth: 0 }}>
+              Letter spacing
+              <NumericInput
+                value={resolved.letterSpacing}
+                min={-2}
+                max={20}
+                step={0.5}
+                onValueChange={(value) => onUpdateProperties((current) => ({
+                  ...current,
+                  letterSpacing: value,
+                }))}
+                style={compactInputStyle}
+              />
+            </label>
+          </div>
 
           <InspectorColorField
             label="Text Color"
