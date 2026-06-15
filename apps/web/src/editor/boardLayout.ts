@@ -178,15 +178,18 @@ export function defaultBoardItemFrame(componentType: string, index: number): Com
         borderRadius: 20,
       };
     case 'image-area':
+      // An image layer is just the image by default — no card fill or frame
+      // behind it. A frame can be added back via the inspector appearance
+      // controls if the creator wants one.
       return {
         x: baseX,
         y: baseY,
         width: 180,
         height: 132,
-        background: 'rgba(255,255,255,0.92)',
-        borderColor: 'rgba(15,118,110,0.16)',
-        borderWidth: 1,
-        borderRadius: 18,
+        background: 'transparent',
+        borderColor: 'rgba(15,118,110,0)',
+        borderWidth: 0,
+        borderRadius: 0,
       };
     case 'network':
       return {

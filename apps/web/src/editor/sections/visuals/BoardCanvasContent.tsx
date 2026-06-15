@@ -106,6 +106,14 @@ export function buildSurfaceItem(
 
   const isSelected = childId === resolvedSelectedBoardChildId;
 
+  // An image layer is just the image — strip the legacy white "card" fill and
+  // hairline border that older image-areas were created with, unless the
+  // creator has deliberately chosen a different fill/border in the inspector.
+  const isImageArea = child.componentType === 'image-area';
+  const imageUsesLegacyDefaultFill = isImageArea && geom.background === 'rgba(255,255,255,0.92)';
+  const imageUsesLegacyDefaultBorder = isImageArea && geom.borderWidth === 1
+    && geom.borderColor === 'rgba(15,118,110,0.16)';
+
   return {
     id: childId,
     label: getComponentLabel(project, childId),
@@ -115,19 +123,22 @@ export function buildSurfaceItem(
     y: projectedFrame.y,
     width: projectedFrame.width,
     height: projectedFrame.height,
-    background: resolvePaletteColor(geom.background),
+    background: imageUsesLegacyDefaultFill ? 'transparent' : resolvePaletteColor(geom.background),
     textureId: geom.textureId ?? null,
     textureOpacity: geom.textureOpacity ?? 0.3,
     borderColor: resolvePaletteColor(geom.borderColor),
-    borderWidth: geom.borderWidth,
+    borderWidth: imageUsesLegacyDefaultBorder ? 0 : geom.borderWidth,
     borderRadius: typeof geom.borderRadius === 'number'
       ? geom.borderRadius * Math.min(projectedFrame.width / Math.max(geom.localWidth, 1), projectedFrame.height / Math.max(geom.localHeight, 1))
       : geom.borderRadius,
     clipPath: geom.clipPath ?? null,
     rotation: child.frame?.rotation ?? 0,
-    // Keep authored grids comfortably inside the rounded drag frame so
-    // the outermost hexes don't get clipped by the frame corners.
-    padding: child.componentType === 'text-box' ? 0 : isBoardGridComponentType(child.componentType) ? 12 : undefined,
+    // Text boxes and images fill their frame edge-to-edge (no inset gutter
+    // showing the item background around them). Grids keep a 12px inset so the
+    // outermost hexes don't get clipped by the rounded frame corners.
+    padding: child.componentType === 'text-box' || child.componentType === 'image-area'
+      ? 0
+      : isBoardGridComponentType(child.componentType) ? 12 : undefined,
     selected: isSelected,
     onClick: () => {
       if (selectedBoardChildId !== childId) {
