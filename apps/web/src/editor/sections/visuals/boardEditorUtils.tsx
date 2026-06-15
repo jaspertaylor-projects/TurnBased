@@ -10,6 +10,11 @@ import type {
 } from '@turnbased/engine-components';
 
 import { inputStyle } from '../../styles';
+import {
+  buildImageFilterCss,
+  buildImageTintStyle,
+  resolveImageAreaProperties,
+} from '../../components/imageAreaStyle';
 import type { EditorProject } from '../../types';
 
 type GridComponentType = 'hex-grid' | 'square-grid' | 'checkerboard-grid';
@@ -91,27 +96,66 @@ export function getGridCellSelectionLabel(
 }
 
 export function renderImageAreaContent(properties: Record<string, unknown>) {
-  const imageUrl = typeof properties.imageUrl === 'string' ? properties.imageUrl.trim() : '';
-  const opacity = typeof properties.opacity === 'number' ? properties.opacity : 1;
-  const objectFit = properties.objectFit === 'cover' || properties.objectFit === 'fill' ? properties.objectFit : 'contain';
+  const resolved = resolveImageAreaProperties(properties);
 
-  if (!imageUrl) {
-    return <div style={{ color: '#94a3b8', fontSize: '0.82rem' }}>Set an image URL in the properties panel.</div>;
+  if (!resolved.imageUrl) {
+    return (
+      <div
+        style={{
+          width: '100%',
+          height: '100%',
+          display: 'grid',
+          placeItems: 'center',
+          textAlign: 'center',
+          color: '#94a3b8',
+          fontSize: '0.82rem',
+          lineHeight: 1.4,
+          padding: '0.4rem',
+        }}
+      >
+        Add an image from the Image panel →
+      </div>
+    );
   }
 
+  const tint = buildImageTintStyle(resolved);
+
   return (
-    <img
-      src={imageUrl}
-      alt=""
-      draggable={false}
+    // imageAreaContent — fills the item frame; rounds + clips the image and
+    // overlays an optional tint wash. Positioned relative so the tint layer
+    // can absolutely cover the same rounded box.
+    <div
+      data-layout="imageAreaContent"
       style={{
+        position: 'relative',
         width: '100%',
         height: '100%',
-        objectFit,
-        opacity,
+        borderRadius: resolved.cornerRadius || undefined,
+        overflow: 'hidden',
         pointerEvents: 'none',
       }}
-    />
+    >
+      <img
+        src={resolved.imageUrl}
+        alt=""
+        draggable={false}
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: resolved.objectFit,
+          objectPosition: `${resolved.focalX * 100}% ${resolved.focalY * 100}%`,
+          opacity: resolved.opacity,
+          filter: buildImageFilterCss(resolved) || undefined,
+        }}
+      />
+      {tint ? (
+        // imageAreaTint — colour wash blended over the image for cohesion.
+        <div
+          data-layout="imageAreaTint"
+          style={{ position: 'absolute', inset: 0, ...tint }}
+        />
+      ) : null}
+    </div>
   );
 }
 

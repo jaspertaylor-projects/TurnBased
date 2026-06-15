@@ -15,6 +15,7 @@ import type {
 import { NumericInput } from '../../../components/NumericInput';
 import { InspectorAccordion, InspectorAppearanceControls } from '../../components/InspectorControls';
 import { TextBoxInspector } from '../../components/TextBoxInspector';
+import { ImageInspector } from '../../components/ImageInspector';
 import {
   getBoardGridCells,
   getGridCellAppearance,
@@ -308,6 +309,7 @@ export function BoardItemInspector({
       {!resolvedSelectedGridCell ? (() => {
         const componentType = selectedBoardChild.componentType as BuiltInComponentType;
         const isTextBox = componentType === 'text-box';
+        const isImage = componentType === 'image-area';
         const presetFamily = getPresetFamily(componentType);
         const presets = presetFamily
           ? boardPresetGroups.find((group) => group.family === presetFamily)?.presets ?? []
@@ -628,6 +630,20 @@ export function BoardItemInspector({
 
             {isTextBox ? (
               <TextBoxInspector
+                key={resolvedSelectedBoardChildId}
+                project={project}
+                properties={selectedBoardChild.properties}
+                paletteOptions={paletteOptions}
+                onAssignProjectPaletteColor={onAssignProjectPaletteColor}
+                onUpdateProperties={(updater) => onUpdateComponent(resolvedSelectedBoardChildId, (instance) => ({
+                  ...instance,
+                  properties: updater(instance.properties),
+                }))}
+              />
+            ) : null}
+
+            {isImage ? (
+              <ImageInspector
                 key={resolvedSelectedBoardChildId}
                 project={project}
                 properties={selectedBoardChild.properties}

@@ -262,17 +262,45 @@ export const entityManifests: Pick<Record<BuiltInComponentType, ComponentManifes
       opacity: { kind: 'number', label: 'Opacity' },
       objectFit: { kind: 'enum', label: 'Object Fit', options: ['cover', 'contain', 'fill'] },
     },
+    // Rich styling props (focalX/Y, cornerRadius, shadow, grayscale, sepia,
+    // brightness, tint*) are intentionally kept out of propertyDefinitions so
+    // the generic property-grid inspector stays simple — they are authored
+    // through the dedicated ImageInspector on the board surface instead.
     propertiesSchema: z.object({
       label: z.string().default('Image'),
       imageUrl: z.string().default(''),
       opacity: z.number().min(0).max(1).default(1),
       objectFit: z.enum(['cover', 'contain', 'fill']).default('contain'),
+      // Focal point (0..1) used as object-position so 'cover' crops around the
+      // subject instead of always centring.
+      focalX: z.number().min(0).max(1).default(0.5),
+      focalY: z.number().min(0).max(1).default(0.5),
+      // Rounded image corners, in board-units (mm).
+      cornerRadius: z.number().min(0).default(0),
+      // Drop-shadow strength preset.
+      shadow: z.enum(['none', 'soft', 'medium', 'strong']).default('none'),
+      // Colour adjustment filters.
+      grayscale: z.number().min(0).max(1).default(0),
+      sepia: z.number().min(0).max(1).default(0),
+      brightness: z.number().min(0.2).max(2).default(1),
+      // Colour wash overlaid on the image (empty = no tint).
+      tintColor: z.string().default(''),
+      tintStrength: z.number().min(0).max(1).default(0),
     }),
     defaultProperties: {
       label: 'Image',
       imageUrl: '',
       opacity: 1,
       objectFit: 'contain',
+      focalX: 0.5,
+      focalY: 0.5,
+      cornerRadius: 0,
+      shadow: 'none',
+      grayscale: 0,
+      sepia: 0,
+      brightness: 1,
+      tintColor: '',
+      tintStrength: 0,
     },
     renderHints: {
       surface: 'entity',
