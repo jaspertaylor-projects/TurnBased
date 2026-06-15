@@ -35,7 +35,7 @@ function bladeStyle(i: number, total: number, palette: BladePalette): CSSPropert
     height: `${height}px`,
     width: `${width}px`,
     zIndex: z,
-    background: `linear-gradient(90deg, hsl(${hue} 64% ${light - 8}%), hsl(${hue + 8} 78% ${light + 8}%), hsl(${hue} 62% ${light - 4}%))`,
+    background: `linear-gradient(90deg, hsl(${hue} 40% ${light - 9}%), hsl(${hue + 6} 50% ${light + 5}%), hsl(${hue} 38% ${light - 5}%))`,
     // CSS custom property — the grassIdleSway keyframe reads --blade-lean
     // to keep each blade rotating around its own resting angle.
     ['--blade-lean' as string]: `${lean}deg`,
@@ -105,9 +105,9 @@ export function GrassBackdrop({ height = 55 }: { height?: number }) {
   // lime so the band reads as part of the magical forest aesthetic. Blade
   // heights are tuned so the tallest front blade still fits inside `height`
   // with a small safety margin.
-  const backPalette: BladePalette = { hue: 132, hueRange: 14, light: 30, lightRange: 14, heightBase: 12, heightVar: 16 };
-  const midPalette: BladePalette = { hue: 138, hueRange: 18, light: 36, lightRange: 16, heightBase: 16, heightVar: 22 };
-  const frontPalette: BladePalette = { hue: 142, hueRange: 22, light: 40, lightRange: 18, heightBase: 20, heightVar: 28 };
+  const backPalette: BladePalette = { hue: 126, hueRange: 12, light: 22, lightRange: 10, heightBase: 12, heightVar: 16 };
+  const midPalette: BladePalette = { hue: 132, hueRange: 14, light: 27, lightRange: 12, heightBase: 16, heightVar: 22 };
+  const frontPalette: BladePalette = { hue: 138, hueRange: 16, light: 32, lightRange: 13, heightBase: 20, heightVar: 28 };
 
   return (
     <div
@@ -132,8 +132,8 @@ export function GrassBackdrop({ height = 55 }: { height?: number }) {
         style={{
           position: 'absolute',
           left: 0, right: 0, bottom: 0,
-          height: '10px',
-          background: 'linear-gradient(to top, rgba(6,78,59,0.45) 0%, rgba(6,78,59,0.08) 60%, transparent 100%)',
+          height: '14px',
+          background: 'linear-gradient(to top, rgba(26,16,6,0.7) 0%, rgba(26,16,6,0.22) 55%, transparent 100%)',
         }}
       />
 

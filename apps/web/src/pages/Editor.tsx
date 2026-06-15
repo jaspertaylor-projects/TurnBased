@@ -45,6 +45,7 @@ import {
 import { createWorkspaceFiles } from '../editor/shipping';
 import { saveProjectWorkspace } from '../editor/workspace';
 import { GrassBackdrop } from '../components/GrassBackdrop';
+import { ambientRoom } from '../editor/theme/tabletop';
 
 const GRASS_BACKDROP_HEIGHT = 55;
 
@@ -524,13 +525,13 @@ export const Editor = () => {
   const isCanvasSection = activeSection === 'component_editor' || activeSection === 'art' || activeSection === 'rules';
 
   return (
-    <div style={{
+    <div className="editor-shell" style={{
       display: 'grid',
-      gridTemplateColumns: '228px minmax(0, 1fr)',
+      gridTemplateColumns: '236px minmax(0, 1fr)',
       height: '100%',
       minHeight: 0,
       overflow: 'hidden',
-      ...(activeSection === 'art' ? { background: STUDIO_BG_VALUE } : {}),
+      background: activeSection === 'art' ? STUDIO_BG_VALUE : ambientRoom,
     }}>
       <EditorSidebar
         project={currentProject}

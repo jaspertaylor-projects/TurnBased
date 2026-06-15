@@ -16,6 +16,7 @@ import { InspectorAccordion, InspectorAppearanceControls } from '../../component
 import { BOARD_SURFACE_HEIGHT, BOARD_SURFACE_WIDTH } from '../../boardLayout';
 import type { CanonicalGeometry } from '../../boardLayout';
 import { mutedTextStyle } from '../../styles';
+import { tabletop, parchmentSurface, woodBar } from '../../theme/tabletop';
 import type { EditorProject } from '../../types';
 import type { listProjectPaletteOptions } from '../../projectPalette';
 
@@ -125,20 +126,21 @@ export function VisualInspectorColumn({
   return (
     /* inspectorColumn — right sidebar with selection header + scrollable property editors */
     <div data-layout="inspectorColumn" style={{
-      background: 'rgba(255,255,255,0.92)',
-      border: '1px solid rgba(16,185,129,0.14)',
-      borderRadius: 0,
-      boxShadow: '0 18px 48px rgba(6,78,59,0.08)',
-      backdropFilter: 'blur(12px)',
+      background: parchmentSurface,
+      border: `1px solid ${tabletop.brass.deep}`,
+      borderRadius: 14,
+      boxShadow: '0 12px 30px rgba(36,22,8,0.32)',
       display: 'grid',
       gridTemplateRows: 'auto minmax(0, 1fr)',
       minHeight: 0,
       overflow: 'hidden',
     }}>
-      {/* inspectorHeader — shows selected component name + action buttons */}
+      {/* inspectorHeader — wooden title plaque with the selected component name */}
       <div data-layout="inspectorHeader" style={{
-        padding: '0.5rem 0.75rem',
-        background: 'linear-gradient(135deg, #064e3b 0%, #0f766e 100%)',
+        padding: '0.55rem 0.75rem',
+        background: woodBar,
+        borderBottom: `2px solid ${tabletop.brass.deep}`,
+        boxShadow: 'inset 0 1px 0 rgba(255,225,180,0.22)',
         display: 'flex',
         alignItems: 'center',
         gap: '0.45rem',
@@ -173,7 +175,7 @@ export function VisualInspectorColumn({
             ? getGridCellSelectionLabel(project, selectedBoardChild, resolvedSelectedGridCell)
             : getComponentLabel(project, compId);
           return (
-            <span title={label} style={{ fontSize: '0.82rem', fontWeight: 700, color: '#ffffff', flex: '1 1 auto', minWidth: 0, whiteSpace: 'normal', wordBreak: 'break-word', lineHeight: 1.25 }}>
+            <span title={label} style={{ fontFamily: '"Cormorant Garamond", Georgia, serif', fontSize: '1.12rem', fontWeight: 700, letterSpacing: '0.02em', color: tabletop.ink.onWood, flex: '1 1 auto', minWidth: 0, whiteSpace: 'normal', wordBreak: 'break-word', lineHeight: 1.2 }}>
               {label}
             </span>
           );

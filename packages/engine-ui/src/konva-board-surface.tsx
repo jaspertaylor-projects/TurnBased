@@ -65,7 +65,15 @@ export interface KonvaBoardSurfaceProps {
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
-const CANVAS_BG = '#1a1a2e';
+/** Deep walnut behind everything — the dim, lamplit corner of the gaming room. */
+const CANVAS_BG = '#241608';
+/** Warm walnut desk surface: a soft top light, a grounding bottom vignette, a
+ *  faint plank grain, then the real wood texture for fibre detail. */
+const WOOD_SURFACE_IMAGE = "radial-gradient(120% 90% at 50% -8%, rgba(255,214,150,0.16), rgba(0,0,0,0) 52%), radial-gradient(140% 140% at 50% 120%, rgba(0,0,0,0.55), rgba(0,0,0,0) 60%), repeating-linear-gradient(93deg, rgba(0,0,0,0.06) 0 2px, rgba(255,255,255,0.015) 2px 6px), linear-gradient(160deg, rgba(96,61,31,0.55), rgba(51,33,15,0.72)), url('/textures/wood_texture.png')";
+const WOOD_SURFACE_SIZE = 'cover, cover, auto, cover, 520px auto';
+const WOOD_SURFACE_REPEAT = 'no-repeat, no-repeat, repeat, no-repeat, repeat';
+/** Deep forest felt play-mat the board rests on. */
+const FELT_SURFACE = "radial-gradient(110% 85% at 50% 30%, rgba(180,230,200,0.12), rgba(0,0,0,0) 60%), radial-gradient(140% 130% at 50% 112%, rgba(0,0,0,0.42), rgba(0,0,0,0) 62%), repeating-linear-gradient(45deg, rgba(0,0,0,0.05) 0 1px, rgba(255,255,255,0.02) 1px 3px), repeating-linear-gradient(-45deg, rgba(0,0,0,0.04) 0 1px, rgba(255,255,255,0.015) 1px 3px), linear-gradient(160deg, #35624b, #274838 55%, #1f3a2c)";
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 40;
 /** Physical bleed margin in mm — matches supplier spec (36/300 inch). */
@@ -539,9 +547,9 @@ export function KonvaBoardSurface({
         height: '100%',
         borderRadius: surfaceBorderRadius ?? 8,
         backgroundColor: CANVAS_BG,
-        backgroundImage: "radial-gradient(ellipse at center, rgba(0,0,0,0) 45%, rgba(0,0,0,0.35) 100%), linear-gradient(rgba(30,19,10,0.55), rgba(30,19,10,0.55)), url('/textures/wood_texture.png')",
-        backgroundSize: 'cover, auto, 520px auto',
-        backgroundRepeat: 'no-repeat, repeat, repeat',
+        backgroundImage: WOOD_SURFACE_IMAGE,
+        backgroundSize: WOOD_SURFACE_SIZE,
+        backgroundRepeat: WOOD_SURFACE_REPEAT,
         overflow: 'hidden',
       }}
     >
@@ -554,18 +562,23 @@ export function KonvaBoardSurface({
         // Match the ruler dimensions declared in the unitsRuler block.
         const rulerOuter = showUnits ? 30 + 4 : 0; // RULER_W + RULER_GAP
         const pad = 18;
+        const matPad = pad + 14; // a little extra felt margin around the mat
         return (
           <div
             data-layout="workMat"
+            /* felt play-mat the board rests on: forest baize with a stitched
+               brass edge, a soft inner vignette, and a grounded drop shadow so
+               it reads as a physical mat lying on the wooden desk. */
             style={{
               position: 'absolute',
-              left: ox - bleed - rulerOuter - pad,
-              top: oy - bleed - rulerOuter - pad,
-              width: boardPxW + bleed * 2 + rulerOuter + pad * 2,
-              height: boardPxH + bleed * 2 + rulerOuter + pad * 2,
-              background: '#0a0a0a',
-              borderRadius: 14,
-              boxShadow: '0 24px 60px rgba(0,0,0,0.55), 0 6px 14px rgba(0,0,0,0.4)',
+              left: ox - bleed - rulerOuter - matPad,
+              top: oy - bleed - rulerOuter - matPad,
+              width: boardPxW + bleed * 2 + rulerOuter + matPad * 2,
+              height: boardPxH + bleed * 2 + rulerOuter + matPad * 2,
+              background: FELT_SURFACE,
+              borderRadius: 18,
+              border: '1px solid rgba(184,146,78,0.35)',
+              boxShadow: '0 30px 70px rgba(0,0,0,0.55), 0 8px 18px rgba(0,0,0,0.42), inset 0 0 0 6px rgba(31,58,44,0.55), inset 0 0 0 7px rgba(184,146,78,0.30), inset 0 0 60px rgba(0,0,0,0.40)',
               pointerEvents: 'none',
               zIndex: 0,
             }}
@@ -590,9 +603,10 @@ export function KonvaBoardSurface({
               top: oy - bleed,
               width: boardPxW + bleed * 2,
               height: boardPxH + bleed * 2,
-              backgroundColor: '#6b7280',
-              backgroundImage: 'repeating-linear-gradient(45deg, rgba(255,255,255,0.18) 0 6px, transparent 6px 14px)',
+              backgroundColor: 'rgba(231,216,180,0.92)',
+              backgroundImage: 'repeating-linear-gradient(45deg, rgba(138,106,51,0.22) 0 5px, rgba(231,216,180,0) 5px 12px)',
               clipPath: bleedClip,
+              boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
               pointerEvents: 'none',
               zIndex: 0,
             }}

@@ -7,6 +7,7 @@ import { ProjectColorPicker, getBoardSurfaceTextureStyle } from '@turnbased/engi
 import type { PaletteColorOption } from '@turnbased/engine-ui';
 
 import { inputStyle, labelStyle } from '../styles';
+import { tabletop } from '../theme/tabletop';
 
 interface InspectorAccordionProps {
   title: string;
@@ -115,7 +116,7 @@ export function InspectorAccordion({
   }, [isOpen]);
 
   return (
-    <div style={{ borderTop: '1px solid rgba(15,118,110,0.10)', alignSelf: 'start' }}>
+    <div style={{ borderTop: `1px solid ${tabletop.parchment.edge}`, alignSelf: 'start' }}>
       <button
         type="button"
         className="inspector-accordion-trigger"
@@ -125,16 +126,16 @@ export function InspectorAccordion({
           alignItems: 'center',
           justifyContent: 'space-between',
           width: 'calc(100% + 0.9rem)',
-          padding: compact && !isOpen ? '0.36rem 0.45rem' : '0.55rem 0.45rem',
+          padding: compact && !isOpen ? '0.42rem 0.45rem' : '0.6rem 0.45rem',
           margin: '0 -0.45rem',
           border: 'none',
           borderRadius: '8px',
           background: 'none',
           cursor: 'pointer',
-          color: '#0f766e',
+          color: tabletop.brass.deep,
           fontSize: compact && !isOpen ? '0.72rem' : '0.76rem',
-          fontWeight: 600,
-          letterSpacing: '0.08em',
+          fontWeight: 800,
+          letterSpacing: '0.13em',
           textTransform: 'uppercase',
           textAlign: 'left',
           lineHeight: 1.1,
@@ -147,7 +148,7 @@ export function InspectorAccordion({
           style={{
             transition: 'transform 180ms ease, color 140ms ease',
             transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)',
-            color: '#0d9488',
+            color: tabletop.brass.base,
           }}
         />
       </button>
@@ -159,7 +160,8 @@ export function InspectorAccordion({
           transition: 'height 200ms ease',
         }}
       >
-        <div style={{ height: 3, borderRadius: 2, background: 'rgba(15,118,110,0.12)', marginBottom: '0.35rem' }} />
+        {/* brass hairline rule under the section heading */}
+        <div style={{ height: 2, borderRadius: 2, background: `linear-gradient(90deg, ${tabletop.brass.base}, ${tabletop.brass.light} 40%, rgba(184,146,78,0))`, marginBottom: '0.45rem' }} />
         <div style={{ display: 'grid', gap: '0.6rem', paddingBottom: '0.5rem' }}>
           {children}
         </div>

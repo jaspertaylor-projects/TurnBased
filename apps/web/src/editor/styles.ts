@@ -1,5 +1,7 @@
 import type { CSSProperties } from 'react';
 
+import { tabletop, parchmentSurface, cardShadow, sunkenShadow } from './theme/tabletop';
+
 /** Root layout for editor pages — flex row that fills the main content area. */
 export const pageStyle: CSSProperties = {
   flex: '1 1 0',
@@ -15,55 +17,57 @@ export const pageStyle: CSSProperties = {
   maxWidth: '100vw',
 };
 
+/** A parchment card resting on the desk — the default surface for panels and
+ *  inspector sections. */
 export const panelStyle: CSSProperties = {
-  background: 'rgba(255,255,255,0.92)',
-  border: '1px solid rgba(16,185,129,0.14)',
-  borderRadius: '20px',
-  boxShadow: '0 18px 48px rgba(6,78,59,0.08)',
+  background: parchmentSurface,
+  border: `1px solid ${tabletop.parchment.edge}`,
+  borderRadius: '16px',
+  boxShadow: cardShadow,
   padding: '1rem',
-  backdropFilter: 'blur(12px)',
 };
 
+/** Small engraved-brass section heading. */
 export const sectionTitleStyle: CSSProperties = {
-  fontSize: '0.8rem',
-  letterSpacing: '0.08em',
+  fontSize: '0.72rem',
+  fontWeight: 800,
+  letterSpacing: '0.14em',
   textTransform: 'uppercase',
-  color: '#0f766e',
+  color: tabletop.brass.deep,
   margin: '0 0 0.7rem 0',
 };
 
 export const labelStyle: CSSProperties = {
   display: 'grid',
   gap: '0.35rem',
-  color: '#0f766e',
-  fontSize: '0.84rem',
+  color: tabletop.ink.soft,
+  fontSize: '0.82rem',
+  fontWeight: 600,
 };
 
+/** A field "carved" into the parchment — sunken cream with an inset shadow. */
 export const inputStyle: CSSProperties = {
   width: '100%',
-  padding: '0.75rem 0.85rem',
-  borderRadius: '12px',
-  border: '1px solid rgba(15,118,110,0.12)',
+  padding: '0.72rem 0.82rem',
+  borderRadius: '10px',
+  border: `1px solid ${tabletop.parchment.edge}`,
   boxSizing: 'border-box',
-  color: '#064e3b',
-  background: 'rgba(255,255,255,0.9)',
+  color: tabletop.ink.strong,
+  backgroundColor: tabletop.parchment.sunken,
+  boxShadow: sunkenShadow,
+  fontWeight: 600,
 };
 
 export const textareaStyle: CSSProperties = {
   ...inputStyle,
   minHeight: '92px',
   resize: 'vertical',
+  fontWeight: 500,
+  lineHeight: 1.5,
 };
 
 export const mutedTextStyle: CSSProperties = {
   margin: 0,
-  color: '#0f766e',
+  color: tabletop.ink.soft,
   lineHeight: 1.6,
-};
-
-export const sidebarSectionStyle: CSSProperties = {
-  borderRadius: 0,
-  border: '1px solid rgba(15,118,110,0.1)',
-  background: 'rgba(255,255,255,0.68)',
-  overflow: 'hidden',
 };

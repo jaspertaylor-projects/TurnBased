@@ -8,6 +8,7 @@ import {
 import type { BuiltInComponentType } from '@turnbased/engine-components';
 
 import { renderComponentIcon } from '../componentMeta';
+import { tabletop, parchmentSurface, cardShadow } from '../theme/tabletop';
 import type { EditorProject } from '../types';
 
 const ALLOWED_TOP_LEVEL_TYPES = new Set(['board', 'deck', 'tile']);
@@ -72,12 +73,12 @@ const cardBaseStyle: CSSProperties = {
   gap: '0.65rem',
   padding: '1.1rem 1rem 1rem 1rem',
   borderRadius: '16px',
-  border: '1px solid rgba(15,118,110,0.14)',
-  background: 'rgba(255,255,255,0.92)',
-  boxShadow: '0 2px 12px rgba(15,118,110,0.06)',
+  border: `1px solid ${tabletop.parchment.edge}`,
+  background: parchmentSurface,
+  boxShadow: cardShadow,
   cursor: 'pointer',
   textAlign: 'left',
-  color: '#064e3b',
+  color: tabletop.ink.strong,
   minHeight: '156px',
   transition: 'transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease',
 };
@@ -87,14 +88,15 @@ const cardPreviewStyle: CSSProperties = {
   placeItems: 'center',
   aspectRatio: '4 / 3',
   borderRadius: '12px',
-  background: 'linear-gradient(135deg, rgba(236,253,245,0.9), rgba(209,250,229,0.55))',
-  border: '1px solid rgba(15,118,110,0.08)',
+  background: 'linear-gradient(160deg, #35624b, #274838 60%, #1f3a2c)',
+  border: `1px solid ${tabletop.brass.deep}`,
+  boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.35), inset 0 0 0 3px rgba(31,58,44,0.5)',
 };
 
 const createCardStyle: CSSProperties = {
   ...cardBaseStyle,
-  background: 'rgba(236,253,245,0.75)',
-  borderStyle: 'dashed',
+  background: 'rgba(247,239,218,0.45)',
+  border: `1.5px dashed ${tabletop.brass.base}`,
 };
 
 /* ------------------------------------------------------------------ */
@@ -123,32 +125,32 @@ function ComponentCard({ project, instanceId, onSelect }: ComponentCardProps) {
       onClick={() => onSelect(instanceId)}
       onMouseEnter={(e) => {
         const el = e.currentTarget as HTMLButtonElement;
-        el.style.transform = 'translateY(-2px)';
-        el.style.boxShadow = '0 8px 24px rgba(15,118,110,0.14)';
-        el.style.borderColor = 'rgba(15,118,110,0.3)';
+        el.style.transform = 'translateY(-3px)';
+        el.style.boxShadow = '0 4px 8px rgba(36,22,8,0.22), 0 20px 40px rgba(36,22,8,0.34)';
+        el.style.borderColor = tabletop.brass.base;
       }}
       onMouseLeave={(e) => {
         const el = e.currentTarget as HTMLButtonElement;
         el.style.transform = 'none';
         el.style.boxShadow = cardBaseStyle.boxShadow as string;
-        el.style.borderColor = 'rgba(15,118,110,0.14)';
+        el.style.borderColor = tabletop.parchment.edge;
       }}
       style={cardBaseStyle}
     >
-      <div data-layout="componentCardPreview" /* icon placeholder for future thumbnail */ style={cardPreviewStyle}>
-        {renderComponentIcon(instance.componentType, { size: 48, style: { color: '#0f766e' } })}
+      <div data-layout="componentCardPreview" /* felt-mat thumbnail with the component glyph */ style={cardPreviewStyle}>
+        {renderComponentIcon(instance.componentType, { size: 46, style: { color: '#f3e4c6' } })}
       </div>
       <div data-layout="componentCardLabelRow" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', minWidth: 0 }}>
-        <span style={{ fontWeight: 800, fontSize: '0.95rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <span style={{ fontFamily: '"Cormorant Garamond", Georgia, serif', fontWeight: 700, fontSize: '1.18rem', letterSpacing: '0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {label}
         </span>
         {quantity > 1 ? (
-          <span style={{ flex: '0 0 auto', fontSize: '0.72rem', fontWeight: 700, color: '#0f766e', background: 'rgba(236,253,245,0.95)', borderRadius: '8px', padding: '0.1rem 0.45rem', border: '1px solid rgba(15,118,110,0.14)' }}>
+          <span style={{ flex: '0 0 auto', fontSize: '0.72rem', fontWeight: 800, color: '#3a2c10', background: 'linear-gradient(180deg, #d8b977, #b8924e)', borderRadius: '8px', padding: '0.1rem 0.45rem', border: `1px solid ${tabletop.brass.deep}` }}>
             ×{quantity}
           </span>
         ) : null}
       </div>
-      <div style={{ fontSize: '0.78rem', color: '#6b7280', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+      <div style={{ fontSize: '0.78rem', color: tabletop.ink.soft, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
         {subtitle}
       </div>
     </button>
@@ -171,23 +173,23 @@ function CreateComponentCard({ onCreateComponent }: CreateComponentCardProps) {
         onClick={() => setMenuOpen((open) => !open)}
         onMouseEnter={(e) => {
           const el = e.currentTarget as HTMLButtonElement;
-          el.style.transform = 'translateY(-2px)';
-          el.style.boxShadow = '0 8px 24px rgba(15,118,110,0.14)';
-          el.style.borderColor = '#0f766e';
+          el.style.transform = 'translateY(-3px)';
+          el.style.boxShadow = '0 4px 8px rgba(36,22,8,0.22), 0 20px 40px rgba(36,22,8,0.34)';
+          el.style.borderColor = tabletop.brass.deep;
         }}
         onMouseLeave={(e) => {
           const el = e.currentTarget as HTMLButtonElement;
           el.style.transform = 'none';
           el.style.boxShadow = cardBaseStyle.boxShadow as string;
-          el.style.borderColor = 'rgba(15,118,110,0.14)';
+          el.style.borderColor = tabletop.brass.base;
         }}
         style={createCardStyle}
       >
-        <div style={{ ...cardPreviewStyle, background: 'rgba(255,255,255,0.6)' }}>
-          <Plus size={44} color="#0f766e" strokeWidth={2.5} />
+        <div style={{ ...cardPreviewStyle, background: 'rgba(247,239,218,0.5)', border: `1.5px dashed ${tabletop.brass.base}`, boxShadow: 'none' }}>
+          <Plus size={44} color={tabletop.brass.deep} strokeWidth={2.5} />
         </div>
-        <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>New component</div>
-        <div style={{ fontSize: '0.78rem', color: '#6b7280' }}>Board, tile, or deck</div>
+        <div style={{ fontFamily: '"Cormorant Garamond", Georgia, serif', fontWeight: 700, fontSize: '1.18rem' }}>New component</div>
+        <div style={{ fontSize: '0.78rem', color: tabletop.ink.soft }}>Board, tile, or deck</div>
       </button>
 
       {menuOpen ? (
@@ -204,9 +206,9 @@ function CreateComponentCard({ onCreateComponent }: CreateComponentCardProps) {
               zIndex: 50,
               marginTop: '0.35rem',
               borderRadius: '14px',
-              border: '1px solid rgba(15,118,110,0.14)',
-              background: 'rgba(255,255,255,0.98)',
-              boxShadow: '0 8px 28px rgba(0,0,0,0.14)',
+              border: `1px solid ${tabletop.brass.base}`,
+              background: parchmentSurface,
+              boxShadow: cardShadow,
               padding: '0.3rem',
               display: 'grid',
               gap: '0.2rem',
@@ -231,7 +233,7 @@ function CreateComponentCard({ onCreateComponent }: CreateComponentCardProps) {
                   gap: '0.14rem',
                   cursor: 'pointer',
                 }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(236,253,245,0.9)'; }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(184,146,78,0.16)'; }}
                 onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
               >
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.86rem', fontWeight: 700 }}>
@@ -279,10 +281,10 @@ export function ComponentGallery({ project, componentOutlineIds, onSelectCompone
     <div data-layout="componentGalleryPage" /* intermediate view between sidebar and per-component editor */ style={pageStyle}>
       <div data-layout="componentGalleryHeading" style={headingRowStyle}>
         <div>
-          <div style={{ color: '#0f766e', fontSize: '0.82rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Component Editor</div>
-          <h1 style={{ margin: '0.2rem 0 0 0', color: '#064e3b', fontSize: '1.5rem', fontWeight: 800 }}>Your components</h1>
+          <div style={{ color: tabletop.brass.light, fontSize: '0.74rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.16em' }}>Component Editor</div>
+          <h1 style={{ margin: '0.15rem 0 0 0', fontFamily: '"Cormorant Garamond", Georgia, serif', color: tabletop.ink.onWood, fontSize: '2rem', fontWeight: 700, letterSpacing: '0.01em' }}>Your components</h1>
         </div>
-        <div style={{ color: '#6b7280', fontSize: '0.88rem' }}>
+        <div style={{ color: tabletop.ink.onWoodSoft, fontSize: '0.88rem' }}>
           {componentOutlineIds.length === 0
             ? 'No components yet — create your first one to start.'
             : `${componentOutlineIds.length} component${componentOutlineIds.length === 1 ? '' : 's'}`}

@@ -32,6 +32,7 @@ import {
   isMovableComponentType,
 } from '../boardLayout';
 import type { EditorProject } from '../types';
+import { tabletop, woodBar } from '../theme/tabletop';
 
 import {
   BOARD_PRESET_FAMILY_ORDER,
@@ -548,11 +549,12 @@ export function VisualsSection({
         alignItems: 'center',
         justifyContent: 'space-between',
         gap: 12,
-        padding: '6px 10px',
-        background: 'rgba(255,255,255,0.92)',
-        border: '1px solid rgba(16,185,129,0.14)',
-        boxShadow: '0 6px 18px rgba(6,78,59,0.06)',
-        minHeight: 36,
+        padding: '6px 12px',
+        background: woodBar,
+        border: `1px solid ${tabletop.brass.deep}`,
+        borderRadius: 12,
+        boxShadow: '0 8px 22px rgba(36,22,8,0.40), inset 0 1px 0 rgba(255,225,180,0.22)',
+        minHeight: 38,
       }}>
         <div data-layout="componentEditorTopBarLeft" /* back-to-gallery button + heading */ style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {onReturnToGallery ? (
@@ -567,36 +569,51 @@ export function VisualsSection({
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 5,
-                padding: '4px 9px 4px 7px',
-                borderRadius: 10,
-                border: '1px solid rgba(15,118,110,0.18)',
-                background: 'rgba(236,253,245,0.9)',
-                color: '#064e3b',
+                padding: '4px 10px 4px 8px',
+                borderRadius: 9,
+                border: '1px solid rgba(216,185,119,0.45)',
+                background: 'rgba(247,239,218,0.14)',
+                color: tabletop.ink.onWood,
                 fontSize: '0.74rem',
                 fontWeight: 700,
                 cursor: 'pointer',
               }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(209,250,229,0.95)'; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(236,253,245,0.9)'; }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(247,239,218,0.26)'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(247,239,218,0.14)'; }}
             >
               <span aria-hidden style={{ fontSize: '0.9rem', lineHeight: 1, marginTop: -1 }}>‹</span>
               All components
             </button>
           ) : null}
-          <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#064e3b', letterSpacing: '0.02em' }}>Component Editor</div>
+          <div style={{ fontFamily: '"Cormorant Garamond", Georgia, serif', fontSize: '1.05rem', fontWeight: 700, color: tabletop.ink.onWood, letterSpacing: '0.04em' }}>Component Editor</div>
         </div>
-        {/* viewToggleGroup — checkbox controls for grid, bleed, units, snap */}
-        <div data-layout="viewToggleGroup" style={{ display: 'flex', alignItems: 'center', gap: 14, fontSize: '0.72rem', color: '#0f766e', fontWeight: 600 }}>
+        {/* viewToggleGroup — brass toggle chips for grid, bleed, units, snap */}
+        <div data-layout="viewToggleGroup" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           {([
-            { id: 'grid', label: 'Show grid', value: showEditorGrid, onChange: setShowEditorGrid },
-            { id: 'bleed', label: 'Show bleed area', value: showBleedArea, onChange: setShowBleedArea },
-            { id: 'units', label: 'Show units', value: showUnits, onChange: setShowUnits },
-            { id: 'snap', label: 'Snap alignment', value: snapAlignment, onChange: setSnapAlignment },
+            { id: 'grid', label: 'Grid', value: showEditorGrid, onChange: setShowEditorGrid },
+            { id: 'bleed', label: 'Bleed', value: showBleedArea, onChange: setShowBleedArea },
+            { id: 'units', label: 'Units', value: showUnits, onChange: setShowUnits },
+            { id: 'snap', label: 'Snap', value: snapAlignment, onChange: setSnapAlignment },
           ] as const).map((opt) => (
-            <label key={opt.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, cursor: 'pointer', userSelect: 'none' }}>
-              <input type="checkbox" checked={opt.value} onChange={(e) => opt.onChange(e.currentTarget.checked)} style={{ accentColor: '#10b981', cursor: 'pointer' }} />
+            <button
+              key={opt.id}
+              type="button"
+              onClick={() => opt.onChange(!opt.value)}
+              aria-pressed={opt.value}
+              title={`Toggle ${opt.label.toLowerCase()}`}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                padding: '4px 10px', borderRadius: 999, cursor: 'pointer',
+                fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.02em',
+                border: opt.value ? '1px solid rgba(216,185,119,0.7)' : '1px solid rgba(216,185,119,0.28)',
+                background: opt.value ? 'linear-gradient(180deg, #d8b977, #b8924e)' : 'rgba(247,239,218,0.10)',
+                color: opt.value ? '#3a2c10' : 'rgba(243,228,198,0.78)',
+                boxShadow: opt.value ? 'inset 0 1px 0 rgba(255,255,255,0.4)' : 'none',
+              }}
+            >
+              <span aria-hidden style={{ width: 6, height: 6, borderRadius: 999, background: opt.value ? '#3a2c10' : 'rgba(243,228,198,0.4)' }} />
               {opt.label}
-            </label>
+            </button>
           ))}
           {/* orientationToggle — swap board width/height between landscape and portrait */}
           {activeBoardId && boardRenderWidth !== boardRenderHeight ? (
@@ -617,12 +634,12 @@ export function VisualsSection({
               }}
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 5,
-                marginLeft: 4, borderLeft: '1px solid rgba(15,118,110,0.15)', paddingLeft: 10,
-                height: 26, borderRadius: 6, paddingRight: 8,
-                border: '1px solid rgba(15,118,110,0.15)',
-                background: 'rgba(240,253,250,0.9)',
-                color: '#0f766e', cursor: 'pointer',
-                fontSize: '0.72rem', fontWeight: 600,
+                marginLeft: 6, paddingLeft: 10,
+                height: 26, borderRadius: 999, paddingRight: 10,
+                border: '1px solid rgba(216,185,119,0.4)',
+                background: 'rgba(247,239,218,0.12)',
+                color: tabletop.ink.onWood, cursor: 'pointer',
+                fontSize: '0.72rem', fontWeight: 700,
               }}
             >
               <ArrowRightLeft size={13} />
@@ -643,11 +660,13 @@ export function VisualsSection({
               alignItems: 'center',
               gap: 0,
               padding: '6px 14px',
-              background: '#064e3b',
+              background: woodBar,
+              border: `1px solid ${tabletop.brass.deep}`,
+              boxShadow: 'inset 0 1px 0 rgba(255,225,180,0.22), 0 6px 16px rgba(36,22,8,0.35)',
               minHeight: 38,
               flexShrink: 0,
               overflow: 'hidden',
-              borderRadius: 14,
+              borderRadius: 12,
             }}>
               {componentPath.map((entry, i) => {
                 const isLast = i === componentPath.length - 1;
@@ -656,7 +675,7 @@ export function VisualsSection({
                   /* pathSegment — single breadcrumb entry */
                   <div data-layout="pathSegment" key={entry.id} style={{ display: 'contents' }}>
                     {i > 0 && (
-                      <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12, margin: '0 6px', flexShrink: 0, userSelect: 'none' }}>/</span>
+                      <span style={{ color: 'rgba(216,185,119,0.55)', fontSize: 12, margin: '0 6px', flexShrink: 0, userSelect: 'none' }}>/</span>
                     )}
                     <button
                       type="button"
@@ -677,9 +696,9 @@ export function VisualsSection({
                         padding: '4px 8px',
                         cursor: 'pointer',
                         fontSize: 12,
-                        fontWeight: isLast ? 700 : 500,
-                        color: isLast ? '#ffffff' : 'rgba(255,255,255,0.6)',
-                        background: isLast ? 'rgba(16,185,129,0.25)' : 'transparent',
+                        fontWeight: isLast ? 800 : 600,
+                        color: isLast ? '#3a2c10' : 'rgba(243,228,198,0.72)',
+                        background: isLast ? 'linear-gradient(180deg, #d8b977, #b8924e)' : 'transparent',
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
@@ -688,7 +707,7 @@ export function VisualsSection({
                         minWidth: 0,
                         transition: 'background 0.15s',
                       }}
-                      onMouseEnter={(e) => { if (!isLast) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)'; }}
+                      onMouseEnter={(e) => { if (!isLast) (e.currentTarget as HTMLElement).style.background = 'rgba(247,239,218,0.12)'; }}
                       onMouseLeave={(e) => { if (!isLast) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
                     >
                       {renderComponentIcon(entry.componentType, { size: 13, style: { color: 'currentColor', flexShrink: 0 } })}

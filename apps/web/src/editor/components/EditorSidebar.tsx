@@ -1,19 +1,35 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { useEffect, useState } from 'react';
-import { Check, ChevronDown, GitBranch, Plus, Save, Sparkles, X } from 'lucide-react';
+import {
+  BarChart3, BookOpen, Check, ChevronDown, GitBranch, LayoutPanelTop, Palette, Plus,
+  Save, Shapes, Sparkles, X,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 import { SECTION_OPTIONS } from '../constants';
 import type { EditorSection } from '../constants';
 import { panelStyle } from '../styles';
+import { tabletop } from '../theme/tabletop';
 import type { EditorProject } from '../types';
+
+const SECTION_ICONS: Record<EditorSection, LucideIcon> = {
+  rules: BookOpen,
+  stats: BarChart3,
+  art: Palette,
+  component_editor: Shapes,
+  versions: GitBranch,
+  app_layout: LayoutPanelTop,
+};
 
 function SectionButton({
   active,
   label,
+  icon: Icon,
   onClick,
 }: {
   active: boolean;
   label: string;
+  icon: LucideIcon;
   onClick: () => void;
 }) {
   return (
@@ -21,20 +37,32 @@ function SectionButton({
       type="button"
       onClick={onClick}
       style={{
+        position: 'relative',
         textAlign: 'left',
-        padding: '0.46rem 0.5rem',
-        borderRadius: '14px',
-        border: 'none',
-        background: active ? 'rgba(16,185,129,0.14)' : 'transparent',
-        color: active ? '#064e3b' : '#0f766e',
+        padding: '0.5rem 0.6rem 0.5rem 0.7rem',
+        borderRadius: '11px',
+        border: active ? `1px solid ${tabletop.brass.base}` : '1px solid transparent',
+        background: active
+          ? 'linear-gradient(180deg, rgba(216,185,119,0.32), rgba(184,146,78,0.18))'
+          : 'transparent',
+        color: active ? tabletop.ink.strong : tabletop.ink.soft,
         display: 'flex',
         alignItems: 'center',
-        fontSize: '0.88rem',
-        fontWeight: active ? 700 : 500,
+        gap: '0.55rem',
+        fontSize: '0.9rem',
+        fontWeight: active ? 800 : 600,
         minWidth: 0,
         cursor: 'pointer',
+        boxShadow: active ? 'inset 0 1px 0 rgba(255,255,255,0.4)' : 'none',
       }}
+      onMouseEnter={(e) => { if (!active) (e.currentTarget as HTMLElement).style.background = 'rgba(184,146,78,0.10)'; }}
+      onMouseLeave={(e) => { if (!active) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
     >
+      {/* brass rail marks the active section like a tab on a binder */}
+      {active ? (
+        <span aria-hidden style={{ position: 'absolute', left: 0, top: 6, bottom: 6, width: 3, borderRadius: 999, background: tabletop.brass.deep }} />
+      ) : null}
+      <Icon size={16} style={{ flexShrink: 0, color: active ? tabletop.brass.deep : tabletop.ink.faint }} />
       <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
         {label.toLowerCase()}
       </span>
@@ -118,8 +146,8 @@ export function EditorSidebar({
         borderLeft: 'none',
         borderTop: 'none',
         borderBottom: 'none',
-        borderRight: '1px solid rgba(15,118,110,0.12)',
-        boxShadow: 'none',
+        borderRight: `2px solid ${tabletop.brass.deep}`,
+        boxShadow: '6px 0 18px rgba(36,22,8,0.22)',
       }}
     >
       <div
@@ -129,7 +157,7 @@ export function EditorSidebar({
           position: 'relative',
           marginBottom: '0.7rem',
           paddingBottom: '0.68rem',
-          borderBottom: '1px solid rgba(15,118,110,0.12)',
+          borderBottom: `1px solid ${tabletop.parchment.edge}`,
         }}
       >
         <div
@@ -420,12 +448,14 @@ export function EditorSidebar({
           // Component editor gets its own click handler so clicking the sidebar
           // button drops the user into the intermediate gallery view instead of
           // an arbitrary component.
+          const Icon = SECTION_ICONS[section.id];
           if (section.id === 'component_editor') {
             return (
               <SectionButton
                 key={section.id}
                 active={isActive}
                 label={section.label}
+                icon={Icon}
                 onClick={onOpenComponentEditor}
               />
             );
@@ -435,6 +465,7 @@ export function EditorSidebar({
               key={section.id}
               active={isActive}
               label={section.label}
+              icon={Icon}
               onClick={() => setActiveSection(section.id)}
             />
           );
