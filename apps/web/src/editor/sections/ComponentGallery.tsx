@@ -1,19 +1,13 @@
 import { useState } from 'react';
 import type { CSSProperties } from 'react';
 import { Plus } from 'lucide-react';
-import {
-  getBuiltInComponentManifest,
-  listAuthorableBuiltInComponents,
-} from '@turnbased/engine-components';
+import { getBuiltInComponentManifest } from '@turnbased/engine-components';
 import type { BuiltInComponentType } from '@turnbased/engine-components';
 
 import { renderComponentIcon } from '../componentMeta';
 import { tabletop, parchmentSurface, cardShadow } from '../theme/tabletop';
+import { NewComponentDialog, type NewComponentCatalog } from './rules/NewComponentDialog';
 import type { EditorProject } from '../types';
-
-const ALLOWED_TOP_LEVEL_TYPES = new Set(['board', 'deck', 'tile']);
-const TOP_LEVEL_COMPONENT_OPTIONS = listAuthorableBuiltInComponents('top-level')
-  .filter((manifest) => ALLOWED_TOP_LEVEL_TYPES.has(manifest.type));
 
 function getComponentLabel(project: EditorProject, instanceId: string): string {
   const instance = project.instances[instanceId];
@@ -157,111 +151,33 @@ function ComponentCard({ project, instanceId, onSelect }: ComponentCardProps) {
   );
 }
 
-interface CreateComponentCardProps {
-  onCreateComponent: (type: BuiltInComponentType) => void;
-}
-
-function CreateComponentCard({ onCreateComponent }: CreateComponentCardProps) {
-  const [menuOpen, setMenuOpen] = useState(false);
-
+function CreateComponentCard({ onOpen }: { onOpen: () => void }) {
   return (
-    <div data-layout="createComponentCardWrapper" /* hosts the new-component button + its popover menu */ style={{ position: 'relative' }}>
-      <button
-        type="button"
-        data-layout="createComponentCard"
-        /* opens a small popover with the list of top-level component types */
-        onClick={() => setMenuOpen((open) => !open)}
-        onMouseEnter={(e) => {
-          const el = e.currentTarget as HTMLButtonElement;
-          el.style.transform = 'translateY(-3px)';
-          el.style.boxShadow = '0 4px 8px rgba(36,22,8,0.22), 0 20px 40px rgba(36,22,8,0.34)';
-          el.style.borderColor = tabletop.brass.deep;
-        }}
-        onMouseLeave={(e) => {
-          const el = e.currentTarget as HTMLButtonElement;
-          el.style.transform = 'none';
-          el.style.boxShadow = cardBaseStyle.boxShadow as string;
-          el.style.borderColor = tabletop.brass.base;
-        }}
-        style={createCardStyle}
-      >
-        <div style={{ ...cardPreviewStyle, background: 'rgba(247,239,218,0.5)', border: `1.5px dashed ${tabletop.brass.base}`, boxShadow: 'none' }}>
-          <Plus size={44} color={tabletop.brass.deep} strokeWidth={2.5} />
-        </div>
-        <div style={{ fontFamily: '"Cormorant Garamond", Georgia, serif', fontWeight: 700, fontSize: '1.18rem' }}>New component</div>
-        <div style={{ fontSize: '0.78rem', color: tabletop.ink.soft }}>Board, tile, or deck</div>
-      </button>
-
-      {menuOpen ? (
-        <>
-          <div style={{ position: 'fixed', inset: 0, zIndex: 49 }} onClick={() => setMenuOpen(false)} />
-          <div
-            data-layout="createComponentMenu"
-            /* popover listing authorable top-level component types */
-            style={{
-              position: 'absolute',
-              top: '100%',
-              left: 0,
-              right: 0,
-              zIndex: 50,
-              marginTop: '0.35rem',
-              borderRadius: '14px',
-              border: `1px solid ${tabletop.brass.base}`,
-              background: parchmentSurface,
-              boxShadow: cardShadow,
-              padding: '0.3rem',
-              display: 'grid',
-              gap: '0.2rem',
-            }}
-          >
-            {TOP_LEVEL_COMPONENT_OPTIONS.map((manifest) => (
-              <button
-                key={manifest.type}
-                type="button"
-                onClick={() => {
-                  setMenuOpen(false);
-                  onCreateComponent(manifest.type as BuiltInComponentType);
-                }}
-                style={{
-                  textAlign: 'left',
-                  padding: '0.65rem 0.7rem',
-                  borderRadius: '10px',
-                  border: 'none',
-                  background: 'transparent',
-                  color: '#064e3b',
-                  display: 'grid',
-                  gap: '0.14rem',
-                  cursor: 'pointer',
-                }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(184,146,78,0.16)'; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
-              >
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.86rem', fontWeight: 700 }}>
-                  <span
-                    style={{
-                      width: '22px',
-                      height: '22px',
-                      borderRadius: '7px',
-                      display: 'grid',
-                      placeItems: 'center',
-                      background: 'rgba(236,253,245,0.95)',
-                      border: '1px solid rgba(15,118,110,0.1)',
-                      flex: '0 0 auto',
-                    }}
-                  >
-                    {renderComponentIcon(manifest.type, { size: 13, style: { color: '#0f766e' } })}
-                  </span>
-                  {manifest.displayName}
-                </span>
-                <span style={{ fontSize: '0.74rem', color: '#6b7280' }}>
-                  {manifest.description}
-                </span>
-              </button>
-            ))}
-          </div>
-        </>
-      ) : null}
-    </div>
+    <button
+      type="button"
+      data-layout="createComponentCard"
+      /* opens the catalog-first new-component dialog */
+      onClick={onOpen}
+      onMouseEnter={(e) => {
+        const el = e.currentTarget as HTMLButtonElement;
+        el.style.transform = 'translateY(-3px)';
+        el.style.boxShadow = '0 4px 8px rgba(36,22,8,0.22), 0 20px 40px rgba(36,22,8,0.34)';
+        el.style.borderColor = tabletop.brass.deep;
+      }}
+      onMouseLeave={(e) => {
+        const el = e.currentTarget as HTMLButtonElement;
+        el.style.transform = 'none';
+        el.style.boxShadow = cardBaseStyle.boxShadow as string;
+        el.style.borderColor = tabletop.brass.base;
+      }}
+      style={createCardStyle}
+    >
+      <div style={{ ...cardPreviewStyle, background: 'rgba(247,239,218,0.5)', border: `1.5px dashed ${tabletop.brass.base}`, boxShadow: 'none' }}>
+        <Plus size={44} color={tabletop.brass.deep} strokeWidth={2.5} />
+      </div>
+      <div style={{ fontFamily: '"Cormorant Garamond", Georgia, serif', fontWeight: 700, fontSize: '1.18rem' }}>New component</div>
+      <div style={{ fontSize: '0.78rem', color: tabletop.ink.soft }}>Board, tile, or deck</div>
+    </button>
   );
 }
 
@@ -273,10 +189,15 @@ interface ComponentGalleryProps {
   project: EditorProject;
   componentOutlineIds: string[];
   onSelectComponent: (instanceId: string) => void;
+  /** Create an untied component (the "skip catalog" path). */
   onCreateComponent: (type: BuiltInComponentType) => void;
+  /** Create a component already tied to a chosen catalog item, then open it. */
+  onCreateCatalogComponent: (type: 'board' | 'deck' | 'tile', catalog: NewComponentCatalog) => void;
 }
 
-export function ComponentGallery({ project, componentOutlineIds, onSelectComponent, onCreateComponent }: ComponentGalleryProps) {
+export function ComponentGallery({ project, componentOutlineIds, onSelectComponent, onCreateComponent, onCreateCatalogComponent }: ComponentGalleryProps) {
+  const [showNewDialog, setShowNewDialog] = useState(false);
+
   return (
     <div data-layout="componentGalleryPage" className="tabletop-surface" /* intermediate view between sidebar and per-component editor */ style={pageStyle}>
       <div data-layout="componentGalleryHeading" style={headingRowStyle}>
@@ -300,8 +221,16 @@ export function ComponentGallery({ project, componentOutlineIds, onSelectCompone
             onSelect={onSelectComponent}
           />
         ))}
-        <CreateComponentCard onCreateComponent={onCreateComponent} />
+        <CreateComponentCard onOpen={() => setShowNewDialog(true)} />
       </div>
+
+      {showNewDialog ? (
+        <NewComponentDialog
+          onClose={() => setShowNewDialog(false)}
+          onCreateCatalog={(type, catalog) => { setShowNewDialog(false); onCreateCatalogComponent(type, catalog); }}
+          onCreateUntied={(type) => { setShowNewDialog(false); onCreateComponent(type); }}
+        />
+      ) : null}
     </div>
   );
 }

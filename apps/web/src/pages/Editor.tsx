@@ -34,6 +34,7 @@ import { RulesSection } from '../editor/sections/RulesSection';
 import { StatsSection } from '../editor/sections/StatsSection';
 import type { BuiltInComponentType, ComponentInstanceModel } from '@turnbased/engine-components';
 import type { CatalogComponentSelection } from '../editor/sections/rules/ComponentPicker';
+import type { NewComponentCatalog } from '../editor/sections/rules/NewComponentDialog';
 import {
   commitActiveProjectVersion,
   createProjectVersionBranch,
@@ -390,6 +391,28 @@ export const Editor = () => {
     handleAddComponent(type, null, { focusNewComponent: true });
   }
 
+  // Catalog-first creation from the gallery's "New component" dialog: the
+  // component is born already tied to the chosen catalog item, then opened.
+  function createCatalogTopLevelComponent(type: 'board' | 'deck' | 'tile', catalog: NewComponentCatalog) {
+    setActiveSection('component_editor');
+    handleAddComponent(type, null, {
+      focusNewComponent: true,
+      initializeComponent: (instance) => ({
+        ...instance,
+        properties: {
+          ...instance.properties,
+          catalogSlug: catalog.catalogSlug,
+          catalogVariantId: catalog.catalogVariantId,
+          ...(catalog.catalogProductTitle ? { catalogProductTitle: catalog.catalogProductTitle } : {}),
+          ...(catalog.catalogVariantTitle ? { catalogVariantTitle: catalog.catalogVariantTitle } : {}),
+          ...(catalog.physicalWidthMm != null ? { physicalWidthMm: catalog.physicalWidthMm } : {}),
+          ...(catalog.physicalHeightMm != null ? { physicalHeightMm: catalog.physicalHeightMm } : {}),
+          ...(catalog.maxCards != null ? { maxCards: catalog.maxCards } : {}),
+        },
+      }),
+    });
+  }
+
   function renderActiveSection() {
     switch (activeSection) {
       case 'rules':
@@ -495,6 +518,7 @@ export const Editor = () => {
               componentOutlineIds={componentOutlineIds}
               onSelectComponent={selectComponent}
               onCreateComponent={createTopLevelComponent}
+              onCreateCatalogComponent={createCatalogTopLevelComponent}
             />
           );
         }
