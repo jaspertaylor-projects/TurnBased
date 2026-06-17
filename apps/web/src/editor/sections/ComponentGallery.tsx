@@ -281,10 +281,10 @@ export function ComponentGallery({ project, componentOutlineIds, onSelectCompone
     <div data-layout="componentGalleryPage" className="tabletop-surface" /* intermediate view between sidebar and per-component editor */ style={pageStyle}>
       <div data-layout="componentGalleryHeading" style={headingRowStyle}>
         <div>
-          <div style={{ color: tabletop.brass.light, fontSize: '0.74rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.16em' }}>Component Editor</div>
-          <h1 style={{ margin: '0.15rem 0 0 0', fontFamily: '"Cormorant Garamond", Georgia, serif', color: tabletop.ink.onWood, fontSize: '2rem', fontWeight: 700, letterSpacing: '0.01em' }}>Your components</h1>
+          <div style={{ color: tabletop.brass.deep, fontSize: '0.74rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.16em' }}>Component Editor</div>
+          <h1 style={{ margin: '0.15rem 0 0 0', fontFamily: '"Cormorant Garamond", Georgia, serif', color: tabletop.ink.strong, fontSize: '2rem', fontWeight: 700, letterSpacing: '0.01em' }}>Your components</h1>
         </div>
-        <div style={{ color: tabletop.ink.onWoodSoft, fontSize: '0.88rem' }}>
+        <div style={{ color: tabletop.ink.soft, fontSize: '0.88rem' }}>
           {componentOutlineIds.length === 0
             ? 'No components yet — create your first one to start.'
             : `${componentOutlineIds.length} component${componentOutlineIds.length === 1 ? '' : 's'}`}

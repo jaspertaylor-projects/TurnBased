@@ -45,7 +45,6 @@ import {
 import { createWorkspaceFiles } from '../editor/shipping';
 import { saveProjectWorkspace } from '../editor/workspace';
 import { GrassBackdrop } from '../components/GrassBackdrop';
-import { ambientRoom } from '../editor/theme/tabletop';
 
 const GRASS_BACKDROP_HEIGHT = 55;
 
@@ -531,13 +530,11 @@ export const Editor = () => {
       height: '100%',
       minHeight: 0,
       overflow: 'hidden',
-      // The walnut "lamplit room" backdrop is reserved for the component
-      // editor — every other section keeps its own cozy feel.
-      background: activeSection === 'art'
-        ? STUDIO_BG_VALUE
-        : activeSection === 'component_editor'
-          ? ambientRoom
-          : undefined,
+      // The component editor shares the app's cozy cream backdrop + grass like
+      // every other section; its "table" feel comes from the canvas surface
+      // itself, not from a separate dark page background. The Art studio keeps
+      // its own backdrop.
+      background: activeSection === 'art' ? STUDIO_BG_VALUE : undefined,
     }}>
       <EditorSidebar
         project={currentProject}
@@ -565,10 +562,7 @@ export const Editor = () => {
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
-          // The component editor is its own wooden table that runs to the
-          // bottom edge — skip the grass band there so the working surface
-          // gets the full height (and grass-under-wood doesn't read oddly).
-          paddingBottom: activeSection === 'component_editor' ? 0 : `${GRASS_BACKDROP_HEIGHT}px`,
+          paddingBottom: `${GRASS_BACKDROP_HEIGHT}px`,
           boxSizing: 'border-box',
         }}
       >
@@ -594,7 +588,7 @@ export const Editor = () => {
           </div>
         )}
 
-        {activeSection === 'component_editor' ? null : <GrassBackdrop height={GRASS_BACKDROP_HEIGHT} />}
+        <GrassBackdrop height={GRASS_BACKDROP_HEIGHT} />
       </div>
     </div>
   );
