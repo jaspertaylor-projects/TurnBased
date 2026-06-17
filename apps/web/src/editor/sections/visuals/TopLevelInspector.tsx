@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react';
-import { Minus, Plus } from 'lucide-react';
+import { AlertTriangle, Minus, Plus } from 'lucide-react';
 import {
   resolveBoardAppearanceProperties,
 } from '@turnbased/engine-components';
@@ -56,6 +56,14 @@ export function TopLevelInspector({
   const isBoardLike = componentType === 'board' || componentType === 'tile';
   const isDeck = componentType === 'deck';
   const hasCatalog = isBoardLike || isDeck;
+  // A catalog-backed component must be tied to a specific supplier product +
+  // variant (the thing/size/finish) before it can be priced or ordered.
+  const catalogSlug = typeof selectedTopLevelComponent.properties.catalogSlug === 'string'
+    ? selectedTopLevelComponent.properties.catalogSlug : '';
+  const catalogVariantId = typeof selectedTopLevelComponent.properties.catalogVariantId === 'string'
+    ? selectedTopLevelComponent.properties.catalogVariantId : '';
+  const hasCatalogTie = catalogSlug !== '' && catalogVariantId !== '';
+  const missingCatalogTie = hasCatalog && !hasCatalogTie;
   const hasQuantity = componentType === 'piece' || componentType === 'token';
   const currentQuantity = hasQuantity
     ? (typeof selectedTopLevelComponent.properties.quantity === 'number' && Number.isFinite(selectedTopLevelComponent.properties.quantity)
@@ -84,6 +92,34 @@ export function TopLevelInspector({
 
   return (
     <>
+      {missingCatalogTie ? (
+        <div
+          data-layout="catalogTieError"
+          /* always-visible: a board/tile/deck with no catalog item can't be
+             priced or ordered. Points the user to the General section. */
+          style={{
+            display: 'flex',
+            gap: '0.5rem',
+            alignItems: 'flex-start',
+            padding: '0.6rem 0.7rem',
+            borderRadius: '10px',
+            border: '1px solid rgba(190,70,40,0.4)',
+            background: 'rgba(254,235,225,0.75)',
+            color: '#9a3412',
+            fontSize: '0.8rem',
+            lineHeight: 1.4,
+            fontWeight: 600,
+            marginBottom: '0.6rem',
+          }}
+        >
+          <AlertTriangle size={15} style={{ flex: '0 0 auto', marginTop: '0.08rem' }} />
+          <span>
+            This {componentType} isn’t linked to a catalog item, so it can’t be priced or ordered.
+            Choose a size and finish under <strong>General</strong> below.
+          </span>
+        </div>
+      ) : null}
+
       <InspectorAccordion title="Info">
         <label style={labelStyle}>
           Display Name
@@ -213,7 +249,7 @@ export function TopLevelInspector({
       </InspectorAccordion>
 
       {hasCatalog ? (
-        <InspectorAccordion title="General">
+        <InspectorAccordion title="General" defaultOpen={missingCatalogTie}>
           <CatalogPicker
             componentType={componentType as 'tile' | 'board' | 'deck'}
             instanceId={selectedTopLevelComponentId}
