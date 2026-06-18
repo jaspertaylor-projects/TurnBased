@@ -12,6 +12,12 @@ export interface CatalogProduct {
   subcategory: string;
   shape?: string | null;
   currency: string;
+  /**
+   * Primary preview image captured during ingestion (`og:image`, falling back
+   * to the main gallery image). An absolute URL to the supplier CDN, or `null`
+   * if none was found. Rendered directly — the API does not proxy it.
+   */
+  imageUrl?: string | null;
 }
 
 export interface CatalogProductsResponse {
@@ -48,6 +54,7 @@ export interface ProductLayoutResponse {
 export interface ProductVariant {
   id: string;
   title: string;
+  isDefault?: boolean;
   options: { optionGroup: string; optionKey: string; optionValue: string }[];
   layoutConstraints: {
     faceKey: string;
@@ -68,6 +75,7 @@ export interface ProductDetailResponse {
   customTitle?: string;
   category: string;
   shape?: string | null;
+  imageUrl?: string | null;
   productVariants: ProductVariant[];
 }
 

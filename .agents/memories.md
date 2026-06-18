@@ -200,6 +200,20 @@ generate (deliberately no raw-URL field). The Konva surface draws 8-point
 selection handles (`RESIZE_HANDLE_SPECS`); arrows nudge, Alt+arrows resize, Shift
 on a corner locks aspect. See `.agents/architecture.md` §4 for the full map.
 
+### One shared catalog selector drives all component-selection surfaces
+
+`editor/sections/visuals/CatalogSelector.tsx` is the single thing → size →
+finish picker. It is hosted in three places: the component-editor inspector
+(`CatalogPicker.tsx`), the rulebook "Add catalog item" picker
+(`rules/ComponentPicker.tsx`), and the "New component" dialog
+(`rules/NewComponentDialog.tsx`). Change the selector once and all three update.
+The catalog API (`/v1/products`) returns `imageUrl` (absolute supplier-CDN URL,
+may be null) on each product; `CatalogSelector` renders it via the shared
+`CatalogPreviewImage` once a product/slug is picked, so every surface shows the
+supplier preview for free. Images load directly from the CDN through the `<img>`
+(not the `/v1` proxy), and the component hides itself on missing/`null`/broken
+images, so the selection flow never depends on the artwork.
+
 ---
 
 ## Maintenance

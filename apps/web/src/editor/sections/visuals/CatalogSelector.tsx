@@ -274,6 +274,61 @@ function CountBadge({ count, unit }: { count: number | null; unit: string }) {
   return <span style={infoBadgeStyle}>{count} {unit}{count !== 1 ? 's' : ''}</span>;
 }
 
+const previewFrameStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  height: '150px',
+  borderRadius: '12px',
+  border: '1px solid rgba(120,95,50,0.2)',
+  // Soft parchment mat so transparent or oddly-cropped supplier shots still
+  // read as a framed preview rather than a floating cut-out.
+  background: 'linear-gradient(180deg, rgba(255,253,246,0.95), rgba(247,239,218,0.7))',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.6), 0 1px 3px rgba(60,40,20,0.08)',
+  overflow: 'hidden',
+  padding: '0.5rem',
+};
+
+const previewImageStyle: CSSProperties = {
+  maxWidth: '100%',
+  maxHeight: '100%',
+  objectFit: 'contain',
+  borderRadius: '6px',
+};
+
+/**
+ * Renders the supplier's preview image for the currently selected catalog
+ * product (the `imageUrl` from the catalog API). Stays out of the way when no
+ * product is selected, the product has no image, or the CDN image fails to
+ * load — the selection flow never depends on the artwork being present.
+ */
+function CatalogPreviewImage({ product }: { product: CatalogProduct | null }) {
+  const imageUrl = product?.imageUrl ?? null;
+  const [errored, setErrored] = useState(false);
+
+  // Reset the error flag whenever the source changes so switching to a working
+  // image after a broken one re-shows the frame.
+  useEffect(() => { setErrored(false); }, [imageUrl]);
+
+  if (!product || !imageUrl || errored) return null;
+
+  const label = product.customTitle || product.title || product.slug;
+  return (
+    <div data-layout="catalogPreviewImage" /* supplier product preview from the catalog API */ style={sectionDividerStyle}>
+      <div style={groupTitleStyle}>Preview</div>
+      <div data-layout="catalogPreviewFrame" /* parchment mat framing the CDN preview shot */ style={previewFrameStyle}>
+        <img
+          src={imageUrl}
+          alt={`Catalog preview of ${label}`}
+          loading="lazy"
+          onError={() => setErrored(true)}
+          style={previewImageStyle}
+        />
+      </div>
+    </div>
+  );
+}
+
 function Spinner() {
   return <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} />;
 }
@@ -304,6 +359,7 @@ function TilePicker({ selection, preferredUnits, onChange, styles }: PickerProps
 
   const { detail, loading: detailLoading } = useCatalogProductDetail(currentSlug || null);
   const tileCountOptions = useMemo(() => extractTileCountOptions(detail), [detail]);
+  const selectedProduct = products.find((p) => p.slug === currentSlug) ?? null;
   const selectedVariant = detail?.productVariants.find((v) => v.id === currentVariantId) ?? null;
   const selectedTileCount = useMemo(() => tileCountOptions.find((o) => o.variantId === currentVariantId)?.count ?? null, [tileCountOptions, currentVariantId]);
 
@@ -349,6 +405,7 @@ function TilePicker({ selection, preferredUnits, onChange, styles }: PickerProps
         </div>
       ) : null}
 
+      {currentSlug ? <CatalogPreviewImage product={selectedProduct} /> : null}
       {currentSlug ? <VariantOptionsPanel detail={detail} loading={detailLoading} selection={selection} onChange={onChange} styles={styles} /> : null}
       <PricingPanel variant={selectedVariant} />
     </div>
@@ -369,6 +426,7 @@ function BoardPicker({ selection, preferredUnits, onChange, styles }: PickerProp
   useApplyLayoutWhenFetched(currentSlug, onChange);
 
   const { detail, loading: detailLoading } = useCatalogProductDetail(currentSlug || null);
+  const selectedProduct = products.find((p) => p.slug === currentSlug) ?? null;
   const selectedVariant = detail?.productVariants.find((v) => v.id === currentVariantId) ?? null;
 
   const fixedSizes = sizeOptions.filter((o) => !o.isCustom);
@@ -398,6 +456,7 @@ function BoardPicker({ selection, preferredUnits, onChange, styles }: PickerProp
         </select>
       </label>
 
+      {currentSlug ? <CatalogPreviewImage product={selectedProduct} /> : null}
       {currentSlug ? (
         <VariantOptionsPanel detail={detail} loading={detailLoading} selection={selection} onChange={onChange} excludeGroups={['Configuration']} styles={styles} />
       ) : null}
@@ -425,6 +484,7 @@ function DeckPicker({ selection, preferredUnits, onChange, styles }: PickerProps
 
   const { detail, loading: detailLoading } = useCatalogProductDetail(currentSlug || null);
   const deckSizeOptions = useMemo(() => extractDeckSizeOptions(detail), [detail]);
+  const selectedProduct = products.find((p) => p.slug === currentSlug) ?? null;
   const selectedVariant = detail?.productVariants.find((v) => v.id === currentVariantId) ?? null;
   const selectedDeckSizeLabel = deckSizeOptions.find((o) => o.variantId === currentVariantId)?.label ?? '';
   const cardCount = useMemo(() => parseCardCount(selectedDeckSizeLabel), [selectedDeckSizeLabel]);
@@ -467,6 +527,7 @@ function DeckPicker({ selection, preferredUnits, onChange, styles }: PickerProps
         </div>
       ) : null}
 
+      {currentSlug ? <CatalogPreviewImage product={selectedProduct} /> : null}
       {currentSlug ? <VariantOptionsPanel detail={detail} loading={detailLoading} selection={selection} onChange={onChange} styles={styles} /> : null}
       <PricingPanel variant={selectedVariant} />
     </div>
