@@ -64,6 +64,7 @@ function SectionButton({
 
 export function EditorSidebar({
   project,
+  isOpen = true,
   activeSection,
   setActiveSection,
   onOpenComponentEditor,
@@ -77,6 +78,9 @@ export function EditorSidebar({
   onDismissNotice,
 }: {
   project: EditorProject;
+  /** Drawer state. When closed the panel slides off to the left and stops
+   *  catching clicks; the canvas grid column collapses in parallel. */
+  isOpen?: boolean;
   activeSection: EditorSection;
   setActiveSection: Dispatch<SetStateAction<EditorSection>>;
   activeVersionName: string;
@@ -127,8 +131,16 @@ export function EditorSidebar({
 
   return (
     <aside
+      data-layout="editorSidebarPanel"
+      aria-hidden={!isOpen}
       style={{
         ...panelStyle,
+        // Pinned inside the clipping drawer shell and slid left when closed so
+        // the whole panel tucks away as one piece (the canvas column collapses
+        // in lockstep via the same easing).
+        position: 'absolute',
+        top: 0,
+        left: 0,
         width: '228px',
         boxSizing: 'border-box',
         height: '100%',
@@ -140,6 +152,9 @@ export function EditorSidebar({
         borderBottom: 'none',
         borderRight: '1px solid rgba(15,118,110,0.12)',
         boxShadow: 'none',
+        transform: isOpen ? 'translateX(0)' : 'translateX(-100%)',
+        transition: 'transform 0.28s ease',
+        pointerEvents: isOpen ? 'auto' : 'none',
       }}
     >
       <div

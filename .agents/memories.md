@@ -200,6 +200,21 @@ generate (deliberately no raw-URL field). The Konva surface draws 8-point
 selection handles (`RESIZE_HANDLE_SPECS`); arrows nudge, Alt+arrows resize, Shift
 on a corner locks aspect. See `.agents/architecture.md` §4 for the full map.
 
+### Editor sidebar is a collapsible drawer
+
+The editor's left sidebar (`editor/components/EditorSidebar.tsx`) is a drawer.
+`pages/Editor.tsx` owns the open/closed state (`isSidebarOpen`, persisted to
+`localStorage['turnbased.editor.sidebarOpen']`). Closing it animates the shell's
+first grid column from `232px` → `0px` while the panel itself slides left via
+`transform: translateX(-100%)` — both share the same `0.28s ease`, so the canvas
+reclaims the space in lockstep with the slide. The panel lives inside a
+`data-layout="editorSidebarDrawer"` clipping box (`overflow:hidden`) and, when
+closed, gets `pointer-events:none` + `aria-hidden`. A single round handle
+(`data-layout="editorSidebarToggle"`, `PanelLeftClose`/`PanelLeftOpen`) rides the
+seam: just past the sidebar on the canvas side when open, far-left edge when
+closed. To add a new sidebar section, edit `EditorSidebar`/`SECTION_OPTIONS`,
+not the drawer plumbing.
+
 ### One shared catalog selector drives all component-selection surfaces
 
 `editor/sections/visuals/CatalogSelector.tsx` is the single thing → size →
