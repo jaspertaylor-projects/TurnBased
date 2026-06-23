@@ -46,7 +46,7 @@ import {
 import { createWorkspaceFiles } from '../editor/shipping';
 import { saveProjectWorkspace } from '../editor/workspace';
 import { GrassBackdrop } from '../components/GrassBackdrop';
-import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 const GRASS_BACKDROP_HEIGHT = 55;
 /** Width of the editor sidebar drawer when open (the closed width is 0). */
@@ -606,33 +606,37 @@ export const Editor = () => {
       <button
         type="button"
         data-layout="editorSidebarToggle"
-        /* drawer handle living on the sidebar/canvas seam; rides the seam as the
-           drawer opens and closes so it is always reachable */
+        /* full-height drawer rail sitting on the sidebar's right edge (the
+           seam); rides the seam to the far-left edge when the drawer closes so
+           it is always reachable */
         onClick={() => setIsSidebarOpen((value) => !value)}
         aria-label={isSidebarOpen ? 'Collapse sidebar' : 'Open sidebar'}
         aria-expanded={isSidebarOpen}
         title={isSidebarOpen ? 'Collapse sidebar' : 'Open sidebar'}
+        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(209,250,229,0.95)'; }}
+        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(236,253,245,0.82)'; }}
         style={{
           position: 'absolute',
-          top: '0.6rem',
-          // Sits just past the seam on the canvas side when open (clear of the
-          // header's save button) and tucks to the far-left edge when closed.
-          left: isSidebarOpen ? `${SIDEBAR_WIDTH + 8}px` : '0.5rem',
+          top: 0,
+          bottom: 0,
+          left: isSidebarOpen ? `${SIDEBAR_WIDTH}px` : '0px',
           zIndex: 60,
-          width: 32,
-          height: 32,
-          borderRadius: '999px',
-          border: '1px solid rgba(15,118,110,0.18)',
-          background: 'rgba(240,253,244,0.96)',
+          width: 18,
+          height: '100%',
+          padding: 0,
+          border: 'none',
+          borderLeft: '1px solid rgba(15,118,110,0.16)',
+          borderRight: '1px solid rgba(15,118,110,0.16)',
+          background: 'rgba(236,253,245,0.82)',
           color: '#0f766e',
-          display: 'grid',
-          placeItems: 'center',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
           cursor: 'pointer',
-          boxShadow: '0 6px 16px rgba(6,78,59,0.16)',
           transition: SIDEBAR_TRANSITION,
         }}
       >
-        {isSidebarOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
+        {isSidebarOpen ? <ChevronLeft size={15} /> : <ChevronRight size={15} />}
       </button>
 
       <div

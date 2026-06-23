@@ -209,10 +209,12 @@ first grid column from `232px` → `0px` while the panel itself slides left via
 `transform: translateX(-100%)` — both share the same `0.28s ease`, so the canvas
 reclaims the space in lockstep with the slide. The panel lives inside a
 `data-layout="editorSidebarDrawer"` clipping box (`overflow:hidden`) and, when
-closed, gets `pointer-events:none` + `aria-hidden`. A single round handle
-(`data-layout="editorSidebarToggle"`, `PanelLeftClose`/`PanelLeftOpen`) rides the
-seam: just past the sidebar on the canvas side when open, far-left edge when
-closed. To add a new sidebar section, edit `EditorSidebar`/`SECTION_OPTIONS`,
+closed, gets `pointer-events:none` + `aria-hidden`. The control is a full-height
+vertical rail (`data-layout="editorSidebarToggle"`, 18px wide, chevron centered)
+sitting on the sidebar's right edge / the seam (`left: SIDEBAR_WIDTH` when open),
+sliding to the far-left edge (`left: 0`) when closed — `ChevronLeft` to collapse,
+`ChevronRight` to open. (User preferred this rail over an earlier floating round
+button.) To add a new sidebar section, edit `EditorSidebar`/`SECTION_OPTIONS`,
 not the drawer plumbing.
 
 ### One shared catalog selector drives all component-selection surfaces
