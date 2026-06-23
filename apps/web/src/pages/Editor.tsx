@@ -56,11 +56,15 @@ const SIDEBAR_OPEN_KEY = 'turnbased.editor.sidebarOpen';
 /** Shared easing so the grid column and the panel slide stay perfectly in sync. */
 const SIDEBAR_TRANSITION = 'transform 0.28s ease, left 0.28s ease, grid-template-columns 0.28s ease';
 /** Width of the drawer-pull rail that rides the sidebar's right edge. */
-const RAIL_WIDTH = 16;
-/** Mahogany drawer-edge finish for the pull rail (horizontal grade reads as a
- *  rounded wooden lip catching the light down its centre). */
-const MAHOGANY = 'linear-gradient(90deg, #3a1a0e, #6e3b27 52%, #3a1a0e)';
-const MAHOGANY_HOVER = 'linear-gradient(90deg, #45200f, #84492f 52%, #45200f)';
+const RAIL_WIDTH = 20;
+/** Radius on the rail's free (exposed) edge so it reads as a rounded pull tab. */
+const RAIL_RADIUS = 10;
+/** Drawer-pull tones drawn from the existing palette: the leafy forest green
+ *  (tabletop.forest.bright) and the warm ink-brown already used on the parchment
+ *  rulebook pages. The rail is a solid fill with a contrasting border + chevron;
+ *  hover swaps fill and accent (see hover handlers). */
+const RAIL_GREEN = '#3f9168';
+const RAIL_BROWN = '#3b2412';
 
 const PENDING_EDITOR_NOTICE_KEY = 'turnbased.creator.pendingEditorNotice';
 
@@ -612,15 +616,26 @@ export const Editor = () => {
       <button
         type="button"
         data-layout="editorSidebarToggle"
-        /* mahogany drawer-pull rail flush against the sidebar's interior right
-           edge; rides to the far-left edge when the drawer closes so it stays
-           reachable */
+        /* leafy-green/brown drawer-pull rail flush against the sidebar's
+           interior right edge; rides to the far-left edge when the drawer
+           closes so it stays reachable. Brown fill + green border/chevron at
+           rest; the two swap on hover. */
         onClick={() => setIsSidebarOpen((value) => !value)}
         aria-label={isSidebarOpen ? 'Collapse sidebar' : 'Open sidebar'}
         aria-expanded={isSidebarOpen}
         title={isSidebarOpen ? 'Collapse sidebar' : 'Open sidebar'}
-        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = MAHOGANY_HOVER; }}
-        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = MAHOGANY; }}
+        onMouseEnter={(e) => {
+          const el = e.currentTarget as HTMLElement;
+          el.style.background = RAIL_GREEN;
+          el.style.borderColor = RAIL_BROWN;
+          el.style.color = RAIL_BROWN;
+        }}
+        onMouseLeave={(e) => {
+          const el = e.currentTarget as HTMLElement;
+          el.style.background = RAIL_BROWN;
+          el.style.borderColor = RAIL_GREEN;
+          el.style.color = RAIL_GREEN;
+        }}
         style={{
           position: 'absolute',
           top: 0,
@@ -632,20 +647,25 @@ export const Editor = () => {
           width: RAIL_WIDTH,
           height: '100%',
           padding: 0,
-          border: 'none',
-          borderRight: '1px solid #2b150b',
-          borderLeft: '1px solid rgba(243,228,198,0.12)',
-          background: MAHOGANY,
-          color: '#f3e4c6',
+          border: `2px solid ${RAIL_GREEN}`,
+          // Round only the exposed edge — the interior (left) edge when open,
+          // the canvas-facing (right) edge once it's docked far-left.
+          borderTopLeftRadius: isSidebarOpen ? RAIL_RADIUS : 0,
+          borderBottomLeftRadius: isSidebarOpen ? RAIL_RADIUS : 0,
+          borderTopRightRadius: isSidebarOpen ? 0 : RAIL_RADIUS,
+          borderBottomRightRadius: isSidebarOpen ? 0 : RAIL_RADIUS,
+          background: RAIL_BROWN,
+          color: RAIL_GREEN,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           cursor: 'pointer',
-          boxShadow: 'inset 0 0 12px rgba(0,0,0,0.28)',
           transition: SIDEBAR_TRANSITION,
         }}
       >
-        {isSidebarOpen ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
+        {isSidebarOpen
+          ? <ChevronLeft size={19} strokeWidth={3.25} />
+          : <ChevronRight size={19} strokeWidth={3.25} />}
       </button>
 
       <div
