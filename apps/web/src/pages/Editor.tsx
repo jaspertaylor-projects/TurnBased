@@ -55,6 +55,12 @@ const SIDEBAR_WIDTH = 232;
 const SIDEBAR_OPEN_KEY = 'turnbased.editor.sidebarOpen';
 /** Shared easing so the grid column and the panel slide stay perfectly in sync. */
 const SIDEBAR_TRANSITION = 'transform 0.28s ease, left 0.28s ease, grid-template-columns 0.28s ease';
+/** Width of the drawer-pull rail that rides the sidebar's right edge. */
+const RAIL_WIDTH = 16;
+/** Mahogany drawer-edge finish for the pull rail (horizontal grade reads as a
+ *  rounded wooden lip catching the light down its centre). */
+const MAHOGANY = 'linear-gradient(90deg, #3a1a0e, #6e3b27 52%, #3a1a0e)';
+const MAHOGANY_HOVER = 'linear-gradient(90deg, #45200f, #84492f 52%, #45200f)';
 
 const PENDING_EDITOR_NOTICE_KEY = 'turnbased.creator.pendingEditorNotice';
 
@@ -606,37 +612,40 @@ export const Editor = () => {
       <button
         type="button"
         data-layout="editorSidebarToggle"
-        /* full-height drawer rail sitting on the sidebar's right edge (the
-           seam); rides the seam to the far-left edge when the drawer closes so
-           it is always reachable */
+        /* mahogany drawer-pull rail flush against the sidebar's interior right
+           edge; rides to the far-left edge when the drawer closes so it stays
+           reachable */
         onClick={() => setIsSidebarOpen((value) => !value)}
         aria-label={isSidebarOpen ? 'Collapse sidebar' : 'Open sidebar'}
         aria-expanded={isSidebarOpen}
         title={isSidebarOpen ? 'Collapse sidebar' : 'Open sidebar'}
-        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(209,250,229,0.95)'; }}
-        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(236,253,245,0.82)'; }}
+        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = MAHOGANY_HOVER; }}
+        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = MAHOGANY; }}
         style={{
           position: 'absolute',
           top: 0,
           bottom: 0,
-          left: isSidebarOpen ? `${SIDEBAR_WIDTH}px` : '0px',
+          // Tucked onto the sidebar's interior right edge (its right side meets
+          // the seam) when open, sliding to the far-left edge when closed.
+          left: isSidebarOpen ? `${SIDEBAR_WIDTH - RAIL_WIDTH}px` : '0px',
           zIndex: 60,
-          width: 18,
+          width: RAIL_WIDTH,
           height: '100%',
           padding: 0,
           border: 'none',
-          borderLeft: '1px solid rgba(15,118,110,0.16)',
-          borderRight: '1px solid rgba(15,118,110,0.16)',
-          background: 'rgba(236,253,245,0.82)',
-          color: '#0f766e',
+          borderRight: '1px solid #2b150b',
+          borderLeft: '1px solid rgba(243,228,198,0.12)',
+          background: MAHOGANY,
+          color: '#f3e4c6',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           cursor: 'pointer',
+          boxShadow: 'inset 0 0 12px rgba(0,0,0,0.28)',
           transition: SIDEBAR_TRANSITION,
         }}
       >
-        {isSidebarOpen ? <ChevronLeft size={15} /> : <ChevronRight size={15} />}
+        {isSidebarOpen ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
       </button>
 
       <div

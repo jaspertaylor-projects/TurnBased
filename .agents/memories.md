@@ -210,12 +210,17 @@ first grid column from `232px` → `0px` while the panel itself slides left via
 reclaims the space in lockstep with the slide. The panel lives inside a
 `data-layout="editorSidebarDrawer"` clipping box (`overflow:hidden`) and, when
 closed, gets `pointer-events:none` + `aria-hidden`. The control is a full-height
-vertical rail (`data-layout="editorSidebarToggle"`, 18px wide, chevron centered)
-sitting on the sidebar's right edge / the seam (`left: SIDEBAR_WIDTH` when open),
-sliding to the far-left edge (`left: 0`) when closed — `ChevronLeft` to collapse,
-`ChevronRight` to open. (User preferred this rail over an earlier floating round
-button.) To add a new sidebar section, edit `EditorSidebar`/`SECTION_OPTIONS`,
-not the drawer plumbing.
+mahogany "drawer-pull" rail (`data-layout="editorSidebarToggle"`, `RAIL_WIDTH`
+16px, cream chevron) flush on the panel's **interior right edge**
+(`left: SIDEBAR_WIDTH - RAIL_WIDTH` when open), sliding to the far-left edge
+(`left: 0`) when closed — `ChevronLeft` to collapse, `ChevronRight` to open. The
+mahogany finish is a custom gradient (`MAHOGANY`/`MAHOGANY_HOVER` in Editor.tsx),
+not the taupe `tabletop.wood` tokens; chevron uses the theme cream
+`tabletop.ink.onWood` (#f3e4c6). The panel reserves a right-padding gutter
+(`1.4rem`) so its content (esp. the save button) clears the rail. (User wanted a
+mahogany rail on the interior edge, not an earlier floating button / teal seam
+rail.) To add a new sidebar section, edit `EditorSidebar`/`SECTION_OPTIONS`, not
+the drawer plumbing.
 
 ### One shared catalog selector drives all component-selection surfaces
 

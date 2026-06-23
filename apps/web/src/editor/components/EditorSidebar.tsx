@@ -145,7 +145,9 @@ export function EditorSidebar({
         boxSizing: 'border-box',
         height: '100%',
         overflow: 'auto',
-        padding: '0.5rem 0.7rem 0.8rem 0.7rem',
+        // Extra right padding reserves a clear gutter for the mahogany drawer
+        // rail that overlays the panel's interior right edge (see Editor.tsx).
+        padding: '0.5rem 1.4rem 0.8rem 0.7rem',
         borderRadius: 0,
         borderLeft: 'none',
         borderTop: 'none',
