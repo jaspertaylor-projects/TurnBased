@@ -234,9 +234,19 @@ finish picker. It is hosted in three places: the component-editor inspector
 The catalog API (`/v1/products`) returns `imageUrl` (absolute supplier-CDN URL,
 may be null) on each product; `CatalogSelector` renders it via the shared
 `CatalogPreviewImage` once a product/slug is picked, so every surface shows the
-supplier preview for free. Images load directly from the CDN through the `<img>`
-(not the `/v1` proxy), and the component hides itself on missing/`null`/broken
-images, so the selection flow never depends on the artwork.
+supplier preview for free. The thumbnail border just hugs the image and clicking
+it opens an enlarged lightbox (`data-layout="catalogPreviewLightbox"`, z-index
+500 to clear the dialogs, Esc/click to close). Images load directly from the CDN
+through the `<img>` (not the `/v1` proxy), and the component hides itself on
+missing/`null`/broken images, so the selection flow never depends on the artwork.
+
+`fetchCatalogProducts` (`supplierCatalog.ts`) **pages through all results** —
+it previously hardcoded `pageSize=50` and silently dropped products once a
+category passed 50 (cards is already 51), which also hid any newly-added
+supplier's items. As of 2026-06, the live catalog API on :3100 contains only ONE
+supplier (boardgamesmaker, `1f2022af…`, 77 products); adding a supplier is a
+job on that separate third-party service (not this repo) — check
+`/v1/admin/scrape-runs`.
 
 ---
 

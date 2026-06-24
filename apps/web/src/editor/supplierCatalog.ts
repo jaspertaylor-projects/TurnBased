@@ -313,14 +313,28 @@ export function getCatalogCategory(componentType: string): string | null {
 }
 
 export async function fetchCatalogProducts(category: string): Promise<CatalogProduct[]> {
-  const url = `${CATALOG_API_BASE}/products?category=${encodeURIComponent(category)}&pageSize=50`;
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Catalog API error: ${response.status}`);
+  // Page through the whole category. A single fixed page silently dropped
+  // products once a category grew past it (e.g. cards already exceeds 50), which
+  // also hid items from newly added suppliers — so we follow the pagination
+  // until every product is collected instead of capping the request.
+  const pageSize = 100;
+  const all: CatalogProduct[] = [];
+  for (let page = 1; page <= MAX_CATALOG_PAGES; page += 1) {
+    const url = `${CATALOG_API_BASE}/products?category=${encodeURIComponent(category)}&page=${page}&pageSize=${pageSize}`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Catalog API error: ${response.status}`);
+    }
+    const data: CatalogProductsResponse = await response.json();
+    all.push(...data.items);
+    const total = typeof data.total === 'number' ? data.total : all.length;
+    if (data.items.length === 0 || all.length >= total) break;
   }
-  const data: CatalogProductsResponse = await response.json();
-  return data.items;
+  return all;
 }
+
+/** Hard stop so a misbehaving API can never spin the pagination loop forever. */
+const MAX_CATALOG_PAGES = 50;
 
 export async function fetchProductLayout(slug: string, variantId?: string): Promise<ProductLayoutResponse> {
   const params = variantId ? `?variantId=${encodeURIComponent(variantId)}` : '';
