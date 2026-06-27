@@ -1,18 +1,21 @@
-import { Loader2 } from 'lucide-react';
+import { Check, Loader2 } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   extractDeckSizeOptions,
   extractShapes,
+  extractSites,
   extractSizeOptions,
   extractTileCountOptions,
   extractVariantOptionGroups,
   findMatchingVariant,
   formatPriceTier,
+  getCatalogCategory,
   parseCardCount,
   productShape,
   type CatalogProduct,
+  type CatalogSite,
   type ProductDetailResponse,
   type ProductVariant,
 } from '../../supplierCatalog';
@@ -399,10 +402,14 @@ interface PickerProps {
   preferredUnits: EditorLengthUnit;
   onChange: SelectionUpdater;
   styles: CatalogSelectorStyles;
+  // Products are fetched once by CatalogSelector and pre-filtered by the active
+  // site selection before being handed to whichever picker is showing.
+  products: CatalogProduct[];
+  loading: boolean;
+  error: string | null;
 }
 
-function TilePicker({ selection, preferredUnits, onChange, styles }: PickerProps) {
-  const { products, loading, error } = useCatalogProducts('tiles');
+function TilePicker({ selection, preferredUnits, onChange, styles, products, loading, error }: PickerProps) {
   const { catalogSlug: currentSlug, catalogVariantId: currentVariantId, shape: currentShape } = selection;
 
   const shapes = useMemo(() => extractShapes(products), [products]);
@@ -475,8 +482,7 @@ function TilePicker({ selection, preferredUnits, onChange, styles }: PickerProps
 
 const CUSTOM_SIZE_SENTINEL = '__custom__';
 
-function BoardPicker({ selection, preferredUnits, onChange, styles }: PickerProps) {
-  const { products, loading, error } = useCatalogProducts('boards');
+function BoardPicker({ selection, preferredUnits, onChange, styles, products, loading, error }: PickerProps) {
   const { catalogSlug: currentSlug, catalogVariantId: currentVariantId } = selection;
 
   const sizeOptions = useMemo(() => extractSizeOptions(products, preferredUnits), [products, preferredUnits]);
@@ -526,8 +532,7 @@ function BoardPicker({ selection, preferredUnits, onChange, styles }: PickerProp
 /* Deck: Card Shape → Card Size → Deck Size → Finish                   */
 /* ------------------------------------------------------------------ */
 
-function DeckPicker({ selection, preferredUnits, onChange, styles }: PickerProps) {
-  const { products, loading, error } = useCatalogProducts('cards');
+function DeckPicker({ selection, preferredUnits, onChange, styles, products, loading, error }: PickerProps) {
   const { catalogSlug: currentSlug, catalogVariantId: currentVariantId, shape: currentShape } = selection;
 
   const shapes = useMemo(() => extractShapes(products), [products]);
@@ -592,6 +597,91 @@ function DeckPicker({ selection, preferredUnits, onChange, styles }: PickerProps
 }
 
 /* ------------------------------------------------------------------ */
+/* Site (supplier) filter                                              */
+/* ------------------------------------------------------------------ */
+
+const siteChipBaseStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '0.3rem',
+  fontSize: '0.74rem',
+  fontWeight: 700,
+  borderRadius: '999px',
+  padding: '0.26rem 0.6rem',
+  cursor: 'pointer',
+  transition: 'background 0.12s, border-color 0.12s, color 0.12s',
+};
+
+/**
+ * "Show components from" multi-select. `selected === null` means every site
+ * (the default); an explicit array narrows it, and an empty array shows none.
+ * Collapses back to `null` once every site is re-selected so the common
+ * "everything" case stays the clean default.
+ */
+function SiteFilter({
+  sites,
+  selected,
+  onChange,
+}: {
+  sites: CatalogSite[];
+  selected: string[] | null;
+  onChange: (next: string[] | null) => void;
+}) {
+  const allIds = useMemo(() => sites.map((s) => s.id), [sites]);
+  const isOn = (id: string) => selected === null || selected.includes(id);
+  const noneSelected = selected !== null && selected.length === 0;
+
+  function toggle(id: string) {
+    const current = selected === null ? allIds : selected;
+    const next = current.includes(id) ? current.filter((x) => x !== id) : [...current, id];
+    onChange(next.length === allIds.length ? null : next);
+  }
+
+  return (
+    <div data-layout="catalogSiteFilter" /* supplier multi-select; defaults to all sites */ style={{ marginBottom: '0.2rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.4rem' }}>
+        <div style={groupTitleStyle}>Show components from</div>
+        <button
+          type="button"
+          onClick={() => onChange(noneSelected || selected !== null ? null : [])}
+          style={{ border: 'none', background: 'none', color: '#0f766e', fontSize: '0.68rem', fontWeight: 700, cursor: 'pointer', padding: 0 }}
+        >
+          {selected === null ? 'Clear all' : 'Select all'}
+        </button>
+      </div>
+      <div data-layout="catalogSiteChips" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
+        {sites.map((site) => {
+          const on = isOn(site.id);
+          return (
+            <button
+              key={site.id}
+              type="button"
+              role="checkbox"
+              aria-checked={on}
+              onClick={() => toggle(site.id)}
+              style={{
+                ...siteChipBaseStyle,
+                background: on ? 'rgba(16,185,129,0.16)' : 'rgba(120,95,50,0.06)',
+                border: `1px solid ${on ? 'rgba(15,118,110,0.4)' : 'rgba(120,95,50,0.2)'}`,
+                color: on ? '#065f46' : '#8a7350',
+              }}
+            >
+              {on ? <Check size={12} /> : null}
+              {site.label}
+            </button>
+          );
+        })}
+      </div>
+      {noneSelected ? (
+        <div style={{ fontSize: '0.72rem', color: '#8a7350', marginTop: '0.4rem' }}>
+          No sites selected — pick at least one to see components.
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* Entry point                                                         */
 /* ------------------------------------------------------------------ */
 
@@ -600,6 +690,10 @@ function DeckPicker({ selection, preferredUnits, onChange, styles }: PickerProps
  * `CatalogSelection` so it can be hosted by the component-editor inspector
  * (bound to an instance) or the rulebook add-component modal (bound to local
  * draft state) — both get identical selectors.
+ *
+ * Owns the catalog fetch for the active category so it can offer a "show
+ * components from" site filter (defaulting to every supplier) before handing
+ * the filtered products to whichever picker matches the component type.
  */
 export function CatalogSelector({
   componentType,
@@ -614,8 +708,31 @@ export function CatalogSelector({
   onChange: SelectionUpdater;
   styles?: CatalogSelectorStyles;
 }) {
-  const props: PickerProps = { selection, preferredUnits, onChange, styles };
-  if (componentType === 'tile') return <TilePicker {...props} />;
-  if (componentType === 'board') return <BoardPicker {...props} />;
-  return <DeckPicker {...props} />;
+  const category = getCatalogCategory(componentType) ?? '';
+  const { products: allProducts, loading, error } = useCatalogProducts(category || null);
+
+  const sites = useMemo(() => extractSites(allProducts), [allProducts]);
+  // null = all sites (the default); explicit array narrows it; [] shows none.
+  const [selectedSites, setSelectedSites] = useState<string[] | null>(null);
+
+  const products = useMemo(() => {
+    // Single-site categories have no meaningful filter, so never let a stale
+    // selection (carried over from a multi-site genre) hide everything.
+    if (selectedSites === null || sites.length <= 1) return allProducts;
+    const allow = new Set(selectedSites);
+    return allProducts.filter((p) => p.supplierId && allow.has(p.supplierId));
+  }, [allProducts, selectedSites, sites.length]);
+
+  const props: PickerProps = { selection, preferredUnits, onChange, styles, products, loading, error };
+
+  return (
+    <div data-layout="catalogSelector">
+      {sites.length > 1 ? (
+        <SiteFilter sites={sites} selected={selectedSites} onChange={setSelectedSites} />
+      ) : null}
+      {componentType === 'tile' ? <TilePicker {...props} /> : null}
+      {componentType === 'board' ? <BoardPicker {...props} /> : null}
+      {componentType === 'deck' ? <DeckPicker {...props} /> : null}
+    </div>
+  );
 }

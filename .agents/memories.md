@@ -240,6 +240,17 @@ it opens an enlarged lightbox (`data-layout="catalogPreviewLightbox"`, z-index
 through the `<img>` (not the `/v1` proxy), and the component hides itself on
 missing/`null`/broken images, so the selection flow never depends on the artwork.
 
+`CatalogSelector` owns the per-category product fetch (was in each leaf picker)
+so it can render a **"Show components from" site/supplier multi-select**
+(`data-layout="catalogSiteFilter"`, `SiteFilter` + `extractSites`/`siteLabel`).
+Sites come from `product.supplierId` + a label derived from `sourceUrl` host
+(`KNOWN_SITE_NAMES` maps boardgamesmaker.com→BoardGamesMaker,
+thegamecrafter.com→The Game Crafter). State is `selectedSites: string[] | null`
+where **null = all (default)**, `[]` = none, explicit = subset; it collapses
+back to null when all are re-picked, and filtering is bypassed when a category
+has ≤1 site so a stale selection can't blank a single-supplier genre. The leaf
+pickers (Tile/Board/Deck) now receive `products/loading/error` as props.
+
 `fetchCatalogProducts` (`supplierCatalog.ts`) **pages through all results** —
 it previously hardcoded `pageSize=50` and silently dropped products once a
 category passed 50 (cards is already 51), which also hid any newly-added

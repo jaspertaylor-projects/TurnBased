@@ -12,6 +12,10 @@ export interface CatalogProduct {
   subcategory: string;
   shape?: string | null;
   currency: string;
+  /** The supplier ("site") this product comes from. */
+  supplierId?: string;
+  /** Original supplier product page; used to derive a human site label. */
+  sourceUrl?: string;
   /**
    * Primary preview image captured during ingestion (`og:image`, falling back
    * to the main gallery image). An absolute URL to the supplier CDN, or `null`
@@ -163,6 +167,54 @@ export function extractShapes(products: CatalogProduct[]): string[] {
 export function productShape(product: CatalogProduct): string {
   const raw = product.shape || 'rectangle';
   return raw === 'square' ? 'rectangle' : raw;
+}
+
+/* ------------------------------------------------------------------ */
+/* Supplier "sites"                                                    */
+/* ------------------------------------------------------------------ */
+
+/** A supplier/site the catalog products can be sourced from. */
+export interface CatalogSite {
+  /** Supplier id (the stable filter key). */
+  id: string;
+  /** Human-friendly site name for the UI. */
+  label: string;
+}
+
+/** Pretty names for known supplier hosts; anything else is title-cased. */
+const KNOWN_SITE_NAMES: Record<string, string> = {
+  'boardgamesmaker.com': 'BoardGamesMaker',
+  'thegamecrafter.com': 'The Game Crafter',
+};
+
+/** Derives a readable site label for a product from its supplier source URL. */
+export function siteLabel(product: CatalogProduct): string {
+  if (product.sourceUrl) {
+    try {
+      const host = new URL(product.sourceUrl).hostname.replace(/^www\./, '');
+      if (KNOWN_SITE_NAMES[host]) return KNOWN_SITE_NAMES[host];
+      const name = host.split('.')[0];
+      return name.charAt(0).toUpperCase() + name.slice(1);
+    } catch {
+      /* fall through to the id-based label */
+    }
+  }
+  return product.supplierId ? `Supplier ${product.supplierId.slice(0, 8)}` : 'Unknown site';
+}
+
+/**
+ * Distinct supplier sites present in a product list (the first product for each
+ * supplier wins the label), sorted alphabetically for a stable filter order.
+ */
+export function extractSites(products: CatalogProduct[]): CatalogSite[] {
+  const byId = new Map<string, string>();
+  for (const product of products) {
+    if (!product.supplierId || byId.has(product.supplierId)) continue;
+    byId.set(product.supplierId, siteLabel(product));
+  }
+  return Array.from(byId, ([id, label]) => ({ id, label })).sort((a, b) =>
+    a.label.localeCompare(b.label),
+  );
 }
 
 /**
