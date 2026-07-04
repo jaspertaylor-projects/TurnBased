@@ -1,41 +1,46 @@
+/**
+ * Local version history for editor projects.
+ *
+ * History lives in IndexedDB (see editor/persistence/): commit records hold a
+ * path → sha-256 map into the content-addressed blob store, so unchanged
+ * files cost nothing across commits and there is no localStorage quota to
+ * blow. Restores rebuild the project from the committed
+ * `turnbased.project.json` blob — commits no longer duplicate a project
+ * snapshot. When a commit syncs to Supabase it is marked `synced`, and older
+ * synced commits beyond a local cap are pruned (the remote copy is the
+ * durable one); orphaned blobs are garbage-collected afterwards.
+ */
+
 import { canonicalSerialize, generateId, hashValue } from '@turnbased/shared-utils';
 
 import { supabase } from '../lib/supabaseClient';
 import { ensureProjectManifest } from './manifest';
+import { garbageCollectBlobs, getBlob, getFiles, putFiles } from './persistence/blobStore';
+import {
+  COMMITS_PROJECT_INDEX,
+  COMMITS_STORE,
+  PROJECT_STATES_STORE,
+  WORKSPACES_STORE,
+  idbDelete,
+  idbDeleteMany,
+  idbGet,
+  idbGetAll,
+  idbGetAllByIndex,
+  idbPut,
+} from './persistence/idb';
+import { collectImageRefHashes, deflateProjectImages, inflateProjectImages } from './persistence/imageBlobs';
+import { ensureStorageMigrated } from './persistence/migrate';
+import { PROJECT_JSON_PATH } from './persistence/paths';
+import type { ProjectVersionState, StoredCommitRecord, StoredWorkspaceRecord } from './persistence/records';
 import { createWorkspaceFiles } from './shipping';
-import type { PreviewRuntime } from './types';
-import type { EditorProject } from './types';
+import type { EditorProject, PreviewRuntime } from './types';
 import { loadProjectWorkspace, saveProjectWorkspace } from './workspace';
 
-const GIT_STORAGE_KEY = 'turnbased.creator.git';
+export type ProjectGitCommitRecord = StoredCommitRecord;
+export type { ProjectVersionState };
 
-export interface ProjectGitCommitRecord {
-  id: string;
-  projectId: string;
-  commitSha: string;
-  message: string;
-  createdAt: string;
-  changedPaths: string[];
-  files: Record<string, string>;
-  projectSnapshot: EditorProject;
-  branchName?: string;
-  versionNumber?: number;
-  parentCommitSha?: string | null;
-  syncStatus?: 'local' | 'synced' | 'sync_failed';
-  remoteBranchName?: string | null;
-  remoteCommitSha?: string | null;
-}
-
-interface StoredGitRecords {
-  commits: ProjectGitCommitRecord[];
-  projectStates?: ProjectVersionState[];
-}
-
-export interface ProjectVersionState {
-  projectId: string;
-  activeBranchName: string;
-  activeCommitSha: string | null;
-}
+/** How many commits per project stay local once they are safely synced. */
+const MAX_LOCAL_COMMITS_PER_PROJECT = 50;
 
 export interface ProjectGitStatus {
   changedPaths: string[];
@@ -60,56 +65,6 @@ export interface ProjectVersionGraph {
 }
 
 export const DEFAULT_VERSION_BRANCH_NAME = 'initial musings';
-
-function getStorage(): Storage | null {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-
-  return window.localStorage;
-}
-
-function readStoredGitData(): StoredGitRecords {
-  const storage = getStorage();
-  if (!storage) {
-    return { commits: [], projectStates: [] };
-  }
-
-  const raw = storage.getItem(GIT_STORAGE_KEY);
-  if (!raw) {
-    return { commits: [], projectStates: [] };
-  }
-
-  try {
-    const parsed = JSON.parse(raw) as StoredGitRecords;
-    return {
-      commits: parsed.commits ?? [],
-      projectStates: parsed.projectStates ?? [],
-    };
-  } catch {
-    return { commits: [], projectStates: [] };
-  }
-}
-
-function readStoredCommits(): ProjectGitCommitRecord[] {
-  return readStoredGitData().commits;
-}
-
-function writeStoredGitData(data: StoredGitRecords): void {
-  const storage = getStorage();
-  storage?.setItem(
-    GIT_STORAGE_KEY,
-    JSON.stringify({
-      commits: data.commits,
-      projectStates: data.projectStates ?? [],
-    } satisfies StoredGitRecords),
-  );
-}
-
-function writeStoredCommits(commits: ProjectGitCommitRecord[]): void {
-  const current = readStoredGitData();
-  writeStoredGitData({ ...current, commits });
-}
 
 function toShortCommit(hash: number): string {
   return hash.toString(16).padStart(8, '0').slice(0, 8);
@@ -156,32 +111,14 @@ function normalizeCommitRecord(commit: ProjectGitCommitRecord, index: number, pr
   };
 }
 
-function readProjectState(projectId: string, commits: ProjectGitCommitRecord[]): ProjectVersionState {
-  const data = readStoredGitData();
-  const stored = data.projectStates?.find((state) => state.projectId === projectId);
+async function readProjectState(projectId: string, commits: ProjectGitCommitRecord[]): Promise<ProjectVersionState> {
+  const stored = await idbGet<ProjectVersionState>(PROJECT_STATES_STORE, projectId);
   const latest = commits[0] ?? null;
   return {
     projectId,
     activeBranchName: normalizeBranchName(stored?.activeBranchName ?? latest?.branchName ?? DEFAULT_VERSION_BRANCH_NAME),
     activeCommitSha: stored?.activeCommitSha ?? latest?.commitSha ?? null,
   };
-}
-
-function writeProjectState(nextState: ProjectVersionState): void {
-  const data = readStoredGitData();
-  const nextStates = [
-    nextState,
-    ...(data.projectStates ?? []).filter((state) => state.projectId !== nextState.projectId),
-  ];
-  writeStoredGitData({ ...data, projectStates: nextStates });
-}
-
-function getNextBranchVersionNumber(projectId: string, branchName: string): number {
-  const normalized = normalizeBranchName(branchName);
-  const existing = listProjectGitCommits(projectId)
-    .filter((commit) => normalizeBranchName(commit.branchName ?? DEFAULT_VERSION_BRANCH_NAME) === normalized)
-    .map((commit) => commit.versionNumber ?? 0);
-  return Math.max(0, ...existing) + 1;
 }
 
 function withVersionMarker(
@@ -278,18 +215,38 @@ async function ensureRemoteProject(project: EditorProject): Promise<string | nul
   return projectRow.id;
 }
 
-export function listProjectGitCommits(projectId: string): ProjectGitCommitRecord[] {
-  const projectCommits = readStoredCommits()
-    .filter((commit) => commit.projectId === projectId)
+export async function listProjectGitCommits(projectId: string): Promise<ProjectGitCommitRecord[]> {
+  await ensureStorageMigrated();
+  const projectCommits = (await idbGetAllByIndex<StoredCommitRecord>(COMMITS_STORE, COMMITS_PROJECT_INDEX, projectId))
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
   return projectCommits.map((commit, index) => normalizeCommitRecord(commit, index, projectCommits));
 }
 
-export function getProjectGitStatus(project: EditorProject, runtime: PreviewRuntime): ProjectGitStatus {
-  const commits = listProjectGitCommits(project.id);
+/** Hydrate the full file map of a commit from the blob store. */
+export async function loadCommitFiles(commit: ProjectGitCommitRecord): Promise<Record<string, string>> {
+  return getFiles(commit.fileHashes);
+}
+
+/** The current workspace files, falling back to a fresh (image-deflated) render of the project. */
+async function resolveWorkspaceFiles(project: EditorProject, runtime: PreviewRuntime): Promise<Record<string, string>> {
+  const workspace = await loadProjectWorkspace(project.id);
+  if (workspace) {
+    return workspace.files;
+  }
+  return createWorkspaceFiles(await deflateProjectImages(project), runtime);
+}
+
+/** Render the project to workspace files (image-deflated) and persist them. */
+export async function syncProjectWorkspace(project: EditorProject, runtime: PreviewRuntime): Promise<void> {
+  const deflated = await deflateProjectImages(project);
+  await saveProjectWorkspace(project.id, createWorkspaceFiles(deflated, runtime));
+}
+
+export async function getProjectGitStatus(project: EditorProject, runtime: PreviewRuntime): Promise<ProjectGitStatus> {
+  const commits = await listProjectGitCommits(project.id);
   const head = commits[0] ?? null;
-  const files = loadProjectWorkspace(project.id)?.files ?? createWorkspaceFiles(project, runtime);
-  const changedPaths = diffPaths(files, head?.files ?? null);
+  const files = await resolveWorkspaceFiles(project, runtime);
+  const changedPaths = diffPaths(files, head ? await loadCommitFiles(head) : null);
 
   return {
     changedPaths,
@@ -299,7 +256,15 @@ export function getProjectGitStatus(project: EditorProject, runtime: PreviewRunt
   };
 }
 
-export function commitProjectToGit(
+async function getNextBranchVersionNumber(projectId: string, branchName: string): Promise<number> {
+  const normalized = normalizeBranchName(branchName);
+  const existing = (await listProjectGitCommits(projectId))
+    .filter((commit) => normalizeBranchName(commit.branchName ?? DEFAULT_VERSION_BRANCH_NAME) === normalized)
+    .map((commit) => commit.versionNumber ?? 0);
+  return Math.max(0, ...existing) + 1;
+}
+
+export async function commitProjectToGit(
   project: EditorProject,
   runtime: PreviewRuntime,
   message: string,
@@ -309,30 +274,30 @@ export function commitProjectToGit(
     parentCommitSha?: string | null;
     forceVersionMarker?: boolean;
   } = {},
-): ProjectGitCommitRecord {
+): Promise<ProjectGitCommitRecord> {
   const trimmedMessage = message.trim();
   if (!trimmedMessage) {
     throw new Error('Add a commit message before creating history.');
   }
 
-  const commits = readStoredCommits();
-  const projectCommits = listProjectGitCommits(project.id);
-  const state = readProjectState(project.id, projectCommits);
+  const projectCommits = await listProjectGitCommits(project.id);
+  const state = await readProjectState(project.id, projectCommits);
   const parentCommitSha = options.parentCommitSha ?? state.activeCommitSha ?? projectCommits[0]?.commitSha ?? null;
   const parent = projectCommits.find((commit) => commit.commitSha === parentCommitSha) ?? projectCommits[0] ?? null;
   const branchName = normalizeBranchName(options.branchName ?? state.activeBranchName);
-  const versionNumber = options.versionNumber ?? getNextBranchVersionNumber(project.id, branchName);
+  const versionNumber = options.versionNumber ?? await getNextBranchVersionNumber(project.id, branchName);
   const commitId = generateId('commit');
-  const baseFiles = loadProjectWorkspace(project.id)?.files ?? createWorkspaceFiles(project, runtime);
+  const baseFiles = await resolveWorkspaceFiles(project, runtime);
   const files = options.forceVersionMarker
     ? withVersionMarker(baseFiles, branchName, versionNumber, commitId, parentCommitSha)
     : baseFiles;
-  const changedPaths = diffPaths(files, parent?.files ?? null);
+  const changedPaths = diffPaths(files, parent ? await loadCommitFiles(parent) : null);
 
   if (parent && changedPaths.length === 0) {
     throw new Error('There are no workspace changes to commit yet.');
   }
 
+  const fileHashes = await putFiles(files);
   const createdAt = new Date().toISOString();
   const commit: ProjectGitCommitRecord = {
     id: commitId,
@@ -341,13 +306,12 @@ export function commitProjectToGit(
       projectId: project.id,
       createdAt,
       message: trimmedMessage,
-      files: canonicalSerialize(files),
+      files: canonicalSerialize(fileHashes),
     })),
     message: trimmedMessage,
     createdAt,
     changedPaths: changedPaths.length > 0 ? changedPaths : Object.keys(files).sort((left, right) => left.localeCompare(right)),
-    files,
-    projectSnapshot: ensureProjectManifest(project),
+    fileHashes,
     branchName,
     versionNumber,
     parentCommitSha,
@@ -356,13 +320,13 @@ export function commitProjectToGit(
     remoteCommitSha: null,
   };
 
-  writeStoredCommits([commit, ...commits.filter((entry) => entry.id !== commit.id)]);
-  writeProjectState({
+  await idbPut(COMMITS_STORE, commit);
+  await idbPut(PROJECT_STATES_STORE, {
     projectId: project.id,
     activeBranchName: branchName,
     activeCommitSha: commit.commitSha,
-  });
-  saveProjectWorkspace(project.id, files);
+  } satisfies ProjectVersionState);
+  await saveProjectWorkspace(project.id, files);
   return commit;
 }
 
@@ -386,17 +350,24 @@ export async function commitProjectVersion(
     if (resolvedRemoteProjectId) {
       remoteProjectId = resolvedRemoteProjectId;
       nextProject = withRemoteProjectId(project, resolvedRemoteProjectId);
-      saveProjectWorkspace(nextProject.id, createWorkspaceFiles(nextProject, runtime));
+      const deflated = await deflateProjectImages(nextProject);
+      await saveProjectWorkspace(nextProject.id, createWorkspaceFiles(deflated, runtime));
     }
   } catch (error) {
     remoteError = error instanceof Error ? error.message : 'Unable to initialize the remote git project.';
   }
 
-  const commit = commitProjectToGit(nextProject, runtime, message, options);
+  const commit = await commitProjectToGit(nextProject, runtime, message, options);
 
   if (remoteProjectId) {
     try {
-      const files = loadProjectWorkspace(nextProject.id)?.files ?? createWorkspaceFiles(nextProject, runtime);
+      // The remote copy must be self-contained: re-inline the project JSON
+      // from the in-memory (image-inflated) project so no idb-image:// refs
+      // — resolvable only by this browser's IndexedDB — leak into Supabase.
+      const files = {
+        ...await loadCommitFiles(commit),
+        [PROJECT_JSON_PATH]: canonicalSerialize(nextProject),
+      };
       const { error } = await supabase.functions.invoke('git-proxy', {
         body: {
           action: 'commit',
@@ -411,6 +382,12 @@ export async function commitProjectVersion(
       if (error) {
         throw error;
       }
+
+      commit.syncStatus = 'synced';
+      commit.remoteBranchName = commit.branchName ?? null;
+      commit.remoteCommitSha = commit.commitSha;
+      await idbPut(COMMITS_STORE, commit);
+      await pruneSyncedCommits(nextProject.id);
     } catch (error) {
       remoteError = error instanceof Error ? error.message : 'Unable to sync the remote git commit.';
     }
@@ -429,10 +406,10 @@ export async function commitActiveProjectVersion(
   project: EditorProject,
   runtime: PreviewRuntime,
 ): Promise<CommitProjectVersionResult> {
-  const commits = listProjectGitCommits(project.id);
-  const state = readProjectState(project.id, commits);
+  const commits = await listProjectGitCommits(project.id);
+  const state = await readProjectState(project.id, commits);
   const branchName = normalizeBranchName(state.activeBranchName);
-  const versionNumber = getNextBranchVersionNumber(project.id, branchName);
+  const versionNumber = await getNextBranchVersionNumber(project.id, branchName);
   return commitProjectVersion(project, runtime, `${branchName} ${versionNumber}`, {
     branchName,
     versionNumber,
@@ -446,8 +423,8 @@ export async function createProjectVersionBranch(
   runtime: PreviewRuntime,
   branchName: string,
 ): Promise<CommitProjectVersionResult> {
-  const commits = listProjectGitCommits(project.id);
-  const state = readProjectState(project.id, commits);
+  const commits = await listProjectGitCommits(project.id);
+  const state = await readProjectState(project.id, commits);
   const normalizedBranchName = normalizeBranchName(branchName);
   return commitProjectVersion(project, runtime, `${normalizedBranchName} 1`, {
     branchName: normalizedBranchName,
@@ -457,9 +434,9 @@ export async function createProjectVersionBranch(
   });
 }
 
-export function getProjectVersionGraph(projectId: string): ProjectVersionGraph {
-  const commits = listProjectGitCommits(projectId);
-  const state = readProjectState(projectId, commits);
+export async function getProjectVersionGraph(projectId: string): Promise<ProjectVersionGraph> {
+  const commits = await listProjectGitCommits(projectId);
+  const state = await readProjectState(projectId, commits);
   const branchNames = Array.from(new Set([
     state.activeBranchName,
     DEFAULT_VERSION_BRANCH_NAME,
@@ -474,17 +451,105 @@ export function getProjectVersionGraph(projectId: string): ProjectVersionGraph {
   };
 }
 
-export function restoreProjectFromCommit(projectId: string, commitSha: string): EditorProject {
-  const commit = listProjectGitCommits(projectId).find((entry) => entry.commitSha === commitSha);
+export async function restoreProjectFromCommit(projectId: string, commitSha: string): Promise<EditorProject> {
+  const commit = (await listProjectGitCommits(projectId)).find((entry) => entry.commitSha === commitSha);
   if (!commit) {
     throw new Error('That commit could not be found.');
   }
 
-  saveProjectWorkspace(projectId, commit.files);
-  writeProjectState({
+  const files = await loadCommitFiles(commit);
+  const projectJson = files[PROJECT_JSON_PATH];
+  if (!projectJson) {
+    throw new Error('That commit is missing its project snapshot.');
+  }
+
+  await saveProjectWorkspace(projectId, files);
+  await idbPut(PROJECT_STATES_STORE, {
     projectId,
     activeBranchName: normalizeBranchName(commit.branchName ?? DEFAULT_VERSION_BRANCH_NAME),
     activeCommitSha: commit.commitSha,
+  } satisfies ProjectVersionState);
+
+  const snapshot = JSON.parse(projectJson) as EditorProject;
+  return ensureProjectManifest(await inflateProjectImages(snapshot));
+}
+
+/** Remove all local version data for a deleted project, then GC blobs. */
+export async function deleteProjectVersionData(projectId: string): Promise<void> {
+  await ensureStorageMigrated();
+  const commits = await idbGetAllByIndex<StoredCommitRecord>(COMMITS_STORE, COMMITS_PROJECT_INDEX, projectId);
+  await idbDeleteMany(COMMITS_STORE, commits.map((commit) => commit.id));
+  await idbDelete(PROJECT_STATES_STORE, projectId);
+  await idbDelete(WORKSPACES_STORE, projectId);
+  await garbageCollectOrphanedBlobs();
+}
+
+/**
+ * Supabase is the durable store once a commit syncs; locally we keep the
+ * newest MAX_LOCAL_COMMITS_PER_PROJECT and drop older *synced* commits —
+ * never branch heads and never the active commit, so every version in the
+ * switcher stays restorable offline.
+ */
+async function pruneSyncedCommits(projectId: string): Promise<void> {
+  const commits = await listProjectGitCommits(projectId);
+  if (commits.length <= MAX_LOCAL_COMMITS_PER_PROJECT) {
+    return;
+  }
+
+  const state = await readProjectState(projectId, commits);
+  // Commits arrive newest-first, so the first commit seen per branch is its head.
+  const headByBranch = new Map<string, string>();
+  commits.forEach((commit) => {
+    const branch = normalizeBranchName(commit.branchName ?? DEFAULT_VERSION_BRANCH_NAME);
+    if (!headByBranch.has(branch)) {
+      headByBranch.set(branch, commit.commitSha);
+    }
   });
-  return ensureProjectManifest(commit.projectSnapshot);
+  const protectedShas = new Set(headByBranch.values());
+  if (state.activeCommitSha) {
+    protectedShas.add(state.activeCommitSha);
+  }
+
+  const prunable = commits
+    .slice(MAX_LOCAL_COMMITS_PER_PROJECT)
+    .filter((commit) => commit.syncStatus === 'synced' && !protectedShas.has(commit.commitSha));
+
+  if (prunable.length === 0) {
+    return;
+  }
+
+  await idbDeleteMany(COMMITS_STORE, prunable.map((commit) => commit.id));
+  await garbageCollectOrphanedBlobs();
+}
+
+/**
+ * Delete blobs no longer reachable from any commit, workspace, or the live
+ * projects key. Image blobs are referenced indirectly (idb-image:// refs
+ * inside serialized project JSON), so root blob contents are scanned one
+ * level deep — image blobs themselves are data URLs and contain no refs.
+ */
+async function garbageCollectOrphanedBlobs(): Promise<void> {
+  const referenced = new Set<string>();
+
+  const commits = await idbGetAll<StoredCommitRecord>(COMMITS_STORE);
+  commits.forEach((commit) => Object.values(commit.fileHashes).forEach((hash) => referenced.add(hash)));
+  const workspaces = await idbGetAll<StoredWorkspaceRecord>(WORKSPACES_STORE);
+  workspaces.forEach((workspace) => Object.values(workspace.fileHashes).forEach((hash) => referenced.add(hash)));
+
+  const rootHashes = Array.from(referenced);
+  await Promise.all(rootHashes.map(async (hash) => {
+    const content = await getBlob(hash);
+    if (content) {
+      collectImageRefHashes(content, referenced);
+    }
+  }));
+
+  if (typeof window !== 'undefined') {
+    const liveProjects = window.localStorage.getItem('turnbased.creator.projects');
+    if (liveProjects) {
+      collectImageRefHashes(liveProjects, referenced);
+    }
+  }
+
+  await garbageCollectBlobs(referenced);
 }

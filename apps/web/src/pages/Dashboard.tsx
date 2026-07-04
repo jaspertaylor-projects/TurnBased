@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { getProjectModeLabel, getProjectModeSupportSummary } from '../editor/capabilities';
 import { listProjectGitCommits } from '../editor/git';
@@ -8,11 +8,26 @@ import type { EditorProject } from '../editor/types';
 import { AppPageFrame } from '../components/AppPageFrame';
 
 export const Dashboard = () => {
-  const [projects, setProjects] = useState<EditorProject[]>(() => loadEditorProjects());
+  const [projects, setProjects] = useState<EditorProject[]>([]);
+  // Version history lives in IndexedDB, so commit counts arrive async.
+  const [commitCounts, setCommitCounts] = useState<Record<string, number>>({});
 
-  function handleDelete(projectId: string) {
-    deleteEditorProject(projectId);
-    setProjects(loadEditorProjects());
+  async function refreshProjects() {
+    const loaded = await loadEditorProjects();
+    setProjects(loaded);
+    const counts = await Promise.all(
+      loaded.map(async (project) => [project.id, (await listProjectGitCommits(project.id)).length] as const),
+    );
+    setCommitCounts(Object.fromEntries(counts));
+  }
+
+  useEffect(() => {
+    void refreshProjects();
+  }, []);
+
+  async function handleDelete(projectId: string) {
+    await deleteEditorProject(projectId);
+    await refreshProjects();
   }
 
   function getProjectSummary(project: EditorProject) {
@@ -22,7 +37,7 @@ export const Dashboard = () => {
       marketplaceEligible: support.marketplaceEligible,
       latestPreview: getLatestBuild(project.id, 'preview'),
       latestRelease: getLatestBuild(project.id, 'release'),
-      commitCount: listProjectGitCommits(project.id).length,
+      commitCount: commitCounts[project.id] ?? 0,
     };
   }
 

@@ -1,4 +1,15 @@
-const WORKSPACE_STORAGE_KEY = 'turnbased.creator.workspaces';
+/**
+ * Per-project working-tree persistence, backed by IndexedDB.
+ *
+ * File bodies live once in the content-addressed blob store; the workspace
+ * record only maps path → hash. The legacy localStorage key
+ * (`turnbased.creator.workspaces`) is migrated on first use.
+ */
+
+import { getFiles, putFiles } from './persistence/blobStore';
+import { WORKSPACES_STORE, idbDelete, idbGet, idbPut } from './persistence/idb';
+import { ensureStorageMigrated } from './persistence/migrate';
+import type { StoredWorkspaceRecord } from './persistence/records';
 
 export interface ProjectWorkspaceRecord {
   projectId: string;
@@ -7,66 +18,37 @@ export interface ProjectWorkspaceRecord {
   updatedAt: string;
 }
 
-interface StoredWorkspaceRecords {
-  workspaces: ProjectWorkspaceRecord[];
-}
-
-function getStorage(): Storage | null {
-  if (typeof window === 'undefined') {
+export async function loadProjectWorkspace(projectId: string): Promise<ProjectWorkspaceRecord | null> {
+  await ensureStorageMigrated();
+  const stored = await idbGet<StoredWorkspaceRecord>(WORKSPACES_STORE, projectId);
+  if (!stored) {
     return null;
   }
 
-  return window.localStorage;
-}
-
-function readStoredWorkspaces(): ProjectWorkspaceRecord[] {
-  const storage = getStorage();
-  if (!storage) {
-    return [];
-  }
-
-  const raw = storage.getItem(WORKSPACE_STORAGE_KEY);
-  if (!raw) {
-    return [];
-  }
-
-  try {
-    const parsed = JSON.parse(raw) as StoredWorkspaceRecords;
-    return parsed.workspaces ?? [];
-  } catch {
-    return [];
-  }
-}
-
-function writeStoredWorkspaces(workspaces: ProjectWorkspaceRecord[]): void {
-  const storage = getStorage();
-  storage?.setItem(
-    WORKSPACE_STORAGE_KEY,
-    JSON.stringify({
-      workspaces,
-    } satisfies StoredWorkspaceRecords),
-  );
-}
-
-export function loadProjectWorkspace(projectId: string): ProjectWorkspaceRecord | null {
-  return readStoredWorkspaces().find((workspace) => workspace.projectId === projectId) ?? null;
-}
-
-export function saveProjectWorkspace(projectId: string, files: Record<string, string>): ProjectWorkspaceRecord {
-  const current = loadProjectWorkspace(projectId);
-  const nextRecord: ProjectWorkspaceRecord = {
-    projectId,
-    files,
-    createdAt: current?.createdAt ?? new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+  return {
+    projectId: stored.projectId,
+    files: await getFiles(stored.fileHashes),
+    createdAt: stored.createdAt,
+    updatedAt: stored.updatedAt,
   };
-
-  const workspaces = readStoredWorkspaces().filter((workspace) => workspace.projectId !== projectId);
-  workspaces.unshift(nextRecord);
-  writeStoredWorkspaces(workspaces);
-  return nextRecord;
 }
 
-export function deleteProjectWorkspace(projectId: string): void {
-  writeStoredWorkspaces(readStoredWorkspaces().filter((workspace) => workspace.projectId !== projectId));
+export async function saveProjectWorkspace(projectId: string, files: Record<string, string>): Promise<ProjectWorkspaceRecord> {
+  await ensureStorageMigrated();
+  const current = await idbGet<StoredWorkspaceRecord>(WORKSPACES_STORE, projectId);
+  const now = new Date().toISOString();
+  const record: StoredWorkspaceRecord = {
+    projectId,
+    fileHashes: await putFiles(files),
+    createdAt: current?.createdAt ?? now,
+    updatedAt: now,
+  };
+  await idbPut(WORKSPACES_STORE, record);
+
+  return { projectId, files, createdAt: record.createdAt, updatedAt: record.updatedAt };
+}
+
+export async function deleteProjectWorkspace(projectId: string): Promise<void> {
+  await ensureStorageMigrated();
+  await idbDelete(WORKSPACES_STORE, projectId);
 }

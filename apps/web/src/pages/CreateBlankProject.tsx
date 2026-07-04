@@ -4,12 +4,10 @@ import { Brush, ChevronDown, Plus, Sparkles, X } from 'lucide-react';
 import { AppPageFrame } from '../components/AppPageFrame';
 import { NumericInput } from '../components/NumericInput';
 import { buildProjectWithAI } from '../editor/aiBuildService';
-import { commitProjectVersion } from '../editor/git';
+import { commitProjectVersion, syncProjectWorkspace } from '../editor/git';
 import { buildPreviewRuntime } from '../editor/runtime';
 import { createDefaultRulesBrief, normalizeRulesBuilderBrief } from '../editor/project';
 import { saveEditorProject } from '../editor/storage';
-import { saveProjectWorkspace } from '../editor/workspace';
-import { createWorkspaceFiles } from '../editor/shipping';
 import type { RulesBuilderBrief } from '../editor/types';
 
 const PENDING_EDITOR_NOTICE_KEY = 'turnbased.creator.pendingEditorNotice';
@@ -256,10 +254,9 @@ export const CreateBlankProject = () => {
       const normalizedBrief = normalizeRulesBuilderBrief(merged);
       const buildResult = await buildProjectWithAI(normalizedBrief);
       const runtime = buildPreviewRuntime(buildResult.project);
-      const files = createWorkspaceFiles(buildResult.project, runtime);
 
-      saveEditorProject(buildResult.project);
-      saveProjectWorkspace(buildResult.project.id, files);
+      await saveEditorProject(buildResult.project);
+      await syncProjectWorkspace(buildResult.project, runtime);
 
       const commitResult = await commitProjectVersion(
         buildResult.project,
@@ -267,7 +264,7 @@ export const CreateBlankProject = () => {
         buildResult.usedAI ? 'AI generated linked multi-view starter project' : 'Generated linked multi-view starter scaffold',
       );
 
-      saveEditorProject(commitResult.project);
+      await saveEditorProject(commitResult.project);
       window.sessionStorage.setItem(
         PENDING_EDITOR_NOTICE_KEY,
         buildResult.usedAI ? 'AI build complete — Rules tab is open and ready to edit.' : 'Workspace ready — Rules tab is open and ready to edit.',

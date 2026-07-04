@@ -38,3 +38,6 @@ supabase/.temp
 .playwright-mcp*
 .playwright-codex/
 .codex
+
+# TypeScript incremental build state
+*.tsbuildinfo

@@ -259,6 +259,39 @@ supplier (boardgamesmaker, `1f2022af…`, 77 products); adding a supplier is a
 job on that separate third-party service (not this repo) — check
 `/v1/admin/scrape-runs`.
 
+### Version history + images live in IndexedDB, not localStorage
+
+Never persist bulky editor data (version commits, workspace file maps, base64
+image data URLs) in localStorage — its ~5MB origin quota is what caused the
+2026-07 `QuotaExceededError` on `turnbased.creator.git`.
+
+- **Why:** the legacy layout stored every commit of every project (each with a
+  full file map AND a full `projectSnapshot`) under one localStorage key. One
+  AI-generated image (~0.5–2MB base64) was serialized into every commit twice;
+  three saves blew the quota.
+- **How to apply:** the persistence layer is `apps/web/src/editor/persistence/`
+  (`idb.ts` thin IDB wrapper, `blobStore.ts` content-addressed sha-256 blobs,
+  `imageBlobs.ts` data-URL deflate/inflate, `migrate.ts` one-time legacy
+  migration, `records.ts` stored shapes). Rules:
+  1. Commits store `fileHashes` (path → sha-256), never file contents, and NO
+     `projectSnapshot` — restores parse the committed `turnbased.project.json`
+     blob.
+  2. Any serialized project at rest has large `data:` URLs replaced by
+     `idb-image://<sha256>` refs (`deflateProjectImages`); loads always
+     `inflateProjectImages` so in-memory projects carry real data URLs.
+     In-memory projects must never be persisted or sent anywhere without
+     deciding deflated-vs-inflated deliberately (remote git-proxy payloads are
+     re-inflated so Supabase stays self-contained).
+  3. `git.ts`, `workspace.ts`, `storage.ts` APIs are all async now —
+     `Editor.tsx` holds `gitStatus`/`versionGraph` in state fed by an effect,
+     refreshed via `versionsRefreshKey` after save/restore/switch actions.
+  4. After a successful remote sync a commit is marked `synced`; older synced
+     commits beyond 50/project are pruned (branch heads and the active commit
+     are never pruned) and orphaned blobs garbage-collected.
+  5. localStorage keeps ONLY small metadata (`turnbased.creator.projects`
+     deflated, UI prefs). If you add a new persisted artifact ask "can this
+     hold an image or a file map?" — if yes, it goes in IndexedDB.
+
 ---
 
 ## Maintenance

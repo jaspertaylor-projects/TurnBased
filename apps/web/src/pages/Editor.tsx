@@ -42,9 +42,10 @@ import {
   getProjectGitStatus,
   getProjectVersionGraph,
   restoreProjectFromCommit,
+  syncProjectWorkspace,
+  type ProjectGitStatus,
+  type ProjectVersionGraph,
 } from '../editor/git';
-import { createWorkspaceFiles } from '../editor/shipping';
-import { saveProjectWorkspace } from '../editor/workspace';
 import { GrassBackdrop } from '../components/GrassBackdrop';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -107,6 +108,11 @@ export const Editor = () => {
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
   const [paletteOwnerId] = useState<string | null>('player_one');
   const [editorNotice, setEditorNotice] = useState<string | null>(null);
+  // Version history lives in IndexedDB, so status + graph arrive async and
+  // are refreshed after every workspace autosave or version action.
+  const [gitStatus, setGitStatus] = useState<ProjectGitStatus | null>(null);
+  const [versionGraph, setVersionGraph] = useState<ProjectVersionGraph | null>(null);
+  const [versionsRefreshKey, setVersionsRefreshKey] = useState(0);
   // The sidebar behaves like a drawer: it slides out of view and the canvas
   // reclaims the space. The open/closed choice is remembered across sessions.
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(() => {
@@ -118,9 +124,16 @@ export const Editor = () => {
   }, [isSidebarOpen]);
 
   useEffect(() => {
-    const syncRoute = () => {
+    // Guards against a stale async load landing after a newer hashchange.
+    let activeLoadId = 0;
+
+    const syncRoute = async () => {
+      const loadId = ++activeLoadId;
       const nextProjectId = readProjectIdFromHash();
-      const loadedProject = nextProjectId ? loadEditorProject(nextProjectId) : null;
+      const loadedProject = nextProjectId ? await loadEditorProject(nextProjectId) : null;
+      if (loadId !== activeLoadId) {
+        return;
+      }
       const nextProject = loadedProject ? syncAllGeneratedBoardChildren(loadedProject) : null;
       const pendingNotice = window.sessionStorage.getItem(PENDING_EDITOR_NOTICE_KEY);
 
@@ -128,15 +141,21 @@ export const Editor = () => {
       resetProjectHistory(nextProject);
       setActiveSection(DEFAULT_EDITOR_SECTION);
       setSelectedComponentId(null);
+      setGitStatus(null);
+      setVersionGraph(null);
       setEditorNotice(pendingNotice);
       if (pendingNotice) {
         window.sessionStorage.removeItem(PENDING_EDITOR_NOTICE_KEY);
       }
     };
 
-    syncRoute();
-    window.addEventListener('hashchange', syncRoute);
-    return () => window.removeEventListener('hashchange', syncRoute);
+    const onHashChange = () => { void syncRoute(); };
+    void syncRoute();
+    window.addEventListener('hashchange', onHashChange);
+    return () => {
+      activeLoadId += 1;
+      window.removeEventListener('hashchange', onHashChange);
+    };
   }, [resetProjectHistory]);
 
   useEffect(() => {
@@ -152,9 +171,26 @@ export const Editor = () => {
       return;
     }
 
-    const runtime = buildPreviewRuntime(project);
-    saveProjectWorkspace(project.id, createWorkspaceFiles(project, runtime));
-  }, [project]);
+    let cancelled = false;
+    const workspaceRuntime = buildPreviewRuntime(project);
+    (async () => {
+      await syncProjectWorkspace(project, workspaceRuntime);
+      const [nextStatus, nextGraph] = await Promise.all([
+        getProjectGitStatus(project, workspaceRuntime),
+        getProjectVersionGraph(project.id),
+      ]);
+      if (!cancelled) {
+        setGitStatus(nextStatus);
+        setVersionGraph(nextGraph);
+      }
+    })().catch((error) => {
+      console.error('[turnbased] workspace sync failed', error);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [project, versionsRefreshKey]);
 
   useUndoRedoKeyboard(undoProject, redoProject);
 
@@ -192,14 +228,25 @@ export const Editor = () => {
   const currentRuntime = runtime;
   const currentSectionMeta = SECTION_OPTIONS.find((section) => section.id === activeSection) ?? SECTION_OPTIONS[0];
   const componentOutlineIds = listComponentOutlineIds(currentProject);
-  const gitStatus = getProjectGitStatus(currentProject, currentRuntime);
-  const versionGraph = getProjectVersionGraph(currentProject.id);
+  // Placeholders until the async IndexedDB read lands (see the sync effect).
+  const currentGitStatus: ProjectGitStatus = gitStatus ?? {
+    changedPaths: [],
+    trackedPaths: [],
+    headCommitSha: null,
+    hasChanges: false,
+  };
+  const currentVersionGraph: ProjectVersionGraph = versionGraph ?? {
+    activeBranchName: DEFAULT_VERSION_BRANCH_NAME,
+    activeCommitSha: null,
+    commits: [],
+    branchNames: [DEFAULT_VERSION_BRANCH_NAME],
+  };
 
   // Map each version (branch) to its head commit so the sidebar dropdown can
   // switch versions. Commits arrive newest-first, so the first one seen per
   // branch is its head.
   const branchHeadShas = new Map<string, string>();
-  versionGraph.commits.forEach((commit) => {
+  currentVersionGraph.commits.forEach((commit) => {
     const branchName = commit.branchName ?? DEFAULT_VERSION_BRANCH_NAME;
     if (!branchHeadShas.has(branchName)) {
       branchHeadShas.set(branchName, commit.commitSha);
@@ -207,7 +254,7 @@ export const Editor = () => {
   });
   const versionOptions = Array.from(branchHeadShas.keys()).map((name) => ({
     name,
-    isActive: name === versionGraph.activeBranchName,
+    isActive: name === currentVersionGraph.activeBranchName,
   }));
 
   function commitProject(nextProject: EditorProject) {
@@ -221,6 +268,7 @@ export const Editor = () => {
       if (result.project !== currentProject) {
         setProject(result.project);
       }
+      setVersionsRefreshKey((key) => key + 1);
       setEditorNotice(
         result.remoteError
           ? `Saved locally. Remote sync is unavailable right now: ${result.remoteError}`
@@ -237,6 +285,7 @@ export const Editor = () => {
       if (result.project !== currentProject) {
         setProject(result.project);
       }
+      setVersionsRefreshKey((key) => key + 1);
       setActiveSection('versions');
       setEditorNotice(
         result.remoteError
@@ -248,15 +297,16 @@ export const Editor = () => {
     }
   }
 
-  function handleSwitchVersion(branchName: string) {
+  async function handleSwitchVersion(branchName: string) {
     const headSha = branchHeadShas.get(branchName);
-    if (!headSha || headSha === versionGraph.activeCommitSha) {
+    if (!headSha || headSha === currentVersionGraph.activeCommitSha) {
       return;
     }
     try {
-      const restoredProject = restoreProjectFromCommit(currentProject.id, headSha);
+      const restoredProject = await restoreProjectFromCommit(currentProject.id, headSha);
       resetProjectHistory(restoredProject);
       setSelectedComponentId(null);
+      setVersionsRefreshKey((key) => key + 1);
       setEditorNotice(`Switched to ${branchName}.`);
     } catch (error) {
       setEditorNotice(error instanceof Error ? error.message : 'Unable to switch versions.');
@@ -513,14 +563,15 @@ export const Editor = () => {
       case 'versions':
         return (
           <VersionsSection
-            gitStatus={gitStatus}
-            versionGraph={versionGraph}
+            gitStatus={currentGitStatus}
+            versionGraph={currentVersionGraph}
             onCreateVersion={handleCreateVersion}
-            onRestoreCommit={(commitSha) => {
+            onRestoreCommit={async (commitSha) => {
               try {
-                const restoredProject = restoreProjectFromCommit(currentProject.id, commitSha);
+                const restoredProject = await restoreProjectFromCommit(currentProject.id, commitSha);
                 resetProjectHistory(restoredProject);
                 setSelectedComponentId(null);
+                setVersionsRefreshKey((key) => key + 1);
                 setEditorNotice(`Restored ${commitSha}.`);
               } catch (error) {
                 setEditorNotice(error instanceof Error ? error.message : 'Unable to restore that version.');
@@ -603,7 +654,7 @@ export const Editor = () => {
           setActiveSection={setActiveSection}
           onOpenComponentEditor={openComponentEditor}
           onRenameProject={(name) => commitProject(renameProject(currentProject, name))}
-          activeVersionName={versionGraph.activeBranchName}
+          activeVersionName={currentVersionGraph.activeBranchName}
           versionOptions={versionOptions}
           onSaveVersion={handleSaveVersion}
           onSwitchVersion={handleSwitchVersion}

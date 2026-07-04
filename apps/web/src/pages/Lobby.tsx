@@ -113,7 +113,7 @@ export const Lobby = () => {
   useEffect(() => {
     const syncPageState = async () => {
       const params = readLobbyParams();
-      const localProjects = loadEditorProjects();
+      const localProjects = await loadEditorProjects();
       setProjects(localProjects);
       setSelectedProjectId((current) => current || params.projectId || localProjects[0]?.id || '');
       setCreateMode(params.mode ?? 'playtest');

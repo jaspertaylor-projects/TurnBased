@@ -99,7 +99,12 @@ out of view files:
 
 - `project.ts` — project mutation primitives.
 - `runtime.ts` — compile authored project → preview runtime state.
-- `storage.ts`, `workspace.ts`, `git.ts` — persistence layers.
+- `storage.ts`, `workspace.ts`, `git.ts` — persistence layers (all async).
+  Version history, workspace file maps, and image payloads live in
+  **IndexedDB** via `persistence/` (content-addressed sha-256 blob store +
+  commit/workspace records + data-URL deflate/inflate + legacy-localStorage
+  migration). localStorage holds only small metadata — never file maps or
+  base64 images (its ~5MB quota is what broke saving in 2026-07).
 - `aiBuilder.ts`, `aiBuildService.ts`, `ai.ts` — AI build orchestration.
 - `supplierCatalog.ts`, `useSupplierCatalog.ts`, `shipping.ts` — physical
   order pricing + supplier lookup.

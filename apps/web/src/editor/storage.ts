@@ -13,7 +13,9 @@ import {
   syncProjectViews,
 } from './project';
 import { createDefaultProjectColorPalette, createProjectPaletteReference } from './projectPalette';
-import { deleteProjectWorkspace } from './workspace';
+import { deleteProjectVersionData } from './git';
+import { deflateProjectImages, inflateProjectImages } from './persistence/imageBlobs';
+import { ensureStorageMigrated } from './persistence/migrate';
 
 const STORAGE_KEY = 'turnbased.creator.projects';
 
@@ -227,7 +229,8 @@ function normalizeEditorProject(project: EditorProject): EditorProject {
   };
 }
 
-export function loadEditorProjects(): EditorProject[] {
+/** The raw, at-rest project list (image payloads deflated to blob refs). */
+function readRawProjects(): EditorProject[] {
   const storage = getStorage();
   if (!storage) {
     return [];
@@ -240,38 +243,52 @@ export function loadEditorProjects(): EditorProject[] {
 
   try {
     const parsed = JSON.parse(raw) as StoredEditorProjects;
-    return (parsed.projects ?? []).map((project) => normalizeEditorProject(project));
+    return parsed.projects ?? [];
   } catch {
     return [];
   }
 }
 
-export function loadEditorProject(projectId: string): EditorProject | null {
-  return loadEditorProjects().find((project) => project.id === projectId) ?? null;
-}
-
-export function saveEditorProject(project: EditorProject): void {
-  const projects = loadEditorProjects();
-  const nextProjects = projects.filter((entry) => entry.id !== project.id);
-  nextProjects.unshift(project);
-
-  const storage = getStorage();
-  storage?.setItem(
+function writeRawProjects(projects: EditorProject[]): void {
+  getStorage()?.setItem(
     STORAGE_KEY,
-    JSON.stringify({
-      projects: nextProjects,
-    } satisfies StoredEditorProjects),
+    JSON.stringify({ projects } satisfies StoredEditorProjects),
   );
 }
 
-export function deleteEditorProject(projectId: string): void {
-  const projects = loadEditorProjects().filter((project) => project.id !== projectId);
-  const storage = getStorage();
-  storage?.setItem(
-    STORAGE_KEY,
-    JSON.stringify({
-      projects,
-    } satisfies StoredEditorProjects),
+export async function loadEditorProjects(): Promise<EditorProject[]> {
+  await ensureStorageMigrated();
+  return Promise.all(
+    readRawProjects().map((project) => inflateProjectImages(normalizeEditorProject(project))),
   );
-  deleteProjectWorkspace(projectId);
+}
+
+export async function loadEditorProject(projectId: string): Promise<EditorProject | null> {
+  await ensureStorageMigrated();
+  const raw = readRawProjects().find((project) => project.id === projectId);
+  return raw ? inflateProjectImages(normalizeEditorProject(raw)) : null;
+}
+
+// Saves are chained so rapid autosaves can't interleave their async
+// deflate + write steps and land out of order.
+let writeQueue: Promise<unknown> = Promise.resolve();
+
+export function saveEditorProject(project: EditorProject): Promise<void> {
+  const task = writeQueue.then(async () => {
+    await ensureStorageMigrated();
+    // Large data URLs move to IndexedDB; localStorage keeps only small refs.
+    const deflated = await deflateProjectImages(project);
+    const nextProjects = readRawProjects().filter((entry) => entry.id !== project.id);
+    nextProjects.unshift(deflated);
+    writeRawProjects(nextProjects);
+  });
+  writeQueue = task.catch(() => undefined);
+  return task;
+}
+
+export async function deleteEditorProject(projectId: string): Promise<void> {
+  await ensureStorageMigrated();
+  writeRawProjects(readRawProjects().filter((project) => project.id !== projectId));
+  // Also drop the project's commits, workspace, and any orphaned blobs.
+  await deleteProjectVersionData(projectId);
 }
