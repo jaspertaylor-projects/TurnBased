@@ -398,3 +398,17 @@ image data URLs) in localStorage — its ~5MB origin quota is what caused the
   five pre-existing type diagnostics in aiBuilder, ComponentsChapterPage, and
   Editor's rule-section props; those unrelated user fixes remain uncommitted.
   Do not discard or accidentally fold that work into this feature commit.
+
+
+## Local development sign-in
+
+- The sign-in form offers **Use local dev account** only for Vite development
+  with both app and Supabase on loopback hosts. The JSX also has an explicit
+  `import.meta.env.DEV` guard so production builds omit its handler/credentials.
+- Anonymous sessions may enter the sign-in form; only regular authenticated
+  users redirect to the workshop. **Continue without signing in** opens the
+  local workshop directly. Supabase anonymous auth is disabled locally and
+  is unnecessary for local project editing.
+- Verified the existing seeded account via the real browser, sign-in state
+  after reload, guest continuation, web production build, and Auth ESLint.
+  No database reset or account reseeding was needed. Logs: `logs/dev-sign-in-*`.

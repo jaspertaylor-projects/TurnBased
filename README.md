@@ -250,6 +250,11 @@ A pre-confirmed account is seeded into the local Postgres on every
 - **Password:** `dev-local-only`
 - **Local AI wallet:** `$50.00`
 
+Open `http://127.0.0.1:3000/#/auth` and choose **Use local dev account**.
+The shortcut appears only in development when both the app and Supabase use
+localhost/loopback addresses. You can also enter the credentials above in the
+normal form. Guest sessions can open this page to sign into a regular account.
+
 Use it to exercise any flow that requires auth (the `Build with AI` path,
 the rulebook `AI` button on each section, anything that hits the edge
 functions). If you already have local data and don't want a full reset,
