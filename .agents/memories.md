@@ -594,3 +594,56 @@ image data URLs) in localStorage — its ~5MB origin quota is what caused the
   Video QA passed beginning/middle/end playback and seek checks with no
   media/page errors or dropped frames. The actual recording had no page
   errors. Build/render/checkpoint logs are under logs/moonlit-market-*.
+
+
+## September 2026 — AI card data and authored fullscreen playtests
+
+- The user requested whole-column and individual-cell AI editing, a visible
+  whole-rulebook generation flow, actual authored cards on the play surface,
+  proportional fullscreen, and a second real video. The follow-up continues
+  the explicit dev-account AI authorization for this recording.
+- The new card-table endpoint uses provider-only r1/r2 aliases and a strict
+  values object, then maps validated results to the original row IDs. A live
+  attempt with long-ID array edits returned invalid row references; it was
+  rejected without changing data or charging the designer. Do not silently
+  repair, partially apply, or accept unknown/duplicate/missing row outputs.
+- Card AI previews are reviewed before atomic apply. Target-baseline guards,
+  cancellation, restore invalidation, and guarded undo preserve newer manual
+  edits and unrelated fields. Custom columns use `custom:<key>` internally.
+  Accessible prompt label is `AI table instructions`; model is `AI table model`.
+- Whole-rulebook drafting changes selected prose bodies only, with exact-ID
+  server/client validation. It leaves structured component/icon chapters intact.
+  Existing per-chapter assistance remains available. Do not imply this prose
+  is an executable arbitrary-game engine.
+- New lab runs/batches freeze authored card templates and artwork along with
+  numeric rules. Acquired zones, drawn-card backs, inspection and replays use
+  those saved visuals. Start a fresh session to adopt subsequent design edits.
+  All tabletop pieces share one physical scale; mixed dimensions must retain
+  their relative size in normal mode, fullscreen, and viewport resize.
+- Native-dialog StrictMode cleanup can queue a close event after reopening.
+  Card inspector close handling checks `dialog.open` before dismissing its
+  parent. Recorder pointer overlays must move inside open dialogs/fullscreen
+  elements to remain visible in the browser top layer.
+
+- Second video: `artifacts/demos/moonlit-market-v2/turnbased-game-creation.mp4`,
+  219.44 seconds / 13.2 MB / H.264 1600×1000 at 25 fps, captions and no audio.
+  The first video is preserved. Three successful real writing calls (whole
+  rulebook, body column, body cell) returned 200; the earlier rejected column
+  attempt remains in raw metadata. Artwork/template were reused from video one.
+- V2 backup/PDF exports live in its `downloads/`. Fresh UI import and reload
+  verified six AI-edited rows, original costs/points/copies, 18 physical cards,
+  five prose chapters, artwork/front/back, 2 checkpoints, 1 finding, and frozen
+  finished 19-action playtest (11–15, opponent wins). Card print has 18 fronts
+  and 18 backs on 6 A4 pages. No paid calls or page errors occurred in verification.
+  The designer's persistent browser was left intact; import the backup there
+  to continue the recorded game.
+- Validation: 68 workshop + 47 version/persistence + 9 rules API + 18 card API
+  tests pass, as do full workspace typecheck/build, scoped lint/Deno checks,
+  the three isolated feature browser checks, backup import/reload and actual
+  MP4 playback/seek/visual QA. Logs use `logs/moonlit-market-v2-*` and
+  `logs/ai-card-table-constraints-*`. Local checkpoints worked; remote sync
+  remained unavailable within its bounded five-second timeout.
+- Match card-table provider constraints to client apply constraints before
+  billing: reject blank titles and merged copy totals over 2,000, including
+  untouched context rows. Exactly 2,000 is allowed. Invalid paid-provider output
+  is audited without returning partial edits or charging the designer.

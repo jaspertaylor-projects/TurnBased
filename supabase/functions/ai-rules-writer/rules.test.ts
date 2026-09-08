@@ -281,3 +281,15 @@ test("provider error and malformed content never debit; GPT-5.1 omits temperatur
     null,
   );
 });
+
+test('whole-rulebook requests use the authenticated writer and reject malformed chapter output before charging', async () => {
+  const request = { ...input, mode: 'rulebook', targetChapters: [{ id: 'setup', title: 'Setup' }] };
+  const text = JSON.stringify({ chapters: [{ id: 'setup', body: 'Each trader starts with two coins.' }] });
+  const valid = fixture({ provider: { choices: [{ message: { content: text } }], usage: { prompt_tokens: 100, completion_tokens: 50 } } });
+  assert.equal((await valid.request(request)).status, 200);
+  assert.equal(valid.ledger.length, 1);
+  assert.equal((valid.ledger[0] as { request_meta: { mode: string } }).request_meta.mode, 'rulebook');
+  const malformed = fixture({ provider: { choices: [{ message: { content: '{"chapters":[]}' } }] } });
+  assert.equal((await malformed.request(request)).status, 502);
+  assert.equal(malformed.debits.length, 0);
+});

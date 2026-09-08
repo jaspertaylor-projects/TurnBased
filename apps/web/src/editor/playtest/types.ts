@@ -1,3 +1,5 @@
+import type { ComponentDesignDocument } from '../templateStudio/types';
+
 export type LabStrategy = 'balanced' | 'greedy' | 'random';
 export type LabSeat = 0 | 1;
 export type LabCardSource = 'sample' | 'project';
@@ -75,6 +77,15 @@ export interface LabVersionRef {
   sha: string | null;
 }
 
+/** One frozen template per design set, one data row per design, never per copy. */
+export interface LabVisualMaterial {
+  schemaVersion: 1;
+  templates: Record<string, ComponentDesignDocument>;
+  cards: Record<string, { templateId: string; data: Record<string, string> }>;
+  /** Shared image URLs; template/data strings reference them with lab-art:// ids. */
+  assets: Record<string, string>;
+}
+
 export interface LabRun {
   id: string;
   startedAt: string;
@@ -82,6 +93,7 @@ export interface LabRun {
   version: LabVersionRef;
   config: LabConfig;
   cards: LabCard[];
+  visuals?: LabVisualMaterial;
   state: LabGameState;
   transcript: LabTurnRecord[];
 }
@@ -102,6 +114,7 @@ export interface LabBatch {
   version: LabVersionRef;
   config: LabConfig;
   cards: LabCard[];
+  visuals?: LabVisualMaterial;
   results: LabGameResult[];
 }
 

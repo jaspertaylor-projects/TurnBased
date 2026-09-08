@@ -5,6 +5,7 @@ import { LabConfigPanel } from '../playtest/LabConfigPanel';
 import { LabJournal, LabSimulationPanel } from '../playtest/LabResults';
 import { LabTable } from '../playtest/LabTable';
 import { getLabMaterial } from '../playtest/material';
+import { freezeLabVisuals } from '../playtest/visuals';
 import { createLabAgentPacket, downloadLabJson, observeLabRun, parseLabAgentMove } from '../playtest/packet';
 import {
   chooseLabBotMove, createLabGame, createPlaytestLabState, normalizeLabConfig,
@@ -61,7 +62,7 @@ export function PlaytestSection({ project, onChange, versionLabel = 'Working dra
   const startSession = () => safely(() => {
     const snapshotCards = cards.map((card) => ({ ...card }));
     const run: LabRun = { id: crypto.randomUUID(), startedAt: new Date().toISOString(), version,
-      config: { ...config }, cards: snapshotCards, state: createLabGame(config, snapshotCards), transcript: [] };
+      config: { ...config }, cards: snapshotCards, visuals: freezeLabVisuals(project, config.cardSource, snapshotCards), state: createLabGame(config, snapshotCards), transcript: [] };
     persist({ ...lab, config, activeRun: run, sessions: archiveSession(lab.sessions, lab.activeRun) });
     setReplay(null); setTab('table');
   });
@@ -96,7 +97,7 @@ export function PlaytestSection({ project, onChange, versionLabel = 'Working dra
     setError(''); setNotice(''); setBusy(true);
     try {
       const batch: LabBatch = { id: crypto.randomUUID(), createdAt: new Date().toISOString(), version,
-        config: { ...config }, cards: cards.map((card) => ({ ...card })), results: simulateLabBatch(config, cards, batchCount) };
+        config: { ...config }, cards: cards.map((card) => ({ ...card })), visuals: freezeLabVisuals(project, config.cardSource, cards), results: simulateLabBatch(config, cards, batchCount) };
       persist({ ...lab, batches: [batch, ...lab.batches].slice(0, 12) });
       setSelectedBatchId(batch.id);
       setNotice(`${batch.results.length} games completed and saved with ${version.label}.`);
@@ -108,7 +109,7 @@ export function PlaytestSection({ project, onChange, versionLabel = 'Working dra
     const replayConfig = { ...batch.config, seed: result.seed, firstPlayer: result.firstPlayer };
     const simulated = simulateLabGame(replayConfig, batch.cards);
     const run: LabRun = { id: `${batch.id}-${index}`, startedAt: batch.createdAt, completedAt: batch.createdAt,
-      version: batch.version, config: replayConfig, cards: batch.cards, ...simulated };
+      version: batch.version, config: replayConfig, cards: batch.cards, visuals: batch.visuals, ...simulated };
     setReplay({ run, step: 0 }); setTab('table');
   });
   const addFinding = () => {

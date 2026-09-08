@@ -2,6 +2,7 @@ import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.39.0
 import { buildRulesPrompt } from "./prompt.ts";
 import { resolveRulesModel, rulesProviderBody } from "./models.ts";
 import { isRecord, parsePriceMeta, toFiniteNumber } from "./protocol.ts";
+import { validateWholeRulebookReply } from './rulebookPrompt.ts';
 
 export interface RulesWriterDependencies {
   env: (name: string) => string | undefined;
@@ -169,6 +170,10 @@ export function createRulesWriterHandler(deps: RulesWriterDependencies) {
           "The model returned an empty response. Try again.",
           502,
         );
+      }
+      if (body.mode === 'rulebook') {
+        try { validateWholeRulebookReply(text, body); }
+        catch (error) { throw new RequestError(error instanceof Error ? error.message : 'The model returned an invalid rulebook.', 502); }
       }
       const usage = isRecord(responseJson) && isRecord(responseJson.usage)
         ? responseJson.usage

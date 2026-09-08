@@ -50,4 +50,5 @@ coverage/
 
 # Local walkthrough recordings and exported prototype artifacts
 /artifacts/demos/
+/artifacts/card-table-ai-browser/
 __pycache__/

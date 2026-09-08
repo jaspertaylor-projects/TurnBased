@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
@@ -78,6 +78,10 @@ export function ComponentsWorkbench({
   selectedComponentId,
 }: ComponentsWorkbenchProps) {
   const [selectedId, setSelectedId] = useState<string | null>(selectedComponentId ?? null);
+  const latest = useRef({ project, onChange });
+  useLayoutEffect(() => {
+    latest.current = { project, onChange };
+  });
   const [filter, setFilter] = useState<TemplateComponentKind | 'all'>(initialKind ?? 'all');
   const [tab, setTab] = useState<WorkbenchTab>('template');
   const [query, setQuery] = useState('');
@@ -262,7 +266,11 @@ export function ComponentsWorkbench({
               [
                 { id: 'template', label: 'Template', icon: Pencil },
                 { id: 'data', label: 'Data & copies', icon: Table2 },
-                { id: 'physical', label: 'Physical specs', icon: SlidersHorizontal },
+                {
+                  id: 'physical',
+                  label: 'Physical specs',
+                  icon: SlidersHorizontal,
+                },
               ] as const
             ).map((item) => (
               <button
@@ -314,10 +322,29 @@ export function ComponentsWorkbench({
                 <CardStudioSection
                   key={selected.id}
                   embedded
+                  studioKey={selected.id}
                   itemLabel={family?.label.toLowerCase() ?? 'pieces'}
-                  project={{ ...project, name: selected.name, cardStudio: selected.studio }}
+                  project={{
+                    ...project,
+                    name: selected.name,
+                    cardStudio: selected.studio,
+                  }}
                   onChange={(next) => {
                     if (next.cardStudio) updateStudio(next.cardStudio);
+                  }}
+                  onUpdateStudio={(updater) => {
+                    const current = latest.current;
+                    const design = listProjectDesignSets(current.project).find(
+                      (item) => item.id === selected.id,
+                    );
+                    if (!design) throw new Error('This component no longer exists.');
+                    const next = setProjectComponentDesign(
+                      current.project,
+                      design.id,
+                      updater(design.studio),
+                    );
+                    latest.current = { ...current, project: next };
+                    current.onChange(next);
                   }}
                 />
               </div>
@@ -382,7 +409,8 @@ export function ComponentsWorkbench({
                       </span>
                       <h2>{design.name}</h2>
                       <p>
-                        {design.studio.rows.length} design{design.studio.rows.length === 1 ? '' : 's'} ·{' '}
+                        {design.studio.rows.length} design
+                        {design.studio.rows.length === 1 ? '' : 's'} ·{' '}
                         {design.studio.rows.reduce((sum, item) => sum + item.copies, 0)} copies
                       </p>
                       <span className="component-card-size">

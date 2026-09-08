@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   Check,
   ChevronLeft,
@@ -11,6 +11,8 @@ import {
   Printer,
   Table2,
   X,
+  Sparkles,
+  Undo2,
 } from 'lucide-react';
 import type { EditorProject } from '../types';
 import { ComponentRowArtwork } from '../componentStudio/ComponentRowArtwork';
@@ -38,19 +40,45 @@ import {
 } from '../cardStudio/render';
 import type { CardStudioRow, CardStudioState } from '../cardStudio/types';
 import '../cardStudio/cardStudio.css';
+import '../cardStudio/cardTableAI.css';
+import { CardTableAIDialog } from '../cardStudio/CardTableAIDialog';
+import { useCardTableAI, type AITableSelection } from '../cardStudio/useCardTableAI';
+import { aiFieldLabel } from '../cardStudio/aiTableModel';
 
 export function CardStudioSection({
   project,
   onChange,
   embedded = false,
   itemLabel = 'cards',
+  studioKey = 'legacy',
+  onUpdateStudio,
 }: {
   project: EditorProject;
   embedded?: boolean;
   itemLabel?: string;
+  studioKey?: string;
+  onUpdateStudio?: (updater: (studio: CardStudioState) => CardStudioState) => void;
   onChange: (project: EditorProject) => void;
 }) {
   const state = useMemo(() => project.cardStudio ?? createDefaultCardStudio(), [project.cardStudio]);
+  const live = useRef({ project, state, onChange });
+  useLayoutEffect(() => {
+    live.current = { project, state, onChange };
+  });
+  const [aiCell, setAICell] = useState<AITableSelection | null>(null);
+  const ai = useCardTableAI(
+    project,
+    state,
+    `${project.id}:${studioKey}`,
+    onUpdateStudio ??
+      ((updater) => {
+        const current = live.current;
+        current.onChange({
+          ...current.project,
+          cardStudio: updater(current.state),
+        });
+      }),
+  );
   const [selectedId, setSelectedId] = useState<string>();
   const [view, setView] = useState<'table' | 'deck'>('table');
   const [importing, setImporting] = useState(false);
@@ -65,10 +93,7 @@ export function CardStudioSection({
   const total = state.rows.reduce((sum, row) => sum + row.copies, 0);
   const fingerprint = useMemo(() => cardStudioFingerprint(state), [state]);
   const batchIsCurrent = state.generated?.sourceFingerprint === fingerprint;
-  const expanded = useMemo(
-    () => (errors.length ? [] : expandCardRows(state.rows)),
-    [state.rows, errors],
-  );
+  const expanded = useMemo(() => (errors.length ? [] : expandCardRows(state.rows)), [state.rows, errors]);
   const currentPage = Math.min(page, Math.max(0, Math.ceil(expanded.length / 48) - 1));
   const rowMap = useMemo(() => new Map(state.rows.map((row) => [row.id, row])), [state.rows]);
   const smallTextCount = useMemo(
@@ -160,14 +185,14 @@ export function CardStudioSection({
     try {
       downloadCardFile(
         embedded
-          ? buildComponentPrintHtml(state, project.name, paper, { faceId: 'all' })
+          ? buildComponentPrintHtml(state, project.name, paper, {
+              faceId: 'all',
+            })
           : buildCardPrintHtml(state, project.name, paper),
         `${cardExportFilename(project.name)}-${itemLabel}-${paper}.html`,
         'text/html;charset=utf-8',
       );
-      setStatus(
-        'Print sheet downloaded. Open the HTML file, then choose Print / save as PDF at 100% scale.',
-      );
+      setStatus('Print sheet downloaded. Open the HTML file, then choose Print / save as PDF at 100% scale.');
       setError('');
     } catch (issue) {
       setError(issue instanceof Error ? issue.message : 'The print sheet could not be created.');
@@ -239,6 +264,36 @@ export function CardStudioSection({
               </button>
             </div>
           </header>
+          {view === 'table' && (
+            <div data-layout="tableAISelectedCell" className="table-ai-cell-toolbar">
+              <span>
+                {aiCell?.rowId && state.rows.some((row) => row.id === aiCell.rowId)
+                  ? `${state.rows.find((row) => row.id === aiCell.rowId)?.title || 'Untitled design'} · ${aiFieldLabel(aiCell.field)}`
+                  : 'Select a cell to edit it with AI, or use AI in a column header.'}
+              </span>
+              <button
+                type="button"
+                className="card-studio-button"
+                disabled={!aiCell || !state.rows.some((row) => row.id === aiCell.rowId)}
+                onClick={() => {
+                  if (aiCell) ai.open(aiCell);
+                }}
+              >
+                <Sparkles size={13} />
+                AI edit selected cell
+              </button>
+              <button
+                type="button"
+                className="card-studio-button"
+                disabled={!ai.canUndo}
+                onClick={ai.undoLast}
+              >
+                <Undo2 size={13} />
+                Undo AI edit
+              </button>
+              {ai.notice && <span role="status">{ai.notice}</span>}
+            </div>
+          )}
           {addingField && (
             <form
               className="card-studio-new-field"
@@ -277,6 +332,8 @@ export function CardStudioSection({
               customColumns={state.customColumns}
               selectedId={selected?.id}
               onSelect={setSelectedId}
+              onAIColumn={(field) => ai.open({ field })}
+              onCellSelect={(rowId, field) => setAICell({ rowId, field })}
               onChange={updateRow}
               onDuplicate={addRow}
               onRemove={(id) =>
@@ -316,9 +373,7 @@ export function CardStudioSection({
                 <div className="card-studio-empty" data-region="card-deck-empty">
                   <Layers3 size={40} />
                   <h3>
-                    {errors.length
-                      ? 'A few details need your attention.'
-                      : 'Your deck is waiting to happen.'}
+                    {errors.length ? 'A few details need your attention.' : 'Your deck is waiting to happen.'}
                   </h3>
                   <p>
                     {errors.length
@@ -502,18 +557,17 @@ export function CardStudioSection({
             update({
               ...state,
               rows: nextRows,
-              customColumns: [
-                ...new Set([...(replace ? [] : state.customColumns), ...result.customColumns]),
-              ],
+              customColumns: [...new Set([...(replace ? [] : state.customColumns), ...result.customColumns])],
             });
             setImporting(false);
             setView('table');
             setSelectedId(rows[0]?.id);
-            setStatus(
-              `Imported ${rows.length} designs. Extra columns are ready to use as template fields.`,
-            );
+            setStatus(`Imported ${rows.length} designs. Extra columns are ready to use as template fields.`);
           }}
         />
+      )}
+      {ai.selection && (
+        <CardTableAIDialog ai={ai} studio={state} defaultModel={project.settings.aiModels.rulesWriter} />
       )}
     </section>
   );

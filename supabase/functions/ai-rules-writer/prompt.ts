@@ -1,4 +1,5 @@
 import { isRecord, toFiniteNumber } from "./protocol.ts";
+import { buildWholeRulebookPrompt } from './rulebookPrompt.ts';
 
 function trimText(value: unknown, max = 8000): string {
   if (typeof value !== "string") return "";
@@ -183,6 +184,7 @@ function orderWeightedSections(
 }
 
 export function buildRulesPrompt(body: Record<string, unknown>) {
+  if (body.mode === 'rulebook') return buildWholeRulebookPrompt(body);
   const gameName = typeof body.gameName === "string" ? body.gameName : "";
   const theme = typeof body.theme === "string" ? body.theme : "";
   const artStyle = typeof body.artStyle === "string" ? body.artStyle : "";

@@ -40,7 +40,11 @@ await context.addInitScript(() => {
       transform: 'translate(-50%, -50%)', transition: 'width .1s, height .1s',
     });
     document.body.append(cursor);
-    window.addEventListener('mousemove', e => { cursor.style.left = `${e.clientX}px`; cursor.style.top = `${e.clientY}px`; });
+    window.addEventListener('mousemove', e => {
+      const host = [...document.querySelectorAll('dialog[open]')].at(-1) || document.fullscreenElement || document.body;
+      if (cursor.parentElement !== host) host.append(cursor);
+      cursor.style.left = `${e.clientX}px`; cursor.style.top = `${e.clientY}px`;
+    });
     window.addEventListener('mousedown', () => { cursor.style.width = '28px'; cursor.style.height = '28px'; });
     window.addEventListener('mouseup', () => { cursor.style.width = '18px'; cursor.style.height = '18px'; });
   });
@@ -52,7 +56,7 @@ const errors = [], scenes = [], downloads = [], responses = [];
 let currentScene = null, stopped = false;
 page.on('pageerror', error => errors.push(error.message));
 page.on('response', response => {
-  if (/\/functions\/v1\/ai-(rules-writer|image-agent)$/.test(response.url()) && response.request().method() === 'POST') {
+  if (/\/functions\/v1\/ai-(rules-writer|image-agent|card-table)$/.test(response.url()) && response.request().method() === 'POST') {
     responses.push({ endpoint: new URL(response.url()).pathname, status: response.status(), at: elapsed() });
   }
 });

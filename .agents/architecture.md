@@ -253,6 +253,12 @@ experiments aggregate card design sets with namespaced set/row IDs, plus
 standalone cards not already represented by a deck. Non-card component
 families are included as reference definitions rather than simulated cards.
 Existing runs retain frozen card/configuration snapshots and unchanged replays.
+New runs and batches also freeze shared templates, row bindings, and deduplicated
+artwork in optional `visuals`. `LabBoard` renders authored fronts, draw backs,
+and acquired cards with `renderDesignSvg`; old runs retain reference faces.
+The physical board uses millimeter coordinates and one uniform scale, including
+mixed card sizes. `useTableFullscreen` supports native fullscreen and a bounded
+fallback; `LabCardInspector` shows the session's saved fronts and backs.
 
 Agent packets include frozen session configuration/card definitions,
 executable rules, public observations, legal action IDs, and a JSON response
@@ -335,6 +341,21 @@ Its hook applies replies through the latest rules updater, protects newer
 typing, and invalidates requests when the panel closes, the section unmounts,
 or a checkpoint restores. RulesSection uses the restore epoch as part of its
 React key. AI undo belongs to the current editing session.
+
+`rules/RulebookAIDraft` sends all selected prose chapters in one
+`ai-rules-writer` request with `mode: rulebook`. Both the server and
+`rulebookDraft.ts` require a complete, exact-ID reply. Review, guarded apply,
+and guarded undo change chapter bodies only; component and icon inventory
+remain connected. Whole drafts reuse the model catalog, wallet and usage ledger.
+
+Card-table AI uses `cardStudio/useCardTableAI` and a dedicated authenticated
+`ai-card-table` function. A designer targets a whole column or one focused cell,
+reviews before/after values, then applies atomically. Baseline checks reject
+stale targeted edits while preserving unrelated changes. The endpoint supports
+100 target cells and 200 context rows, including existing custom columns.
+Provider-only short row aliases and an exact keyed value map avoid unreliable
+long-ID copying; validated replies map back to public row IDs. Invalid proposals
+never change the table or debit the designer; incurred provider usage is audited.
 
 The rules writer edge entrypoint delegates to handler.ts (auth/provider/usage),
 prompt.ts (context/modes), models.ts (supported models and parameters), and

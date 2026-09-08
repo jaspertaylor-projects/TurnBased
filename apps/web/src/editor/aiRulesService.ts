@@ -105,10 +105,14 @@ export function buildRulesRequestBody(args: AIRulesRequest, mode: AIRulesMode) {
 }
 
 async function invokeRules(args: AIRulesRequest, mode: AIRulesMode): Promise<ServerResponse> {
+  return requestRulesWriter(buildRulesRequestBody(args, mode));
+}
+
+export async function requestRulesWriter(body: Record<string, unknown>): Promise<ServerResponse> {
   if (!hasSupabaseConfig()) throw new Error('Supabase is not configured in this environment, so AI assist is unavailable.');
   const { data: { session } } = await supabase.auth.getSession();
   if (!session || session.user.is_anonymous) throw new Error('Sign in to use the AI rules writer.');
-  const { data, error } = await supabase.functions.invoke<ServerResponse>('ai-rules-writer', { body: buildRulesRequestBody(args, mode) });
+  const { data, error } = await supabase.functions.invoke<ServerResponse>('ai-rules-writer', { body });
   if (error) {
     const detail = await extractFunctionError(error);
     throw new Error(detail || error.message || 'The AI rules service was unavailable.');

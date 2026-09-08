@@ -5,6 +5,7 @@ import { addChapter, createBlankChapter, removeChapter, updateChapter } from '..
 import { useRulesAIAssist } from './rules/useRulesAIAssist';
 import type { CustomRulebookComponent, EditorProject, EditorRuleConfig } from '../types';
 import { RulebookPage } from './rules/RulebookPage';
+import { RulebookAIDraft } from './rules/RulebookAIDraft';
 import type { CatalogComponentSelection } from './rules/ComponentPicker';
 import { SERIF_STACK } from './rules/rulebookStyles';
 import {
@@ -311,6 +312,10 @@ export function RulesSection({
         >
           {pageLabel}
         </span>
+        <RulebookAIDraft project={project} onUpdateRules={onUpdateRules} onOpen={() => {
+          cancelAIPanel();
+          chapters.forEach((chapter) => clearAIUndo(chapter.id));
+        }} />
       </div>
 
       <div

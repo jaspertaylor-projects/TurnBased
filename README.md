@@ -12,6 +12,9 @@ The [Moonlit Market walkthrough](docs/demos/README.md) records this journey
 through the real development app, including AI-assisted rules and artwork,
 a spreadsheet-driven deck, playtesting, version restore, and printable exports.
 Its recording and rendering tools are reusable for future demos.
+The [second walkthrough](docs/demos/moonlit-market-v2.md) adds whole-rulebook
+AI drafting, column/cell AI editing, and authored cards on a proportional
+fullscreen tabletop.
 
 ## Try the workshop
 
@@ -25,6 +28,9 @@ After starting the local stack, open `http://127.0.0.1:3000`:
    or pieces. Card Studio lives inside each card deck: edit its table or
    import CSV / pasted spreadsheet rows, bind custom fields, and generate
    copies. Every component uses the same fully editable template workspace.
+   Use a column header's **AI** action or focus a cell and choose **AI edit
+   selected cell**. Review the proposed values, apply them together, and undo
+   the batch. Custom fields are supported; newer edits invalidate stale replies.
    Add text, images, shapes, grids, or tracks; move, resize, rotate, reorder,
    align, hide, and lock layers. Edit physical dimensions, trim shape, bleed,
    safe zones, and front/back faces in millimeters. Preview any data row and
@@ -37,6 +43,11 @@ After starting the local stack, open `http://127.0.0.1:3000`:
    Export an agent packet with public state and legal moves, and paste an
    external agent's JSON reply to take a validated turn. No LLM runner is
    required for the built-in simulations.
+   New sessions put the designed card fronts and backs on a wooden tabletop,
+   with a shared market, draw pile and each player's acquired cards. Use
+   **Fullscreen table** to fit the whole table with one scale, preserving
+   physical dimensions and proportions. Inspect a card to read either face.
+   Session artwork stays fixed for reproducible replays.
 4. In **Version history**, name checkpoints, branch an experiment, compare
    changes, and restore earlier work. Restoring saves uncheckpointed work in
    a safety checkpoint first. Browser drafts survive reloads independently
@@ -74,6 +85,7 @@ Run from the repository root:
 npm run test:workshop # Node tests: tables, editable templates, all-family printing, agents
 npm run test:versions # Vitest + fake IndexedDB: persistence, versions and archives
 npm run test:rules:api # Rules writer: auth, model selection, prompts and mocked provider calls
+npm run test:cards:api # Card table AI: scoped edits, provider contracts, auth and billing
 npm run typecheck    # Typecheck all workspaces
 ```
 
@@ -88,6 +100,12 @@ The shared template workflow has a separate browser check:
 ```bash
 npm run test:components:browser
 ```
+
+The new AI and tabletop surfaces have focused browser checks:
+`npm run test:rulebook:browser`, `npm run test:cards:ai:browser`, and
+`npm run test:playtest:table:browser`. They launch isolated Chrome processes;
+AI responses are intercepted in regression checks. The tabletop check uses
+the Moonlit Market archive fixture described in the second walkthrough.
 
 It exercises all six component families, layer gestures and data bindings,
 faces, template/SVG/print downloads, reloads, and checkpoint restore in an
@@ -107,6 +125,10 @@ weights, theme/style selections, and Creativity setting per project. Models
 that do not support Creativity show the control as unavailable. A delayed
 reply cannot overwrite newer section text or a restored checkpoint. Icon
 descriptions are shared with Art Studio and included in printable rulebooks.
+**Draft rulebook with AI** generates selected prose chapters together from
+the brief, current rules and component tables. Review the chapter-by-chapter
+proposal before applying it; component inventories and icon legends stay
+connected to the project. Applied prose can be undone until its targets change.
 Changing a component's supplier size updates its printable template dimensions
 while preserving its identity, table rows, and authored layers.
 
