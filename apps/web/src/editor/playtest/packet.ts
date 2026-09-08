@@ -1,5 +1,6 @@
 import { summarizeRulesForAI } from '@turnbased/engine-ai';
 import type { EditorProject } from '../types';
+import { listProjectDesignSets } from '../componentStudio/model';
 import { getLabLegalActions, STRATEGY_DESCRIPTIONS } from './simulation';
 import type { LabMove, LabRun } from './types';
 
@@ -80,7 +81,9 @@ export function createLabAgentPacket(project: EditorProject, run: LabRun) {
       rulesSummary: summarizeRulesForAI({ rulesText: project.rules.rulesText,
         documents: project.rules.chapters.map((chapter) => ({ title: chapter.title, content: chapter.body })),
         additionalNotes: [project.rules.designerNotes] }, { maxCharacters: 12000 }),
-      rulebook: project.rules, components: project.instances, cardStudio: project.cardStudio ?? null,
+      rulebook: project.rules, components: project.instances,
+      componentDesigns: listProjectDesignSets(project),
+      cardStudio: project.cardStudio ?? null,
     },
     findings: (project.playtestLab?.findings ?? []).filter((finding) => finding.sessionId === run.id),
   };

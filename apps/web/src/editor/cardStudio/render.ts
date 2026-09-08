@@ -1,5 +1,9 @@
 import { expandCardRows, getCardField, safeArtUrl } from "./model";
 import type { CardStudioRow, CardStudioState, CardTemplate } from "./types";
+import { renderDesignSvg } from "../templateStudio/render";
+import { rowTemplateData, resolveTemplateText } from "../templateStudio/model";
+import { layoutTemplateText } from "../templateStudio/text";
+import { buildComponentPrintHtml } from "../componentStudio/print";
 
 export function escapeMarkup(value: string): string {
   return value.replace(
@@ -67,6 +71,7 @@ function forestArtwork(template: CardTemplate, width: number, height: number): s
 
 /** One SVG renderer drives the workbench, exported cards, and physical print sheets. */
 export function renderCardSvg(row: CardStudioRow, template: CardTemplate, artReference?: string): string {
+  if (template.document) return renderDesignSvg(template.document, { data: rowTemplateData(row) });
   const width = 315;
   const height = (width * template.heightMm) / template.widthMm;
   const { background, foreground, accent, preset } = template;
@@ -106,15 +111,30 @@ export function renderCardSvg(row: CardStudioRow, template: CardTemplate, artRef
 }
 
 export function cardTextNeedsReview(row: CardStudioRow, template: CardTemplate): boolean {
+  if (template.document) {
+    const data = rowTemplateData(row);
+    return template.document.faces.some((face) =>
+      face.layers.some((layer) => {
+        if (layer.type !== "text" || !layer.visible) return false;
+        const layout = layoutTemplateText(layer, resolveTemplateText(layer.content, data));
+        return layout.overflow || layout.fontSizePt < 6;
+      }),
+    );
+  }
   const height = (315 * template.heightMm) / template.widthMm;
   const bodyY = template.showArt ? 102 + height * 0.32 : 98;
   return (
-    fitText(getCardField(row, template.bodyField), 255, height - bodyY - 58, template.bodyFontSize).size < 12 ||
-    fitText(getCardField(row, template.titleField), 199, 39, 22).size < 12
+    fitText(getCardField(row, template.bodyField), 255, height - bodyY - 58, template.bodyFontSize).size <
+      12 || fitText(getCardField(row, template.titleField), 199, 39, 22).size < 12
   );
 }
 
-export function buildCardPrintHtml(state: CardStudioState, projectName: string, paper: "a4" | "letter" = "a4"): string {
+export function buildCardPrintHtml(
+  state: CardStudioState,
+  projectName: string,
+  paper: "a4" | "letter" = "a4",
+): string {
+  if (state.template.document) return buildComponentPrintHtml(state, projectName, paper);
   const cards = expandCardRows(state.rows);
   if (!cards.length) throw new Error("Add at least one card with a positive number of copies.");
   const pageWidth = paper === "a4" ? 210 : 215.9;

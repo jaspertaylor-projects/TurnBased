@@ -1,3 +1,5 @@
+import type { ComponentDesignDocument } from "../templateStudio/types";
+
 export type CardTemplatePreset = "woodland" | "storybook" | "modern";
 
 export interface CardStudioRow {
@@ -12,6 +14,7 @@ export interface CardStudioRow {
 }
 
 export interface CardTemplate {
+  document?: ComponentDesignDocument;
   preset: CardTemplatePreset;
   background: string;
   foreground: string;

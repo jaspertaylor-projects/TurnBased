@@ -20,9 +20,14 @@ The September 2026 direction makes these parts of one active workflow:
 2. **Keep the history of the game.** Version rules, components, artwork, card
    data, and playtest findings together. Name checkpoints, branch experiments,
    compare changes, protect work before restores, and export portable backups.
-3. **Turn tables into attractive decks.** Reusable templates, CSV/spreadsheet
-   import, custom fields, copies, live previews, and batch generation should
-   make a whole deck as convenient to change as one card.
+3. **Make every component fully editable.** Components is the shared home for
+   cards, boards, tokens, tiles, player mats, and pieces. Card Studio belongs
+   inside each deck. Every component uses editable layer templates with text,
+   images, shapes, grids, tracks, faces, physical dimensions, and table-field
+   bindings. CSV/spreadsheet import, custom fields, copies, live previews,
+   reusable template JSONs, and batch generation should make a whole set as
+   convenient to change as one piece. Presets are editable starting points;
+   designers must be able to change their layout, not just their colors.
 4. **Make games understandable to agents.** Build toward explicit state,
    legal moves, reproducible experiments, and AI-agent playtesting. Start with
    supported executable game models and clearly state their limits; rulebook
@@ -44,10 +49,18 @@ card costs and points, seeded heuristic agents, transcripts, and an external
 JSON agent protocol. It does not yet execute arbitrary game rules or run an
 LLM automatically. Expand game coverage through explicit, testable contracts.
 
-Current printing produces prototype card fronts and a shareable rulebook.
-Manufacturing-ready duplex/bleed handling, supplier checkout, and fulfillment
-remain future work. Keep supplier-backed components as the path to physical
-orders, while allowing household or custom materials for early playtests.
+Current printing covers every component family using actual-millimeter
+A4/Letter sheets, shaped cut guides, selectable faces, optional bleed, and
+aligned duplex fronts/backs. Large boards tile across pages with overlap and
+assembly labels rather than being shrunk. Shareable rulebooks and complete
+design archives close the prototype loop. Supplier production-file validation,
+checkout, and fulfillment remain future work. Keep supplier-backed components
+as the path to physical orders, while allowing household or custom materials
+for early playtests.
+
+Printed template artwork and interactive placement are distinct. A grid or
+track drawn in the template does not silently become executable board logic;
+keep that boundary visible while making both workflows convenient.
 
 Broader online play and, eventually, digital/physical sales remain part of the
 long-term vision. They should grow naturally from a useful design-and-test

@@ -24,7 +24,7 @@ export function LabConfigPanel({ config, cards, running, onChange, onStart }: Pr
         <span className="lab-eyebrow">Executable experiment</span>
         <h3 style={{ marginTop: 8 }}>Market race</h3>
         <p className="lab-muted">Gather coins. Buy cards from a shared market. Race to {config.targetScore} points, or lead when {config.maxRounds} rounds end.</p>
-        <div className="lab-note">This two-player protocol tests cost, scoring and turn economy. Card abilities and freeform rules are reference material; the bot follows the settings below.</div>
+        <div data-layout="playtestProtocolLimits" className="lab-note">This two-player protocol tests cost, scoring and turn economy. Card abilities and freeform rules are reference material; the bot follows the settings below.</div>
       </div>
       <div className="lab-panel" data-layout="playtestSetup">
         <h3>Set the experiment</h3>
@@ -55,11 +55,11 @@ export function LabConfigPanel({ config, cards, running, onChange, onStart }: Pr
       </div>
       <div className="lab-panel" data-layout="playtestMaterialSummary">
         <h3><FlaskConical size={15} /> {cards.length} card designs</h3>
-        <p className="lab-muted">{cards.reduce((sum, card) => sum + card.quantity, 0)} copies · {config.cardSource === 'sample' ? 'Explicit sample material' : 'Current Card Studio rows, or component cards when no table rows exist'}</p>
+        <p className="lab-muted">{cards.reduce((sum, card) => sum + card.quantity, 0)} copies · {config.cardSource === 'sample' ? 'Explicit sample material' : 'Card decks from Components, plus standalone card components'}</p>
         {config.cardSource === 'project' && <p className="lab-muted">Uses numeric cost and points (or victory_points). Missing values become 0. Quantities are capped at 100 per design; up to 500 designs.</p>}
-        {!cards.length && <div className="lab-note warning">Add rows in Card Studio, or choose the sample deck to begin.</div>}
-        {!!cards.length && cards.every((card) => card.points === 0) && <div className="lab-note warning">No scoring values found. Add a points column in Card Studio; this setup will otherwise end in a draw.</div>}
-        {unbuyable > 0 && <div className="lab-note warning">{unbuyable} design{unbuyable === 1 ? '' : 's'} cost more than the coin limit and can block the market.</div>}
+        {!cards.length && <div data-layout="playtestMissingCards" className="lab-note warning">Add card rows in Components, or choose the sample deck to begin.</div>}
+        {!!cards.length && cards.every((card) => card.points === 0) && <div data-layout="playtestMissingPoints" className="lab-note warning">No scoring values found. Add a points column to your card table in Components; this setup will otherwise end in a draw.</div>}
+        {unbuyable > 0 && <div data-layout="playtestUnbuyableCards" className="lab-note warning">{unbuyable} design{unbuyable === 1 ? '' : 's'} cost more than the coin limit and can block the market.</div>}
       </div>
     </div>
   );

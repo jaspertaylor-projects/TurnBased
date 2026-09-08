@@ -1,5 +1,6 @@
 import type { EditorArtReference, EditorIconAsset, EditorProject, RulesChapter } from './types';
 import { normalizeCardStudioState } from './cardStudio/model';
+import { normalizeProjectComponentDesigns } from './componentStudio/model';
 import { ensureProjectManifest } from './manifest';
 import { normalizeProjectAIModels } from './aiModelCatalog';
 import {
@@ -231,7 +232,11 @@ function normalizeEditorProject(project: EditorProject): EditorProject {
 
 async function hydrateStoredProject(project: EditorProject): Promise<EditorProject> {
   const hydrated = await inflateProjectImages(normalizeEditorProject(project));
-  return hydrated.cardStudio ? { ...hydrated, cardStudio: normalizeCardStudioState(hydrated.cardStudio) } : hydrated;
+  return normalizeProjectComponentDesigns(
+    hydrated.cardStudio
+      ? { ...hydrated, cardStudio: normalizeCardStudioState(hydrated.cardStudio) }
+      : hydrated,
+  );
 }
 
 export async function loadEditorProjects(onError?: ProjectReadErrorHandler): Promise<EditorProject[]> {

@@ -1,0 +1,170 @@
+.component-dialog {
+  padding: 24px;
+  max-width: min(500px, calc(100vw - 32px));
+  width: 500px;
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  background: #fcf9ef;
+  color: #34543b;
+  border: 1px solid #d1d9bf;
+  border-radius: 14px;
+  box-shadow: 0 25px 70px #12250f33;
+}
+.component-dialog::backdrop {
+  background: #23331d66;
+  backdrop-filter: blur(3px);
+}
+.component-dialog > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  margin-bottom: 21px;
+}
+.component-dialog h2 {
+  font:
+    600 29px/1.2 'Cormorant Garamond',
+    Georgia,
+    serif;
+  color: #34543b;
+  margin: 0;
+}
+.component-dialog footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 25px;
+}
+.component-family-choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 17px;
+}
+.component-family-choices button {
+  border: 1px solid #dce2ce;
+  background: #fffdf5;
+  color: #798c6c;
+  border-radius: 8px;
+  padding: 12px;
+  text-align: left;
+  font-size: 11px;
+}
+.component-family-choices button.is-active {
+  background: #e7eedb;
+  border-color: #b7c8a4;
+  color: #365c40;
+}
+.component-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 20px;
+  color: #5c7452;
+  font-size: 12px;
+}
+.component-field input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #d4dcc5;
+  background: #fffef9;
+  border-radius: 7px;
+  color: #345b3e;
+  font:
+    13px 'Inter',
+    sans-serif;
+}
+.component-button:focus-visible,
+.component-tabs button:focus-visible,
+.component-gallery-toolbar button:focus-visible,
+.component-field input:focus-visible,
+.component-icon-button:focus-visible {
+  outline: 2px solid #8fa977;
+  outline-offset: 3px;
+}
+@media (max-width: 1100px) {
+  .component-gallery-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .component-search {
+    margin-left: 0;
+  }
+  .component-design-grid {
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  }
+}
+@media (max-width: 760px) {
+  .components-heading {
+    padding: 20px 18px;
+    gap: 12px;
+  }
+  .components-heading h1 {
+    font-size: 31px;
+  }
+  .component-title-row h1 {
+    font-size: 23px;
+  }
+  .component-title-row > span {
+    display: none;
+  }
+  .components-heading-actions {
+    gap: 3px;
+  }
+  .component-gallery-toolbar {
+    padding: 0 18px 12px;
+  }
+  .component-gallery-toolbar nav {
+    flex-wrap: nowrap;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+  .component-gallery-body {
+    padding: 7px 18px 20px;
+  }
+  .component-tabs {
+    padding-inline: 12px;
+    gap: 3px;
+  }
+  .component-tabs button {
+    font-size: 10px;
+    padding: 8px;
+  }
+  .component-tabs button:last-child {
+    margin-left: 0;
+  }
+  .components-footer {
+    padding-inline: 18px;
+  }
+  .components-footer > span:last-child:not(:first-child) {
+    display: none;
+  }
+  .component-design-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 12px;
+  }
+  .component-thumbnail {
+    height: 145px;
+    flex-basis: 145px;
+  }
+  .component-card-identity {
+    padding: 13px;
+  }
+  .component-create-card {
+    min-height: 270px;
+  }
+  .component-physical {
+    grid-template-columns: 1fr;
+    padding: 16px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .component-design-card {
+    transition: none;
+  }
+  .component-design-card:hover {
+    transform: none;
+  }
+}

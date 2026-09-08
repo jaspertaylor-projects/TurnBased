@@ -1,4 +1,5 @@
 import { canonicalSerialize, generateId, hashValue } from '@turnbased/shared-utils';
+import { listProjectDesignSets } from './componentStudio/model';
 
 import { getProjectModeLabel, getProjectModeSupportSummary } from './capabilities';
 import { pinProjectToCurrentVersions } from './manifest';
@@ -244,6 +245,7 @@ export function createWorkspaceFiles(project: EditorProject, runtime: PreviewRun
   return {
     'turnbased.project.json': projectFile,
     ...(project.cardStudio ? { 'design/card-studio.json': canonicalSerialize(project.cardStudio) } : {}),
+    'design/components.json': canonicalSerialize(listProjectDesignSets(project)),
     ...(project.playtestLab ? { 'playtest/lab.json': canonicalSerialize(project.playtestLab) } : {}),
     'turnbased.brief.json': briefFile,
     'turnbased.views.json': viewsFile,

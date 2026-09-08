@@ -1,5 +1,6 @@
 import { canonicalSerialize } from '@turnbased/shared-utils';
 import type { EditorProject } from '../types';
+import { listProjectDesignSets } from '../componentStudio/model';
 
 export interface DesignChange {
   area: string;
@@ -32,9 +33,16 @@ export function compareDesigns(before: EditorProject | null, after: EditorProjec
     const newItem = after.instances[id];
     add('Components', newItem?.displayName ?? oldItem?.displayName ?? id, oldItem, newItem);
   });
-  add('Card studio', 'Card table', before?.cardStudio?.rows, after.cardStudio?.rows);
-  add('Card studio', 'Custom table fields', before?.cardStudio?.customColumns, after.cardStudio?.customColumns);
-  add('Card studio', 'Card template', before?.cardStudio?.template, after.cardStudio?.template);
+  const oldSets = new Map((before ? listProjectDesignSets(before) : []).map((set) => [set.id, set]));
+  const newSets = new Map(listProjectDesignSets(after).map((set) => [set.id, set]));
+  for (const id of new Set([...oldSets.keys(), ...newSets.keys()])) {
+    const oldSet = oldSets.get(id);
+    const newSet = newSets.get(id);
+    const label = newSet?.name ?? oldSet?.name ?? 'Component';
+    add('Component designs', `${label} · Data table`, oldSet?.studio.rows, newSet?.studio.rows);
+    add('Component designs', `${label} · Table fields`, oldSet?.studio.customColumns, newSet?.studio.customColumns);
+    add('Component designs', `${label} · Faces and template`, oldSet?.studio.template, newSet?.studio.template);
+  }
   add('Playtesting', 'Sessions, findings & protocol', before?.playtestLab, after.playtestLab);
   add('Art', 'Art direction & assets', before?.art, after.art);
   add('Table', 'Player setup', before?.seats, after.seats);

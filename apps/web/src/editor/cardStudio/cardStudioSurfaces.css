@@ -248,3 +248,11 @@
   white-space: nowrap;
   border: 0;
 }
+
+/* Components owns navigation and the visual template editor; this slot is only data and batch tools. */
+.card-studio.card-studio--embedded .card-studio-workspace { grid-template-columns: minmax(0, 1fr); padding: 14px; }
+.card-studio.card-studio--embedded .card-studio-footer { flex-wrap: wrap; }
+.card-studio.card-studio--embedded .card-studio-deck-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.component-row-artwork { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 10px; padding: 11px 14px; border-top: 1px solid #e0e6d4; flex: 0 0 auto; }
+.component-row-artwork >label:first-child { display: flex; flex-direction: column; gap: 5px; color: #829675; font-size: 10px; flex: 1; min-width: 120px; }
+.component-row-artwork input[type='url'] { padding: 7px 9px; width: 100%; font-size: 11px; border: 1px solid #d9e2ce; border-radius: 6px; background: #fffdf7; color: #36543e; }

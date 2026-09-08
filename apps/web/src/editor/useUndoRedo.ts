@@ -110,15 +110,24 @@ export function useUndoRedo<T>(initialValue: T): UndoRedoResult<T> {
   return { value, set, undo, redo, canUndo: availability.canUndo, canRedo: availability.canRedo, reset };
 }
 
+function hasNativeEditingContext(target: EventTarget | null): boolean {
+  // Native dialogs may hand focus to browser chrome (leaving body as the key target).
+  // The modal still owns the interaction until it closes.
+  if (document.querySelector('dialog[open], [role="dialog"][aria-modal="true"]')) return true;
+  return target instanceof HTMLElement && Boolean(
+    target.closest('input, textarea, select, dialog, [role="dialog"], [contenteditable="true"]'),
+  );
+}
+
 export function useUndoRedoKeyboard(undo: () => void, redo: () => void) {
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
+      if (e.defaultPrevented) return;
       const mod = e.metaKey || e.ctrlKey;
       if (!mod || e.key.toLowerCase() !== 'z') return;
 
-      // Ignore when typing in an input/textarea
-      const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      // Inputs own native undo. Modal actions must never change the project behind them.
+      if (hasNativeEditingContext(e.target)) return;
 
       e.preventDefault();
       if (e.shiftKey) {
@@ -129,11 +138,11 @@ export function useUndoRedoKeyboard(undo: () => void, redo: () => void) {
     }
 
     function handleKeyDownY(e: KeyboardEvent) {
+      if (e.defaultPrevented) return;
       const mod = e.metaKey || e.ctrlKey;
       if (!mod || e.key.toLowerCase() !== 'y') return;
 
-      const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      if (hasNativeEditingContext(e.target)) return;
 
       e.preventDefault();
       redo();

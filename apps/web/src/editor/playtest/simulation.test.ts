@@ -114,7 +114,7 @@ test('normalize bounds prevent unbounded configurations and invalid seeds', () =
 test('agent packet separates public observation from referee secrets and validates response shape', () => {
   const run: LabRun = { id: 'test', startedAt: '2026-01-01', version: { label: 'v1', sha: 'abc' },
     config, cards, state: createLabGame(config, cards), transcript: [] };
-  const project = { id: 'project', name: 'Game', description: 'A prototype', instances: {},
+  const project = { id: 'project', name: 'Game', description: 'A prototype', instances: {}, rootInstanceIds: [],
     rules: { rulesText: 'Reference rules', chapters: [], designerNotes: '', customComponents: [] } } as unknown as EditorProject;
   const packet = createLabAgentPacket(project, run);
   assert.equal('drawPile' in packet.observation, false);

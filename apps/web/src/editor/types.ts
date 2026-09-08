@@ -281,6 +281,7 @@ export interface EditorProject {
   art: EditorArtDirection;
   appLayout: EditorAppLayout;
   cardStudio?: CardStudioState;
+  componentDesigns?: Record<string, CardStudioState>;
   playtestLab?: PlaytestLabState;
 }
 

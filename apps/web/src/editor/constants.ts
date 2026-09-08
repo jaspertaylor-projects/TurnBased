@@ -11,8 +11,7 @@ export const DEFAULT_EDITOR_SECTION: EditorSection = 'workshop';
 export const SECTION_OPTIONS: EditorSectionOption[] = [
   { id: 'workshop', label: 'Workshop', description: 'Your next step from idea to a game on the table.' },
   { id: 'rules', label: 'Rulebook', description: 'Write the rules your playtesters will use.' },
-  { id: 'card_studio', label: 'Card studio', description: 'One template, a table of ideas, a whole deck.' },
-  { id: 'component_editor', label: 'Components', description: 'Design the physical pieces in your game.' },
+  { id: 'component_editor', label: 'Components', description: 'Design cards, boards, tokens, and every piece with editable templates.' },
   { id: 'art', label: 'Art studio', description: 'Give your game a consistent visual language.' },
   { id: 'playtest', label: 'Playtest lab', description: 'Try your design, test agents, and record what you learn.' },
   { id: 'versions', label: 'Version history', description: 'Keep checkpoints, compare changes, and explore alternatives.' },
@@ -23,5 +22,6 @@ export const SECTION_OPTIONS: EditorSectionOption[] = [
 
 export function readEditorSection(hash: string): EditorSection {
   const requested = new URLSearchParams(hash.split('?')[1] ?? '').get('section');
+  if (requested === 'card_studio') return 'card_studio';
   return SECTION_OPTIONS.find(({ id }) => id === requested)?.id ?? DEFAULT_EDITOR_SECTION;
 }

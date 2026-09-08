@@ -24,7 +24,21 @@ await mkdir(artifacts, { recursive: true });
 const button = (name) => page.getByRole('button', { name, exact: true });
 const tab = (name) => page.getByRole('tab', { name, exact: true });
 const section = async (name) => { await button(name).click(); };
-const saved = () => page.getByRole('status').filter({ hasText: 'Draft saved in this browser' }).waitFor();
+async function saved() {
+  // Let this edit's debounced save start before accepting the saved status.
+  await page.waitForTimeout(700);
+  await page.getByRole('status').filter({ hasText: 'Draft saved in this browser' }).waitFor();
+}
+async function openCardData() {
+  await section('components');
+  const allComponents = button('All components');
+  if (await allComponents.isVisible()) await allComponents.click();
+  await page.locator('.component-design-card').filter({
+    has: page.getByRole('heading', { name: 'Original card deck', exact: true }),
+  }).click();
+  await page.getByRole('navigation', { name: 'Component editing tools' })
+    .getByRole('button', { name: 'Data & copies', exact: true }).click();
+}
 async function download(name) {
   const pending = page.waitForEvent('download');
   await button(name).click();
@@ -41,7 +55,12 @@ try {
   await button('Try Little Woodland').click();
   await page.waitForURL(/#\/editor\//);
   const originalUrl = page.url();
-  await section('card studio');
+  assert.equal(await page.locator('[data-layout="componentDesignSetCount"] dd').innerText(), '1');
+  assert.equal(await page.locator('[data-layout="physicalComponentCopyCount"] dd').innerText(), '10');
+  await button('Components').click();
+  await page.getByRole('region', { name: 'Components workbench', exact: true }).waitFor();
+  console.log('PASS unified Components overview counts and next-step link');
+  await openCardData();
   const title = page.getByLabel('Card 1 title', { exact: true });
   await title.fill('Checkpoint card');
   await saved();
@@ -50,14 +69,14 @@ try {
   await button('Save checkpoint').click();
   const checkpoints = page.getByRole('complementary', { name: 'Saved checkpoints' });
   await checkpoints.getByRole('button', { name: /Before the balance change/ }).waitFor();
-  await section('card studio');
+  await openCardData();
   await title.fill('Unsaved experiment card');
   await saved();
   await section('version history');
   await checkpoints.getByRole('button', { name: /Before the balance change/ }).click();
   await button('Restore this version').click();
   await checkpoints.getByRole('button', { name: /Safety checkpoint before switching versions/ }).waitFor();
-  await section('card studio');
+  await openCardData();
   assert.equal(await title.inputValue(), 'Checkpoint card');
   await page.screenshot({ path: `${artifacts}/cards.png` });
   await bounded();
@@ -91,7 +110,8 @@ try {
   console.log('PASS legal agent moves, rejected illegal move, 20 simulations, and findings');
 
   await section('print & share');
-  const cards = await download('Download card sheets');
+  await page.getByLabel('Component', { exact: true }).selectOption({ label: 'Original card deck · card' });
+  const cards = await download('Download component sheets');
   assert.match(cards.content, /Checkpoint card/);
   assert.match(cards.content, /@page/);
   const rules = await download('Download rulebook');
@@ -101,21 +121,26 @@ try {
   assert.ok(archive.checkpoints.length >= 3);
   assert.equal(archive.version, 2);
   assert.equal(archive.project.playtestLab.batches[0].results.length, 20);
+  assert.equal(archive.project.cardStudio, undefined, 'Legacy deck migrated into Components');
+  const archivedDesigns = Object.values(archive.project.componentDesigns);
+  assert.equal(archivedDesigns.length, 1, 'Archive contains one authored deck without duplicates');
+  assert.equal(archivedDesigns[0].rows[0].title, 'Checkpoint card');
+  assert.ok(archivedDesigns[0].template.document.faces[0].layers.length > 5, 'Archive retains editable layers');
   await page.getByLabel('Import game backup', { exact: true }).setInputFiles(backup.path);
   const originalId = new URL(originalUrl).hash.split('?')[0];
   await page.waitForURL((url) => url.hash.includes('/editor/') && url.hash.split('?')[0] !== originalId);
   await page.waitForFunction(() => document.querySelector('[aria-label="Project name"]')?.value === 'Little Woodland (imported)');
-  await section('card studio');
+  await openCardData();
   assert.equal(await title.inputValue(), 'Checkpoint card');
   await page.reload();
-  await section('card studio');
+  await openCardData();
   assert.equal(await title.inputValue(), 'Checkpoint card');
   await section('version history');
   await checkpoints.getByRole('button', { name: /Before the balance change/ }).waitFor();
   await page.screenshot({ path: `${artifacts}/versions.png` });
   await bounded();
   assert.deepEqual(errors, []);
-  console.log('PASS card/rulebook downloads, full history import into a new game, reload, and bounded layout');
+  console.log('PASS component/rulebook downloads, editable-template archive, full history import, reload, and bounded layout');
   console.log(`Screenshots and downloads: ${artifacts}`);
 } catch (error) {
   console.error('Browser errors:', errors);

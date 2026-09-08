@@ -16,10 +16,16 @@ After starting the local stack, open `http://127.0.0.1:3000`:
    and try **Little Woodland**. Creating a game and its first local checkpoint
    needs no account or AI generation. The example includes five rules chapters,
    four card designs, and ten physical cards.
-2. In **Card studio**, edit the table or import CSV / pasted spreadsheet rows.
-   Bind fields to a Woodland, Storybook, or Modern template, then generate
-   the deck. Copy counts, custom fields, artwork, and template settings save
-   with the project.
+2. Open **Components** to create cards, boards, tokens, tiles, player mats,
+   or pieces. Card Studio lives inside each card deck: edit its table or
+   import CSV / pasted spreadsheet rows, bind custom fields, and generate
+   copies. Every component uses the same fully editable template workspace.
+   Add text, images, shapes, grids, or tracks; move, resize, rotate, reorder,
+   align, hide, and lock layers. Edit physical dimensions, trim shape, bleed,
+   safe zones, and front/back faces in millimeters. Preview any data row and
+   export/import template JSON to reuse a layout in another component.
+   The **Placement** view handles interactive spaces and pieces separately
+   from the template's printed artwork.
 3. In **Playtest lab**, record observations or run the supported two-player
    market-race experiment. Seeded heuristic agents play explicit numeric
    cost/points rules; they do not interpret arbitrary rulebooks or card powers.
@@ -30,15 +36,21 @@ After starting the local stack, open `http://127.0.0.1:3000`:
    changes, and restore earlier work. Restoring saves uncheckpointed work in
    a safety checkpoint first. Browser drafts survive reloads independently
    of the selected checkpoint.
-5. In **Print & share**, download A4 or US Letter card sheets with millimeter
-   dimensions and cutting guides, a printable rulebook, or a design archive
-   with history. Open the HTML sheets and print at **100% / actual size**
-   with browser headers and footers off. These are prototype card fronts;
-   manufacturing bleed, duplex backs, and supplier ordering need further work.
+5. In **Print & share**, select any component and download A4 or US Letter
+   sheets with physical dimensions and shaped cutting guides. Print one face,
+   every face separately, or duplex fronts/backs with mirrored placements.
+   Large boards tile across pages with 10 mm overlap and assembly labels;
+   their artwork stays at its original size. Optional bleed is supported.
+   Open the HTML sheets and print at **100% / actual size**, with browser
+   headers and footers off. Duplex uses **flip on the long edge**; check two
+   pages for alignment first. Printable rulebooks and archives with complete
+   design history are also available. Supplier production-file validation,
+   checkout, and fulfillment remain future work.
 
 `#/new` is the local creation path; `#/new/guided` retains guided AI setup.
 Editor links accept a section, for example
-`#/editor/<project-id>?section=card_studio`.
+`#/editor/<project-id>?section=component_editor`. Legacy `card_studio` links
+open the card family within Components.
 
 Live project snapshots, workspace files, checkpoints, and embedded artwork
 are stored in IndexedDB. localStorage contains a small project index and UI
@@ -52,7 +64,7 @@ artwork still needs its original source; upload it to make it portable.
 Run from the repository root:
 
 ```bash
-npm run test:workshop # Node tests: card tables, exports, simulation and agent protocol
+npm run test:workshop # Node tests: tables, editable templates, all-family printing, agents
 npm run test:versions # Vitest + fake IndexedDB: persistence, versions and archives
 npm run typecheck    # Typecheck all workspaces
 ```
@@ -62,6 +74,27 @@ With the dev stack and the dedicated browser running, `npm run test:workshop:bro
 checks cards, checkpoint restore, agent moves, simulations, print downloads, and
 backup import in an isolated browser context. Set `PLAYWRIGHT_MODULE_PATH` if
 Playwright is installed elsewhere; artifacts go to `/tmp/turnbased-workshop-smoke`.
+
+The shared template workflow has a separate browser check:
+
+```bash
+npm run test:components:browser
+```
+
+It exercises all six component families, layer gestures and data bindings,
+faces, template/SVG/print downloads, reloads, and checkpoint restore in an
+isolated context. It uses the same app and CDP browser defaults; override
+`CODEX_BROWSER_URL`, `CODEX_BROWSER_CDP_URL`, or `PLAYWRIGHT_MODULE_PATH` as
+needed. Screenshots and downloads go to `/tmp/turnbased-component-templates`,
+or `COMPONENT_TEMPLATE_ARTIFACT_DIR` when set.
+
+Component templates are stored in `EditorProject.componentDesigns`, keyed by
+the existing physical component instance ID. This keeps the component, its
+table, and its artwork in one versioned design. Old `project.cardStudio`
+data appears as one original deck and moves into the component map when
+opened for editing; its row IDs and copy counts are preserved. The shared
+template renderer drives previews and exports. Printed grids and tracks
+remain artwork until configured as interactive structures in Placement.
 
 ## Local Dev
 

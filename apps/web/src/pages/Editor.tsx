@@ -20,12 +20,11 @@ import type { EditorSection } from '../editor/constants';
 import { readProjectIdFromHash } from '../editor/helpers';
 import { EditorSidebar } from '../editor/components/EditorSidebar';
 import { VisualsSection } from '../editor/sections/VisualsSection';
-import { ComponentGallery } from '../editor/sections/ComponentGallery';
+import { ComponentsWorkbench } from '../editor/componentStudio/ComponentsWorkbench';
 import { VersionsSection } from '../editor/sections/VersionsSection';
 import { AppLayoutSection } from '../editor/sections/AppLayoutSection';
 import { ArtSection } from '../editor/sections/ArtSection';
 import { RulesSection } from '../editor/sections/RulesSection';
-import { CardStudioSection } from '../editor/sections/CardStudioSection';
 import { PlaytestSection } from '../editor/sections/PlaytestSection';
 import { WorkshopSection } from '../editor/sections/WorkshopSection';
 import { PrintSection } from '../editor/sections/PrintSection';
@@ -48,31 +47,6 @@ const SIDEBAR_OPEN_KEY = 'turnbased.editor.sidebarOpen';
 
 const PENDING_EDITOR_NOTICE_KEY = 'turnbased.creator.pendingEditorNotice';
 
-// Component types that represent physical, designable game objects.
-// These appear in the Component Gallery. `tile` and `deck` are now authorable
-// top-level types (the gallery's "New component" menu lists them alongside
-// `board`), so they must also show up in the gallery listing. Conceptual
-// types (zone, hand, discard, bag, counter, score-track, network, track)
-// belong in App Layout where the creator configures placement and
-// game-structure concerns.
-const COMPONENT_EDITOR_TYPES = new Set(['board', 'tile', 'deck', 'piece', 'token', 'card']);
-
-function isMovableTemplateType(componentType: string): boolean {
-  return componentType === 'piece' || componentType === 'token';
-}
-
-function listComponentOutlineIds(project: EditorProject): string[] {
-  const movableTemplateIds = Object.values(project.instances)
-    .filter((instance) => isMovableTemplateType(instance.componentType))
-    .map((instance) => String(instance.instanceId));
-
-  const designableRootIds = project.rootInstanceIds.filter(
-    (instanceId) => COMPONENT_EDITOR_TYPES.has(project.instances[instanceId]?.componentType ?? ''),
-  );
-
-  return Array.from(new Set([...designableRootIds, ...movableTemplateIds]));
-}
-
 export const Editor = () => {
   const [projectId, setProjectId] = useState<string | null>(null);
   const projectHistory = useUndoRedo<EditorProject | null>(null);
@@ -85,6 +59,7 @@ export const Editor = () => {
   } = projectHistory;
   const [activeSection, setActiveSection] = useState<EditorSection>(DEFAULT_EDITOR_SECTION);
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
+  const [placementId, setPlacementId] = useState<string | null>(null);
   const [paletteOwnerId] = useState<string | null>('player_one');
   const [editorNotice, setEditorNotice] = useState<string | null>(null);
   // Version history lives in IndexedDB, so status + graph arrive async and
@@ -101,11 +76,17 @@ export const Editor = () => {
   // reclaims the space. The open/closed choice is remembered across sessions.
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(() => {
     if (typeof window === 'undefined') return true;
+    if (window.innerWidth < 900) return false;
     return window.localStorage.getItem(SIDEBAR_OPEN_KEY) !== 'false';
   });
   useEffect(() => {
     window.localStorage.setItem(SIDEBAR_OPEN_KEY, String(isSidebarOpen));
   }, [isSidebarOpen]);
+  useEffect(() => {
+    const resize = () => { if (window.innerWidth < 900) setIsSidebarOpen(false); };
+    window.addEventListener('resize', resize);
+    return () => window.removeEventListener('resize', resize);
+  }, []);
 
   useEffect(() => {
     // Guards against a stale async load landing after a newer hashchange.
@@ -140,6 +121,7 @@ export const Editor = () => {
       resetProjectHistory(nextProject);
       setActiveSection(readEditorSection(window.location.hash));
       setSelectedComponentId(null);
+      setPlacementId(null);
       setGitStatus(null);
       setVersionGraph(null);
       setEditorNotice(pendingNotice);
@@ -238,7 +220,6 @@ export const Editor = () => {
 
   const currentProject = project;
   const currentRuntime = runtime;
-  const componentOutlineIds = listComponentOutlineIds(currentProject);
   // Placeholders until the async IndexedDB read lands (see the sync effect).
   const currentGitStatus: ProjectGitStatus = gitStatus ?? {
     changedPaths: [],
@@ -354,7 +335,7 @@ export const Editor = () => {
     if (commitSha) void handleRestoreVersion(commitSha);
   }
 
-  const { handleAddComponent, handleAddCatalogComponent, handleUpdateCatalogComponent, updateComponent, removeComponent, duplicateComponent, openComponentEditor, selectComponent, createTopLevelComponent, createCatalogTopLevelComponent } = createEditorComponentActions({
+  const { handleAddComponent, handleAddCatalogComponent, handleUpdateCatalogComponent, updateComponent, removeComponent, duplicateComponent, openComponentEditor, selectComponent } = createEditorComponentActions({
     project: currentProject, paletteOwnerId, selectedComponentId, setSelectedComponentId, setActiveSection, onChange: commitProject, setNotice: setEditorNotice,
   });
 
@@ -366,7 +347,7 @@ export const Editor = () => {
       case 'workshop':
         return <WorkshopSection project={currentProject} onNavigate={setActiveSection} versionCount={currentVersionGraph.commits.length} />;
       case 'card_studio':
-        return <CardStudioSection key={sectionKey} project={currentProject} onChange={commitProject} />;
+        return <ComponentsWorkbench key={`${sectionKey}-cards`} project={currentProject} onChange={commitProject} initialKind="card" onOpenPlacement={(id) => { setSelectedComponentId(id); setPlacementId(id); setActiveSection('component_editor'); }} />;
       case 'playtest':
         return <PlaytestSection key={sectionKey} project={currentProject} onChange={commitProject} versionSha={currentVersionGraph.activeCommitSha} versionLabel={playtestVersionLabel} />;
       case 'print':
@@ -461,16 +442,8 @@ export const Editor = () => {
         );
       case 'component_editor':
       default:
-        if (!resolvedSelectedComponentId) {
-          return (
-            <ComponentGallery
-              project={currentProject}
-              componentOutlineIds={componentOutlineIds}
-              onSelectComponent={selectComponent}
-              onCreateComponent={createTopLevelComponent}
-              onCreateCatalogComponent={createCatalogTopLevelComponent}
-            />
-          );
+        if (!placementId || !resolvedSelectedComponentId) {
+          return <ComponentsWorkbench key={`${sectionKey}-${resolvedSelectedComponentId ?? 'gallery'}`} project={currentProject} onChange={commitProject} selectedComponentId={resolvedSelectedComponentId} onOpenPlacement={(id) => { setSelectedComponentId(id); setPlacementId(id); }} />;
         }
         return (
           <VisualsSection
@@ -482,7 +455,7 @@ export const Editor = () => {
             onUpdateComponent={updateComponent}
             onRemoveComponent={removeComponent}
             onDuplicateComponent={duplicateComponent}
-            onReturnToGallery={() => setSelectedComponentId(null)}
+            onReturnToGallery={() => setPlacementId(null)}
             onAssignProjectPaletteColor={(paletteId, value) => commitProject(updateProjectSettings(currentProject, (settings) => ({
               ...settings,
               colorPalette: {
@@ -500,9 +473,9 @@ export const Editor = () => {
         <EditorSidebar
           project={currentProject}
           isOpen={isSidebarOpen}
-          activeSection={activeSection}
-          setActiveSection={setActiveSection}
-          onOpenComponentEditor={openComponentEditor}
+          activeSection={activeSection === 'card_studio' ? 'component_editor' : activeSection}
+          setActiveSection={(next) => { setActiveSection(next); if (window.innerWidth < 900) setIsSidebarOpen(false); }}
+          onOpenComponentEditor={() => { setPlacementId(null); openComponentEditor(); if (window.innerWidth < 900) setIsSidebarOpen(false); }}
           onRenameProject={(name) => commitProject(renameProject(currentProject, name))}
           activeVersionName={currentVersionGraph.activeBranchName}
           versionOptions={versionOptions}

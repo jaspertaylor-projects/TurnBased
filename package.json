@@ -16,9 +16,10 @@
     "dev:stop": "node scripts/dev-local.mjs --stop",
     "test:dev": "node --test scripts/dev/*.test.mjs",
     "test:catalog": "npm run test:e2e --workspace @turnbased/catalog-api",
-    "test:workshop": "tsx --test apps/web/src/editor/cardStudio/*.test.ts apps/web/src/editor/playtest/*.test.ts",
+    "test:workshop": "tsx --test apps/web/src/editor/cardStudio/*.test.ts apps/web/src/editor/playtest/*.test.ts apps/web/src/editor/templateStudio/*.test.ts apps/web/src/editor/componentStudio/*.test.ts",
     "test:versions": "vitest run --config scripts/vitest.versions.config.ts",
-    "test:workshop:browser": "node scripts/check-workshop-browser.mjs"
+    "test:workshop:browser": "node scripts/check-workshop-browser.mjs",
+    "test:components:browser": "node scripts/check-component-templates-browser.mjs"
   },
   "engines": {
     "node": ">=22.12.0"

@@ -1,4 +1,12 @@
-import type { CardStudioRow, CardStudioState, CardTemplate, CardTemplatePreset, GeneratedCard } from "./types";
+import type {
+  CardStudioRow,
+  CardStudioState,
+  CardTemplate,
+  CardTemplatePreset,
+  GeneratedCard,
+} from "./types";
+import { canonicalSerialize } from "@turnbased/shared-utils";
+import { normalizeTemplateDocument } from "../templateStudio/model";
 
 export const MAX_CARD_ROWS = 1000;
 export const MAX_GENERATED_CARDS = 2000;
@@ -12,8 +20,16 @@ export const PRESETS: Record<
     description: "Botanical borders & warm parchment",
     colors: ["#fbf3dd", "#193e31", "#a46e38"],
   },
-  storybook: { label: "Storybook", description: "An illustrated keepsake", colors: ["#f6edfc", "#3b2850", "#9467b8"] },
-  modern: { label: "Modern", description: "Clean, bold & easy to read", colors: ["#f9faf7", "#153c3b", "#d29645"] },
+  storybook: {
+    label: "Storybook",
+    description: "An illustrated keepsake",
+    colors: ["#f6edfc", "#3b2850", "#9467b8"],
+  },
+  modern: {
+    label: "Modern",
+    description: "Clean, bold & easy to read",
+    colors: ["#f9faf7", "#153c3b", "#d29645"],
+  },
 };
 
 export function createCardRow(values: Partial<CardStudioRow> = {}): CardStudioRow {
@@ -98,7 +114,9 @@ export function safeArtUrl(value: string): string {
   if (/^data:image\/(png|jpe?g|webp|gif);base64,[a-z0-9+/=\s]+$/i.test(trimmed)) return trimmed;
   try {
     const parsed = new URL(trimmed);
-    return ["http:", "https:"].includes(parsed.protocol) && !parsed.username && !parsed.password ? parsed.href : "";
+    return ["http:", "https:"].includes(parsed.protocol) && !parsed.username && !parsed.password
+      ? parsed.href
+      : "";
   } catch {
     return "";
   }
@@ -129,10 +147,13 @@ export function normalizeCardStudioState(value: unknown): CardStudioState {
         artUrl: safeArtUrl(textValue(row.artUrl)),
         customFields,
         copies:
-          typeof row.copies === "number" && Number.isInteger(row.copies) ? Math.max(0, Math.min(99, row.copies)) : 1,
+          typeof row.copies === "number" && Number.isInteger(row.copies)
+            ? Math.max(0, Math.min(99, row.copies))
+            : 1,
       };
     });
   const source = input.template ?? base.template;
+  const document = source.document ? normalizeTemplateDocument(source.document, source) : undefined;
   const preset = Object.hasOwn(PRESETS, source.preset) ? source.preset : "woodland";
   const color = (value: unknown, fallback: string) =>
     typeof value === "string" && /^#[\da-f]{6}$/i.test(value) ? value : fallback;
@@ -144,8 +165,9 @@ export function normalizeCardStudioState(value: unknown): CardStudioState {
     background: color(source.background, base.template.background),
     foreground: color(source.foreground, base.template.foreground),
     accent: color(source.accent, base.template.accent),
-    widthMm: bounded(source.widthMm, 63, 40, 100),
-    heightMm: bounded(source.heightMm, 88, 50, 140),
+    ...(document ? { document } : {}),
+    widthMm: document?.widthMm ?? bounded(source.widthMm, 63, 40, 100),
+    heightMm: document?.heightMm ?? bounded(source.heightMm, 88, 50, 140),
     titleField: textValue(source.titleField) || "title",
     bodyField: textValue(source.bodyField) || "body",
     badgeField: textValue(source.badgeField) || "cost",
@@ -155,11 +177,14 @@ export function normalizeCardStudioState(value: unknown): CardStudioState {
   };
   const customColumns = [
     ...new Set([
-      ...(Array.isArray(input.customColumns) ? input.customColumns.filter((key) => typeof key === "string") : []),
+      ...(Array.isArray(input.customColumns)
+        ? input.customColumns.filter((key) => typeof key === "string")
+        : []),
       ...rows.flatMap((row) => Object.keys(row.customFields)),
     ]),
   ].filter(
-    (key) => key && !["id", "copies", ...BASE_CARD_FIELDS, "__proto__", "constructor", "prototype"].includes(key),
+    (key) =>
+      key && !["id", "copies", ...BASE_CARD_FIELDS, "__proto__", "constructor", "prototype"].includes(key),
   );
   // Generated snapshots are caches; rebuild their card payload from normalized source data.
   const result: CardStudioState = { schemaVersion: 1, rows, customColumns, template };
@@ -173,7 +198,10 @@ export function normalizeCardStudioState(value: unknown): CardStudioState {
       sourceFingerprint: input.generated.sourceFingerprint,
       cards: [],
     };
-    if (input.generated.sourceFingerprint === cardStudioFingerprint(result) && !validateCardRows(rows).length) {
+    if (
+      input.generated.sourceFingerprint === cardStudioFingerprint(result) &&
+      !validateCardRows(rows).length
+    ) {
       result.generated.cards = expandCardRows(rows).map(({ id, sourceRowId, copyNumber }) => ({
         id,
         sourceRowId,
@@ -228,7 +256,13 @@ export function expandCardRows(rows: CardStudioRow[]): GeneratedCard[] {
 }
 
 export function cardStudioFingerprint(state: CardStudioState): string {
-  const orderedFields = (fields: object) => Object.entries(fields).sort(([left], [right]) => left.localeCompare(right));
+  const orderedFields = (fields: object) =>
+    Object.entries(fields)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, value]) => [
+        key,
+        value && typeof value === "object" ? JSON.parse(canonicalSerialize(value)) : value,
+      ]);
   const source = JSON.stringify({
     rows: state.rows.map((row) => [
       row.id,
@@ -244,7 +278,8 @@ export function cardStudioFingerprint(state: CardStudioState): string {
     template: orderedFields(state.template),
   });
   let hash = 2166136261;
-  for (let index = 0; index < source.length; index += 1) hash = Math.imul(hash ^ source.charCodeAt(index), 16777619);
+  for (let index = 0; index < source.length; index += 1)
+    hash = Math.imul(hash ^ source.charCodeAt(index), 16777619);
   return (hash >>> 0).toString(36);
 }
 

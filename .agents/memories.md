@@ -166,28 +166,19 @@ over one-off Playwright snippets.
   - The local dev login is `dev@turnbased.local` / `dev-local-only`; the
     persistent Codex profile lives under `.playwright-codex/chrome-profile`.
 
-### Editor restores the committed version snapshot, not raw localStorage
+### Editor reloads the saved working draft; checkpoints restore explicitly
 
-When verifying the editor in a browser, the editor restores the project from the
-committed **version snapshot** (e.g. "initial musings"), NOT directly from the
-raw `localStorage` key `turnbased.creator.projects`.
-
-- **Why:** seeding a project/component into `localStorage` while the editor is
-  already mounted shows nothing — neither new instances nor changed property
-  values appear, and even a full reload restores the snapshot. This wasted real
-  debugging time during the image-component work until the cause was found.
-- **How to apply:**
-  - Seed into storage BEFORE the editor first loads the project, or (more
-    reliable) add/edit through the real UI — the board's "Add Subcomponent →
-    Text / Image" buttons, inspector controls, drag/resize all autosave and
-    render correctly.
-  - Vite serves app modules as source: import factories in the page for setup,
-    e.g. `await import('/src/editor/project.ts')` (`createBlankProject`,
-    `addProjectComponent`) and `'/src/editor/storage.ts'`.
-  - The board is `KonvaBoardSurface` (`window.Konva.stages[0]`) under the
-    `component_editor` tab; open it by clicking a component gallery card. Konva
-    drag/resize via synthetic events needs ~80ms after mousedown before the
-    mousemoves — the window listener attaches in a React effect post-commit.
+- **Why:** earlier editor builds restored a checkpoint on reload. That behavior
+  is obsolete: a designer's latest autosaved working draft must survive
+  independently of the selected historical checkpoint.
+- **How to apply:** set up browser fixtures through `saveEditorProject` before
+  loading the editor, or use the real UI. Do not write raw localStorage project
+  bodies: its project list now contains small pointers to IndexedDB snapshots.
+  Vite serves the app factories for test setup (`/src/editor/project.ts`,
+  `/src/editor/storage.ts`, and `/src/editor/componentStudio/model.ts`).
+- Components opens the shared template workbench. Use its **Placement** action
+  to reach the existing Konva board/interactive-child editor. Printed template
+  grids and tracks do not automatically create playable spaces.
 
 ### Board image + text components have dedicated inspectors
 
@@ -285,12 +276,12 @@ image data URLs) in localStorage — its ~5MB origin quota is what caused the
   3. `git.ts`, `workspace.ts`, `storage.ts` APIs are all async now —
      `Editor.tsx` holds `gitStatus`/`versionGraph` in state fed by an effect,
      refreshed via `versionsRefreshKey` after save/restore/switch actions.
-  4. After a successful remote sync a commit is marked `synced`; older synced
-     commits beyond 50/project are pruned (branch heads and the active commit
-     are never pruned) and orphaned blobs garbage-collected.
+  4. After a successful remote sync a commit is marked `synced`. Checkpoints
+     are retained; do not reintroduce the former 50-checkpoint pruning or
+     uncoordinated orphan-blob collection.
   5. localStorage keeps ONLY small metadata (`turnbased.creator.projects`
-     deflated, UI prefs). If you add a new persisted artifact ask "can this
-     hold an image or a file map?" — if yes, it goes in IndexedDB.
+     v2 pointer index, UI prefs). Full live snapshots belong in IndexedDB,
+     including component rows and nested template artwork.
 
 ---
 
@@ -369,11 +360,11 @@ image data URLs) in localStorage — its ~5MB origin quota is what caused the
   reference material, not executable rules. Public JSON packets expose state
   and legal actions; replies validate action IDs and expected step. There is
   no built-in LLM runner for arbitrary games.
-- Card Studio exports actual-mm A4/Letter HTML sheets with cutting guides;
-  browser printing uses 100% scale. These are prototype fronts. Production
-  bleed, duplex backs, supplier checkout, and fulfillment are still future
-  work. Linked URL artwork requires its source; uploaded artwork travels with
-  the exported files.
+- Prototype printing now supports all component families, optional bleed,
+  shaped cut guides, face selection, aligned duplex backs, and tiled boards.
+  Browser printing uses 100% scale and long-edge flipping for duplex. Supplier
+  production-file validation, checkout, and fulfillment remain future work.
+  Linked URL artwork requires its source; uploaded artwork travels with files.
 - Checks: `npm run test:workshop` (Node domain tests), `npm run test:versions`
   (Vitest/fake IndexedDB), and `npm run typecheck`. Use Playwright for the
   guest/sample workflow and verify bounded non-landing surfaces at desktop,
@@ -382,11 +373,12 @@ image data URLs) in localStorage — its ~5MB origin quota is what caused the
 
 ## Workshop verification — September 2026
 
-- 20 Card Studio / Playtest Lab domain tests and 27 IndexedDB/version/archive
-  tests pass. The browser smoke covers safety restore, valid/invalid agent
-  moves, 20-game batches, findings, printable downloads, full-history import,
-  reload persistence, and bounded desktop layouts. Print proof verified 10
-  cards across 2 actual-size A4 PDF pages.
+- Before the unified-template expansion, 20 Card Studio / Playtest Lab domain
+  tests and 27 IndexedDB/version/archive tests passed. That browser smoke
+  covered safety restore, valid/invalid agent moves, 20-game batches, findings,
+  printable downloads, full-history import, reload persistence, and bounded
+  desktop layouts. Its print proof used 10 cards across 2 A4 pages. See the
+  unified Components entry below for the newer verification scope.
 - `npm run test:workshop:browser` uses an isolated context in the dedicated
   CDP browser; screenshots/downloads default to `/tmp/turnbased-workshop-smoke`.
 - Version comparisons use canonical key ordering; serialization order must
@@ -412,3 +404,89 @@ image data URLs) in localStorage — its ~5MB origin quota is what caused the
 - Verified the existing seeded account via the real browser, sign-in state
   after reload, guest continuation, web production build, and Auth ESLint.
   No database reset or account reseeding was needed. Logs: `logs/dev-sign-in-*`.
+
+## September 2026 — Components owns every editable template
+
+- **Product contract:** Components is the shared workspace for cards, boards,
+  tokens, tiles, player mats, and pieces; Card Studio belongs inside each deck.
+  Presets become fully editable text, image, shape, grid, and track layers.
+  Printed grids/tracks remain artwork; Placement authors interactive board
+  structures and relationships separately.
+- **Canonical state:** `EditorProject.componentDesigns` maps physical instance
+  IDs to studio data. Use `listProjectDesignSets` for inventory, counts,
+  comparisons, exports, and playtests. Legacy `project.cardStudio` appears once
+  as `legacy-card-studio`; opening it materializes a physical deck and removes
+  the legacy field while preserving row IDs, quantities, artwork, and history.
+  Old standalone root cards remain editable under their physical IDs; their
+  duplicates become valid deck roots. Lab fallback material must exclude both
+  represented physical IDs and represented deck-child IDs to avoid duplicates.
+- **Shared authoring:** `templateStudio/TemplateEditor` edits faces, layer
+  ordering, visibility/locks, geometry, typography, image fit, shapes, grids,
+  tracks, bindings, and print guides. Coordinates use millimeters; font sizes
+  use points. Explicit `{{field}}` substitutions preview selected table rows.
+  Canvas gestures, keyboard actions, undo/redo, alignment/distribution, and
+  reusable template JSONs share the same document model. Native modal dialogs
+  contain keyboard focus, support Escape, and protect background controls.
+- **Physical dimensions:** new components use their family's native preset
+  dimensions. Existing supplier-sized components proportionally scale starter
+  artwork into the preserved physical dimensions; do not apply card-size
+  limits to boards, mats, or tokens. Template edits synchronize physical
+  instance dimensions and clear an incompatible supplier match. Normalization
+  runs after embedded artwork hydration.
+- **Rendering:** `renderDesignSvg` drives previews and exports; give each inline
+  copy a unique `idPrefix`. Text uses conservative family-aware wrapping and
+  shrink-to-fit estimates, including wide glyphs and stroke/italic insets.
+  SVG text honors fill, stroke, and stroke width; clipping remains explicit.
+  Keep deterministic rendering independent of browser font measurement.
+- **Async edits:** artwork reads resolve the current target by identity, patch
+  the latest state, and invalidate pending requests on unmount or target
+  changes. Never apply a captured whole-project updater after switching a
+  component/layer or restoring a version.
+- **Exports:** all-family sheets use actual millimeters, shaped trim guides,
+  optional bleed, selectable faces, and duplex back placement mirrored across
+  the page for long-edge printing, including partial sheets. Large boards tile
+  with 10 mm overlap and coordinate labels. Embedded artwork is reused across
+  copies. Rulebooks, shipping workspaces, archives, and agent packets consume
+  the shared design inventory; existing lab runs retain frozen definitions.
+
+### Verified completion
+
+- `npm run test:workshop`: **57 domain tests passed**, covering tables,
+  template documents/rendering/text, editor actions, physical components,
+  adapter quantities, print layout, deterministic simulations, and agent
+  packets. `npm run test:versions`: **30 persistence/archive tests passed**.
+  Every family's authored layers, faces, data, artwork, and physical dimensions
+  survive saves, checkpoints, and a fresh-browser archive import. Coverage
+  includes single legacy migration, independent duplication/removal, standalone
+  cards counted once, and a 420×297 mm board retaining its true print size.
+- `npm run build` passed for both the catalog API and web app. The web build
+  retains its existing large-chunk warning. Scoped ESLint passed for all source
+  changed by this task. Staged-only source and HEAD checks report the same
+  five pre-existing diagnostics (AI brief fields, catalog callback types,
+  and implicit icon callback arguments). The working-tree build includes the
+  user's existing fixes; preserve those changes uncommitted. Logs:
+  `logs/components-head-source-check.log` and
+  `logs/components-staged-source-check.log`.
+- `npm run test:workshop:browser` passed: canonical overview counts and
+  Components navigation, safety checkpoint restore, card persistence,
+  accepted/rejected agent moves, 20 simulations, findings, component/rulebook
+  downloads, full-history archive import, reload, bounded layout, and no page
+  errors. Artifacts: `/tmp/turnbased-workshop-smoke`.
+- `npm run test:components:browser` passed on the final implementation:
+  pointer movement, resize, rotation and rotated resize; layer actions and
+  undo; live table bindings; face artwork; template JSON/SVG/print downloads;
+  exact reload/checkpoint restore; and all six component families. Native
+  dialog Ctrl-Z/Delete/Escape/Tab behavior, wide-glyph SVG text bounds, and
+  fitted canvases without scrollbars passed. Canvases and footers remain
+  bounded at 1600×1000 with no app errors. Artifacts:
+  `/tmp/turnbased-component-templates`.
+- Dedicated Chrome print checks confirmed four duplex pages, a 400×400 mm
+  board across six A4 pages, physical dimensions, and embedded image reuse.
+  Prototype files are distinct from supplier-approved production files.
+- Repeatable browser sources are
+  [check-workshop-browser.mjs](../scripts/check-workshop-browser.mjs) and
+  [check-component-templates-browser.mjs](../scripts/check-component-templates-browser.mjs).
+  Both use isolated CDP contexts. Defaults: app port 3000, CDP port 9223.
+  Override `CODEX_BROWSER_URL`, `CODEX_BROWSER_CDP_URL`, or
+  `PLAYWRIGHT_MODULE_PATH`; artifact overrides are `WORKSHOP_ARTIFACT_DIR`
+  and `COMPONENT_TEMPLATE_ARTIFACT_DIR`, respectively.

@@ -24,12 +24,12 @@ export function WorkshopSection({ project, onNavigate, versionCount = 0 }: Works
     },
     {
       icon: Layers3,
-      title: 'Make a little deck',
-      text: summary.designs
-        ? `${summary.designs} designs · ${summary.copies} cards. Edit your table, refine the template, or generate a new batch.`
-        : 'Turn a table of names, costs, and abilities into a deck with one reusable template.',
-      section: 'card_studio' as const,
-      action: 'Card studio',
+      title: 'Make the pieces your game needs',
+      text: summary.designSets
+        ? `${summary.designSets} component sets · ${summary.componentCopies} physical copies. Edit their layers, refine the data, or generate a new batch.`
+        : 'Design cards, boards, tokens, tiles, mats, and pieces with editable templates and tables.',
+      section: 'component_editor' as const,
+      action: 'Components',
     },
     {
       icon: Bot,
@@ -50,7 +50,7 @@ export function WorkshopSection({ project, onNavigate, versionCount = 0 }: Works
     {
       icon: Printer,
       title: 'Put your prototype on the table',
-      text: 'Check your game’s readiness and prepare printable cards for the next game night.',
+      text: 'Prepare cards, boards, and other pieces at their real size for the next game night.',
       section: 'print' as const,
       action: 'Prepare to print',
     },
@@ -85,13 +85,13 @@ export function WorkshopSection({ project, onNavigate, versionCount = 0 }: Works
         </div>
         <aside className="workshop-rail" aria-label="Prototype at a glance">
           <dl className="workshop-overview__stats">
-            <div data-layout="cardDesignCount">
-              <dd>{summary.designs}</dd>
-              <dt>Card designs</dt>
+            <div data-layout="componentDesignSetCount">
+              <dd>{summary.designSets}</dd>
+              <dt>Component sets</dt>
             </div>
-            <div data-layout="physicalCardCount">
-              <dd>{summary.copies}</dd>
-              <dt>Cards in your deck</dt>
+            <div data-layout="physicalComponentCopyCount">
+              <dd>{summary.componentCopies}</dd>
+              <dt>Physical copies</dt>
             </div>
             <div data-layout="rulesChapterCount">
               <dd>{summary.chapters}</dd>
@@ -117,7 +117,7 @@ export function WorkshopSection({ project, onNavigate, versionCount = 0 }: Works
             className="workshop-button workshop-button--text"
             onClick={() => onNavigate('component_editor')}
           >
-            <PackageOpen size={15} /> {summary.components} physical components <ArrowRight size={12} />
+            <PackageOpen size={15} /> Explore all components <ArrowRight size={12} />
           </button>
         </aside>
       </div>

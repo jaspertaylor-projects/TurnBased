@@ -9,23 +9,28 @@ matter for the current milestone*. If something here contradicts a doc in
 
 TurnBased is an approachable workshop for amateur board game designers:
 **idea → prototype → playtest → revise → print**. The user explicitly made
-versioning, AI-compatible playtesting, and card templates driven by tables
-current priorities in September 2026. Earlier exclusions of AI players and
-legal-move generation from the active milestone no longer apply.
+versioning, AI-compatible playtesting, and templates driven by tables current
+priorities in September 2026. Components is the unified authoring surface;
+Card Studio lives inside decks, and cards, boards, tokens, tiles, mats, and
+pieces share the same fully editable layer/face template editor. Earlier
+exclusions of AI players and legal-move generation from the active milestone no longer apply.
 
 The current product supports:
 
 - Guest/local game creation, a recent-games workshop, and a Little Woodland
   example with rules, card data, and a configured playtest experiment.
-- Rulebooks, supplier-linked components, art assistance, and table-driven
-  card design with reusable templates and batch generation.
+- Rulebooks, supplier-linked physical inventory, art assistance, and a unified
+  Components workspace for cards, boards, tokens, tiles, mats, and pieces.
+  Its shared layer editor supports editable layouts, faces, data bindings,
+  reusable template JSONs, and table-driven copy generation.
 - Named checkpoints, experiment branches, design comparisons, safe restores,
   and portable archives containing design history and embedded artwork.
 - A bounded, executable two-player market-race lab with seeded heuristic
   agents, replayable transcripts, version-linked findings, and a public JSON
   observation/legal-move contract for external agents.
-- A4/Letter prototype card sheets and printable rulebooks. Supplier checkout
-  and production fulfillment remain future work.
+- A4/Letter prototype sheets for every component family, shaped trim guides,
+  optional bleed, duplex fronts/backs, tiled large boards, and printable
+  rulebooks. Supplier checkout and production fulfillment remain future work.
 
 The lab does not interpret arbitrary rulebook prose or card abilities, and
 it is not an automatic LLM runner. Broad game-engine coverage, hosted
@@ -88,9 +93,9 @@ The entry workflow creates a saved project before optional AI assistance:
 - [Editor.tsx](../apps/web/src/pages/Editor.tsx) coordinates loading, autosave,
   undo, sections, and version actions. `EditorFrame` owns shared rendering;
   `editorComponentActions.ts` isolates component actions. The default section
-  is `workshop`; deep links use `#/editor/<id>?section=card_studio` (or another
-  section ID). Load the latest saved draft; selecting a checkpoint is an
-  explicit restore action.
+  is `workshop`; Components links use `#/editor/<id>?section=component_editor`.
+  Legacy `card_studio` links open the card family in Components. Load the
+  latest saved draft; selecting a checkpoint is an explicit restore action.
 
 ### Section modules
 
@@ -99,12 +104,19 @@ Top-level editor surfaces live under
 
 - `WorkshopSection` — next steps and prototype counts.
 - `RulesSection`, `StatsSection` — rulebook and game details.
-- `CardStudioSection` — data table, template editor, generated deck preview.
+- `ComponentsWorkbench` in `componentStudio/` — unified inventory, shared
+  template authoring, component tables, physical options, and Placement access.
+- `CardStudioSection` — table, import, and generated-copy tools embedded inside
+  the selected component; it is not a separate top-level workflow.
+- `TemplateEditor` in `templateStudio/` — shared layer, face, data-preview,
+  physical-dimension, and reusable-template tools for all component families.
 - `PlaytestSection` — executable lab, external-agent turns, sessions, findings.
 - `VersionsSection` — named checkpoints, branches, change comparison, trail map.
-- `PrintSection` — card sheets, rulebook export, portable archive import/export.
-- `VisualsSection`, `ComponentEditorSection`, `ComponentGallery` — component
-  workbench, appearance, placement, and component outline.
+- `PrintSection` — all-family sheets, face/duplex selection, tiled board
+  assembly, rulebook export, and portable archive import/export.
+- `VisualsSection`, `ComponentEditorSection`, `ComponentGallery` — existing
+  interactive placement, board appearance, and legacy outline tools reached
+  from the unified Components workflow.
 - `ArtSection`, `AppLayoutSection` — art and linked table/player views.
 
 There is intentionally **no separate `PreviewSection`** anymore — preview
@@ -125,8 +137,14 @@ out of view files:
 - `aiBuilder.ts`, `aiBuildService.ts`, `ai.ts` — AI build orchestration.
 - `supplierCatalog.ts`, `useSupplierCatalog.ts` — supplier lookup and pricing.
 - `shipping.ts` — generated workspace files and preview/release build records.
-- `cardStudio/` — table normalization, CSV/TSV parsing, template rendering,
-  copy expansion, and print HTML.
+- `cardStudio/` — table normalization, CSV/TSV parsing, copy expansion, and
+  legacy card rendering. Document-bearing card exports use the shared renderer.
+- `componentStudio/model.ts` — enumerate physical design sets, migrate legacy
+  card data, and create/update/duplicate/remove component designs.
+- `componentStudio/print.ts`, `printLayout.ts` — actual-size imposition,
+  matching duplex backs, tiled board regions, and portable print HTML.
+- `templateStudio/` — shared millimeter-based document/layer types, normalized
+  presets, rendering, editing operations, and the interactive TemplateEditor.
 - `playtest/` — the executable market-race model, agent packets, replay,
   batches, and findings.
 - `versions/` — readable design comparison and portable archives.
@@ -145,7 +163,8 @@ out of view files:
   than writing localStorage directly.
 - Workspace and checkpoint records hold path → SHA-256 references. Embedded
   images become `idb-image://<hash>` references at rest and inflate on load.
-  Card Studio normalization runs after image hydration.
+  Component/table/template normalization runs after image hydration, so
+  persisted image references are never stripped as unsupported image URLs.
 - Checkpoints are immutable and retained locally even after remote sync.
   Restore preserves a dirty draft in a named safety checkpoint first;
   new checkpoints retain their parent links without deleting forward
@@ -163,23 +182,69 @@ out of view files:
   destroy its new snapshot. A future coordinated compaction must capture
   all roots and serialize against saves; do not reintroduce eager pruning.
 
-### Card and agent contracts
+### Unified component and template contracts
 
-`EditorProject.cardStudio` holds rows, custom columns, a shared template,
-copy counts, and compact generated references. CSV import and pasted TSV
-support custom fields; imports validate before replacing/appending data.
-One SVG renderer produces live previews, individual card files, and A4 or
-Letter HTML sheets with explicit millimeter dimensions, page breaks, and
-cutting guides. Uploaded artwork is embedded and reused across copies;
-linked remote artwork remains dependent on its URL. These exports are
-single-sided home prototypes, not supplier-approved manufacturing files.
+`EditorProject.componentDesigns?: Record<instanceId, CardStudioState>` is the
+canonical authoring map. Each key is an existing physical component instance
+ID, so adding a design does not create a second inventory item. Physical
+instances retain placement, supplier links, dimensions, and quantities.
+`listProjectDesignSets(project)` is the adapter used by Components, counts,
+rulebook exports, version comparison, workspace exports, print, and playtests.
+It returns named sets with an ID, instance ID, family, and studio state.
+
+Legacy `EditorProject.cardStudio` remains readable as exactly one virtual
+`legacy-card-studio` deck. Opening it materializes a physical deck, copies its
+existing rows and template into `componentDesigns`, then removes the legacy
+field. Preserve source row IDs, quantities, artwork, and old checkpoints;
+never enumerate both representations as separate physical decks. Existing
+physical components without authored documents derive deterministic starter
+sets that are saved when opened. Reads must not create random inventory IDs.
+
+Each `CardStudioState` holds rows, custom columns, copy counts, compact
+generated references, and a shared `CardTemplate`. Its optional `document`
+is a `ComponentDesignDocument`: physical width/height, trim shape, corner
+radius, bleed, safe margin, grid/snapping settings, and editable faces.
+Each face contains ordered text, image, shape, grid, and track layers.
+Coordinates and sizes are millimeters; text font sizes are points. Data-bound
+text/images use explicit `{{field}}` substitutions from a selected table row.
+Legacy card templates retain their prior renderer until migrated.
+
+`TemplateEditor` edits layout, face names, layer order, visibility, locks,
+position, size, rotation, opacity, typography, image fit, shape appearance,
+grids, and tracks. It supports canvas gestures, keyboard manipulation,
+alignment/distribution, undo/redo, and previewing table records. Reusable
+`turnbased-component-template` JSON files carry normalized documents and
+embedded artwork. Adding, duplicating, and removing faces is supported.
+Template import/preset replacement asks for confirmation before replacing the
+current layout. CSV/TSV import validates before replacing or
+appending component data.
+
+`renderDesignSvg(document, options)` drives live template previews and exports.
+Use a unique `idPrefix` for each inline copy so SVG clipping IDs cannot collide.
+`buildComponentPrintHtml` packs physical copies onto A4/Letter sheets, selects
+one/all faces or aligned duplex pairs, optionally includes bleed, and tiles
+oversized boards at actual size with 10 mm overlap and labeled coordinates.
+Duplex mirrors placement across the page for long-edge flipping, including
+partial final sheets; it does not mirror the artwork. Uploaded images are
+embedded once and reused across copies. Linked artwork still needs its URL.
+These are home prototype files, not supplier-approved production files.
+
+Printed template artwork does not create interactive game structure. Grids,
+tracks, and icons remain artwork; Placement continues to author interactive
+spaces, children, and pieces through the existing board surface/runtime.
+
+### Agent contract
 
 `EditorProject.playtestLab` holds the lab configuration, session transcripts,
 batches, and version-linked findings. `market-race-v1` supports exactly two
 seats gathering a resource, buying public-market cards by numeric cost,
 scoring points, and ending turns. It offers balanced/greedy/random heuristic
 strategies, deterministic seeds, batch results, and replay validation.
-Rulebook prose and card ability text are reference material only.
+Rulebook prose and card ability text are reference material only. New project
+experiments aggregate card design sets with namespaced set/row IDs, plus
+standalone cards not already represented by a deck. Non-card component
+families are included as reference definitions rather than simulated cards.
+Existing runs retain frozen card/configuration snapshots and unchanged replays.
 
 Agent packets include frozen session configuration/card definitions,
 executable rules, public observations, legal action IDs, and a JSON response
@@ -259,11 +324,13 @@ shape: edge function → structured payload → workspace mutation.
 
 ## 6. Prototype printing and supplier direction
 
-`PrintSection` closes the current iteration loop with downloadable card
-sheets and a rulebook. Users open the HTML export and print at 100% / actual
-size with browser headers/footers disabled. Designer notes stay out of the
-public rulebook. Readability and supplier-link counts help prepare the next
-paper playtest; they do not certify a manufacturing-ready product.
+`PrintSection` closes the current iteration loop with a selector for every
+component family, physical paper/face/duplex/bleed settings, downloadable
+sheets, and a rulebook. Users open HTML exports and print at 100% / actual
+size with browser headers/footers disabled. Duplex sheets use long-edge
+flipping; large boards retain their size through labeled overlapping tiles.
+Designer notes stay out of the public rulebook. Inventory counts enumerate
+physical components once; prototype exports do not certify production files.
 
 The component editor already resolves dimensions, finishes, and pricing
 through the integrated catalog API. Keep supplier sizes and bleed/safe-zone
@@ -342,10 +409,20 @@ material from executable behavior actually implemented in the current lab.
 
 From the repository root:
 
-- `npm run test:workshop` — Node/tsx tests for card data, template/print exports,
+- `npm run test:workshop` — Node/tsx tests for tables, editable template
+  documents/rendering, component adapters, actual-size/duplex/tiled printing,
   deterministic simulations, replay, and agent packets.
 - `npm run test:versions` — Vitest with fake IndexedDB for live-draft storage,
-  checkpoint ancestry, restore/branch behavior, archives, and image deduplication.
+  checkpoint ancestry, restore/branch behavior, archives, image deduplication,
+  every component family's authored documents, legacy migration, and independent
+  component duplication/removal.
 - `npm run typecheck` — all workspace TypeScript checks.
-- Playwright verifies guest creation, card imports/generation, version restore,
-  exports, lab actions, and bounded desktop/mobile surfaces. Keep logs in `logs/`.
+- `npm run test:workshop:browser` runs the general workshop smoke in an
+  isolated CDP browser context.
+- `npm run test:components:browser` is the dedicated
+  [shared template browser check](../scripts/check-component-templates-browser.mjs):
+  all six families, pointer editing, row bindings, faces, template/SVG/print
+  downloads, reloads, and checkpoint restore. Defaults: app port 3000, CDP
+  port 9223, artifacts `/tmp/turnbased-component-templates`. Overrides:
+  `CODEX_BROWSER_URL`, `CODEX_BROWSER_CDP_URL`, `PLAYWRIGHT_MODULE_PATH`,
+  `COMPONENT_TEMPLATE_ARTIFACT_DIR`. Keep validation logs in `logs/`.
