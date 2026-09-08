@@ -1,5 +1,10 @@
 # BoardGameMaker API Guide
 
+The service now lives in [`apps/catalog-api`](../apps/catalog-api/README.md)
+inside this monorepo. `npm run dev` starts it automatically on port 3100;
+Vite proxies `/v1` to it. The imported, fuller endpoint reference lives at
+[`apps/catalog-api/api-guide.md`](../apps/catalog-api/api-guide.md).
+
 This documentation covers the endpoints exposed by the BoardGameMaker API Server. The server routes are prefixed with `/v1` except for health checks. 
 
 ## Table of Contents

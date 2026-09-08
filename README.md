@@ -16,10 +16,25 @@ To start the full local stack in one command:
 npm run dev:local
 ```
 
+Both `npm run dev` and `npm run dev:local` start the full stack. Use Node 22.12+
+and Docker with Compose v2.
+
 That script uses your existing `.env` when present. If `.env` is missing, it
 copies `.env.example` to `.env` without overwriting an existing file. It then
-starts Supabase, serves the local edge runtime, and starts the web app at
-`http://127.0.0.1:3000`.
+installs workspace dependencies, starts catalog Postgres + Redis, applies the
+catalog migrations and supplier seed, starts the catalog API on port 3100,
+then starts Supabase, the local edge runtime, and the web app at
+`http://127.0.0.1:3000`. Missing `apps/catalog-api/.env` is also created from its
+example. The web app receives the running local Supabase URL and anon key
+automatically.
+
+The catalog server is now part of this monorepo at
+[`apps/catalog-api`](apps/catalog-api/README.md). Its existing API routes stay
+at `/v1`; Vite forwards them to the local server. `npm run dev:catalog` starts
+just the API and its dependencies. Logs are saved under `logs/`.
+
+Catalog data lives in its own persistent Docker volume. A fresh machine needs
+a supplier refresh to populate products; see the [catalog setup guide](apps/catalog-api/README.md#catalog-data).
 
 Set `RESET_DB=1` if you want to rebuild the local database from migrations
 and seed data:
@@ -51,6 +66,8 @@ The Supabase CLI manages them on your behalf.
 
 Plus, in front of all that:
 
+- **Catalog API** on `http://127.0.0.1:3100`, with Postgres on **54328**
+  and Redis on **6380** (managed by the root `compose.yml`).
 - **Vite dev server** on `http://127.0.0.1:3000` — the web app
 - The Supabase CLI's `functions serve` Deno worker, attached to
   `supabase_edge_runtime_TurnBased` over a websocket so the runtime can
@@ -65,8 +82,9 @@ npm run dev:local
 
 **Stop everything**:
 ```bash
-npx supabase stop                # tears down all the supabase_* containers
-# then Ctrl+C the npm run dev:local terminal to stop the Vite dev server
+# First Ctrl+C the npm run dev terminal (stops web, API, and edge workers).
+npm run dev:stop                 # stops Supabase + catalog Postgres/Redis
+# Database volumes and catalog data are preserved.
 ```
 
 **Register a newly-added edge function with the running runtime.** The
@@ -126,13 +144,24 @@ http://127.0.0.1:54323
    ```bash
    npx supabase functions serve ai-project-builder --env-file .env
    ```
-5. Start the web app:
+5. In another terminal, start the catalog API and its dependencies:
+   ```bash
+   npm run dev:catalog
+   ```
+6. Start the web app:
    ```bash
    npm run dev --workspace web -- --host 127.0.0.1 --port 3000
    ```
-6. Open `http://127.0.0.1:3000`, sign in, and use `Build with AI`.
+7. Open `http://127.0.0.1:3000`, sign in, and use `Build with AI`.
 
 ### Environment variables
+
+Optional root `.env` / shell overrides: `WEB_HOST`, `WEB_PORT`,
+`CATALOG_PORT` (3100), `CATALOG_DB_PORT` (54328), and
+`CATALOG_REDIS_PORT` (6380). The launcher keeps these ports and the web proxy
+in sync. For a manually started Vite server, use `CATALOG_API_URL` to override
+its default `http://127.0.0.1:3100` target. Supplier credentials belong in
+`apps/catalog-api/.env`, which is ignored by git.
 
 The web app reads `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` at build
 time from `.env` (Vite only exposes vars prefixed with `VITE_` to the

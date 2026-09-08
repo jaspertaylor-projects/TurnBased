@@ -15,7 +15,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/v1': {
-        target: 'http://localhost:3100',
+        target: process.env.CATALOG_API_URL || 'http://127.0.0.1:3100',
         changeOrigin: true,
       },
     },

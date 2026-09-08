@@ -41,3 +41,9 @@ supabase/.temp
 
 # TypeScript incremental build state
 *.tsbuildinfo
+
+# Catalog API generated test output
+coverage/
+
+# Local database migration backups
+*.dump

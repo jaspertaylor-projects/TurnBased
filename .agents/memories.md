@@ -304,3 +304,30 @@ image data URLs) in localStorage — its ~5MB origin quota is what caused the
   "Feedback / collaboration preferences" with a **Why** and **How to apply**.
 - Keep entries short and actionable. If an entry stops being true, edit or
   delete it rather than letting it rot.
+
+
+## 2026-09-07 — Catalog API moved into the monorepo
+
+- `apps/catalog-api` is the imported NestJS/Prisma/BullMQ supplier service.
+  Root npm workspaces and `package-lock.json` manage its dependencies. Node
+  22.12+ is required; the Supabase CLI is pinned as a root dev dependency.
+- `npm run dev` and `npm run dev:local` now supervise catalog Postgres/Redis,
+  migrations, supplier seeding, the API, Supabase edge functions, and Vite.
+  `npm run dev:catalog` starts just the catalog stack. Logs live in `logs/`.
+  Ctrl+C stops child process groups; `npm run dev:stop` then stops containers.
+- Root `compose.yml` uses ports 54328/6380 and separate persistent catalog
+  volumes. `CATALOG_PORT`, `CATALOG_DB_PORT`, `CATALOG_REDIS_PORT` root env
+  overrides stay in sync with the API and Vite proxy. `RESET_DB=1` only resets
+  Supabase. Local startup always uses local catalog connections.
+- Copied 3,058 products and the full original DB into the monorepo volume,
+  preserving IDs. The old directory/DB volume remain as a rollback copy,
+  with no runtime dependency on them. Supplier credentials are in ignored
+  `apps/catalog-api/.env`; a DB backup is in ignored `logs/`. Redis starts
+  fresh. New machines must explicitly refresh suppliers to populate products.
+- `npm run test:dev` checks env setup, port coordination, readiness, secret
+  capture, and watcher cleanup. `npm run test:catalog` exercises the running
+  API. API build, all-workspace typecheck, and web build pass. The imported
+  API still has pre-existing ESLint/Prettier violations; migration did not
+  reformat or rewrite its supplier/quote behavior.
+- Updated VersionsSection useSurfaceSize return type to include nullable
+  refs, fixing the existing React 19 typecheck error exposed during validation.

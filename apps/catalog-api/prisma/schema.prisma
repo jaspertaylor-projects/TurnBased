@@ -1,0 +1,194 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Supplier {
+  id        String   @id @default(uuid()) @db.Uuid
+  code      String   @unique
+  name      String
+  baseUrl   String   @map("base_url")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  catalogProducts CatalogProduct[]
+  scrapeRuns      ScrapeRun[]
+  quotes          Quote[]
+
+  @@map("suppliers")
+}
+
+model CatalogProduct {
+  id                String   @id @default(uuid()) @db.Uuid
+  supplierId        String   @map("supplier_id") @db.Uuid
+  externalProductId String?  @map("external_product_id")
+  slug              String   @unique
+  title             String
+  customTitle       String?  @map("custom_title")
+  category          String
+  subcategory       String?
+  shape             String?
+  sourceUrl         String   @map("source_url")
+  imageUrl          String?  @map("image_url")
+  description       String?
+  currency          String   @default("USD")
+  status            String   @default("active")
+  rawSourceHash     String?  @map("raw_source_hash")
+  firstSeenAt       DateTime @default(now()) @map("first_seen_at") @db.Timestamptz(6)
+  lastSeenAt        DateTime @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  supplier Supplier @relation(fields: [supplierId], references: [id])
+
+  productVariants ProductVariant[]
+  rawSnapshots    RawSnapshot[]
+  quotes          Quote[]
+
+  @@map("catalog_products")
+}
+
+model ProductVariant {
+  id          String   @id @default(uuid()) @db.Uuid
+  productId   String   @map("product_id") @db.Uuid
+  variantCode String   @map("variant_code")
+  title       String
+  isDefault   Boolean  @default(false) @map("is_default")
+  status      String   @default("active")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  catalogProduct CatalogProduct @relation(fields: [productId], references: [id])
+
+  options           VariantOption[]
+  layoutConstraints LayoutConstraint[]
+  priceTiers        PriceTier[]
+  quotes            Quote[]
+
+  @@unique([productId, variantCode])
+  @@map("product_variants")
+}
+
+model VariantOption {
+  id           String   @id @default(uuid()) @db.Uuid
+  variantId    String   @map("variant_id") @db.Uuid
+  optionGroup  String   @map("option_group")
+  optionKey    String   @map("option_key")
+  optionLabel  String   @map("option_label")
+  optionValue  String   @map("option_value")
+  displayOrder Int      @default(0) @map("display_order")
+  priceDataJson Json?   @map("price_data_json") @db.JsonB
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  productVariant ProductVariant @relation(fields: [variantId], references: [id])
+
+  @@unique([variantId, optionGroup, optionKey])
+  @@map("variant_options")
+}
+
+model LayoutConstraint {
+  id              String   @id @default(uuid()) @db.Uuid
+  variantId       String   @map("variant_id") @db.Uuid
+  faceKey         String   @map("face_key")
+  widthMm         Decimal? @map("width_mm") @db.Decimal
+  heightMm        Decimal? @map("height_mm") @db.Decimal
+  widthPx         Int?     @map("width_px")
+  heightPx        Int?     @map("height_px")
+  bleedMm         Decimal? @map("bleed_mm") @db.Decimal
+  safeZoneMm      Decimal? @map("safe_zone_mm") @db.Decimal
+  dpi             Int?
+  panelCount      Int?     @map("panel_count")
+  cutlineRequired Boolean  @default(false) @map("cutline_required")
+  notes           String?
+  constraintsJson Json     @default("{}") @map("constraints_json") @db.JsonB
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  productVariant ProductVariant @relation(fields: [variantId], references: [id])
+
+  @@map("layout_constraints")
+}
+
+model PriceTier {
+  id          String   @id @default(uuid()) @db.Uuid
+  variantId   String   @map("variant_id") @db.Uuid
+  minQuantity Int      @map("min_quantity")
+  maxQuantity Int?     @map("max_quantity")
+  unitPrice   Decimal  @map("unit_price") @db.Decimal(12, 4)
+  totalPrice  Decimal? @map("total_price") @db.Decimal(12, 4)
+  currency    String   @default("USD")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  productVariant ProductVariant @relation(fields: [variantId], references: [id])
+
+  @@map("price_tiers")
+}
+
+model ScrapeRun {
+  id                 String    @id @default(uuid()) @db.Uuid
+  supplierId         String    @map("supplier_id") @db.Uuid
+  runType            String    @map("run_type")
+  status             String
+  startedAt          DateTime  @map("started_at") @db.Timestamptz(6)
+  finishedAt         DateTime? @map("finished_at") @db.Timestamptz(6)
+  pagesFetched       Int       @default(0) @map("pages_fetched")
+  productsDiscovered Int       @default(0) @map("products_discovered")
+  productsUpdated    Int       @default(0) @map("products_updated")
+  parseFailures      Int       @default(0) @map("parse_failures")
+  errorSummary       String?   @map("error_summary")
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  supplier Supplier @relation(fields: [supplierId], references: [id])
+
+  rawSnapshots RawSnapshot[]
+
+  @@map("scrape_runs")
+}
+
+model RawSnapshot {
+  id          String   @id @default(uuid()) @db.Uuid
+  scrapeRunId String   @map("scrape_run_id") @db.Uuid
+  productId   String?  @map("product_id") @db.Uuid
+  sourceUrl   String   @map("source_url")
+  contentType String   @map("content_type")
+  storageKey  String   @map("storage_key")
+  contentHash String   @map("content_hash")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  scrapeRun      ScrapeRun       @relation(fields: [scrapeRunId], references: [id])
+  catalogProduct CatalogProduct? @relation(fields: [productId], references: [id])
+
+  @@map("raw_snapshots")
+}
+
+model Quote {
+  id                String   @id @default(uuid()) @db.Uuid
+  quoteRequestId    String   @unique @map("quote_request_id")
+  supplierId        String   @map("supplier_id") @db.Uuid
+  productId         String   @map("product_id") @db.Uuid
+  variantId         String   @map("variant_id") @db.Uuid
+  quantity          Int
+  currency          String
+  inputOptionsJson  Json     @map("input_options_json") @db.JsonB
+  pricingInputsJson Json     @map("pricing_inputs_json") @db.JsonB
+  unitPrice         Decimal  @map("unit_price") @db.Decimal(12, 4)
+  subtotal          Decimal  @db.Decimal(12, 4)
+  markupAmount      Decimal  @default(0) @map("markup_amount") @db.Decimal(12, 4)
+  riskBufferAmount  Decimal  @default(0) @map("risk_buffer_amount") @db.Decimal(12, 4)
+  handlingAmount    Decimal  @default(0) @map("handling_amount") @db.Decimal(12, 4)
+  total             Decimal  @db.Decimal(12, 4)
+  catalogVersion    String   @map("catalog_version")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  supplier       Supplier       @relation(fields: [supplierId], references: [id])
+  catalogProduct CatalogProduct @relation(fields: [productId], references: [id])
+  productVariant ProductVariant @relation(fields: [variantId], references: [id])
+
+  @@map("quotes")
+}

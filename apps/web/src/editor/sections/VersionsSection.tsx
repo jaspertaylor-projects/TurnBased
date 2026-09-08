@@ -36,7 +36,7 @@ function shortSha(value: string | null | undefined): string {
 
 /** Tracks the live pixel size of a scroll surface so the terrain can fill the
  * whole visible map even when the branch graph itself is small. */
-function useSurfaceSize(): [React.RefObject<HTMLDivElement>, { width: number; height: number }] {
+function useSurfaceSize(): [React.RefObject<HTMLDivElement | null>, { width: number; height: number }] {
   const ref = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
   useEffect(() => {

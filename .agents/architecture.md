@@ -32,6 +32,7 @@ and should not drive new decisions in the editor.
 
 ```
 /apps
+  /catalog-api               supplier catalog + quotes + ingestion (NestJS/Prisma) [M1 ACTIVE]
   /web                       creator dashboard + editor + (stubbed) play shell
 /packages
   /engine-components         built-in component catalog + schemas       [M1 ACTIVE]
@@ -49,6 +50,13 @@ and should not drive new decisions in the editor.
                              build-manager, git-proxy, play-session-token,
                              stripe-webhook
 ```
+
+**Local stack:** `npm run dev` / `npm run dev:local` starts catalog Postgres
+(54328), Redis (6380), the API (3100), Supabase, and Vite (3000). The root
+`compose.yml` owns persistent catalog volumes, separate from Supabase.
+`apps/catalog-api` is the former BoardGameMakerAPIServer; no sibling checkout
+is needed. The web still uses HTTP `/v1`, proxied by Vite. See the
+[catalog README](../apps/catalog-api/README.md) for setup and data ingestion.
 
 **Import rules (from ADR 0001, still in force):**
 

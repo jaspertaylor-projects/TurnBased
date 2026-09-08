@@ -8,9 +8,19 @@
   ],
   "scripts": {
     "dev:local": "./scripts/dev-local.sh",
-    "dev": "npm run dev --workspaces --if-present",
+    "dev": "npm run dev:local",
     "build": "npm run build --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present"
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "dev:catalog": "node scripts/dev-local.mjs --catalog-only",
+    "dev:stop": "node scripts/dev-local.mjs --stop",
+    "test:dev": "node --test scripts/dev/*.test.mjs",
+    "test:catalog": "npm run test:e2e --workspace @turnbased/catalog-api"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "devDependencies": {
+    "supabase": "2.107.0"
   }
 }
