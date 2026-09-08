@@ -551,3 +551,46 @@ image data URLs) in localStorage — its ~5MB origin quota is what caused the
   export rendering; the monorepo root can contain another React version. Use
   createRequire from apps/web/package.json instead of hardcoding dependency
   hoisting locations.
+
+## September 2026 — Moonlit Market recorded walkthrough
+
+- The user requested a real game-creation video and explicitly authorized the
+  dev account for AI tooling. The isolated recording made two real paid AI
+  requests (rules writer and image agent), both HTTP 200. Do not generalize
+  this authorization to unrelated future AI calls.
+- Final artifact: `artifacts/demos/moonlit-market/turnbased-game-creation.mp4`,
+  332.68 seconds, 1600×1000 / 25 fps H.264, captions and no audio. Selected
+  scenes omit operator gaps/failed takes; `recording-original.json` and the
+  raw WebM preserve the source. Generated artifacts are ignored by Git.
+- The real prototype has six card designs / eighteen copies, shared embedded
+  AI artwork, an editable two-face template, authored rules, a 20-game lab
+  batch, a finding, and five checkpoints. Its cost experiment was restored
+  to the playtest baseline, retaining the alternate in a safety checkpoint.
+  Printable HTML/PDF, an agent packet, template JSON, and a portable backup
+  are under the demo's `downloads/` directory.
+- Recording utilities: `scripts/demo/record-session.mjs` accepts local JSONL
+  Playwright commands; `render-walkthrough.py` trims scene boundaries and
+  adds a 100px caption band; `check-video.mjs` checks actual Chrome playback,
+  seeking, decoded frames, and errors in an isolated process. Workflow docs
+  and the CSV fixture live in `docs/demos/`.
+- The recorder launches an isolated Chrome with separate browser storage.
+  Export the game before closing it. It does not change the designer's CDP
+  browser at port 9223. An implicit select label may include its options;
+  the CSV Import mode is reliably scoped as dialog.getByRole('combobox').
+- NumericInput now forwards aria-label and aria-labelledby. The real browser
+  walkthrough verified named age/playtime controls after that correction.
+- Checkpoints now commit locally before optional remote synchronization.
+  Auth, cloud initialization, and upload share a five-second deadline;
+  supported requests are aborted and late responses cannot mutate local
+  state. The live UI confirmed bounded completion with an honest remote
+  failure notice. The remote git service remained unavailable during the
+  recording; local checkpoint, branch, and safety restore worked.
+- New cloud project IDs are checkpoint sync metadata, not edits to the saved
+  design. Legacy manifest links remain readable. Archive imports deliberately
+  detach both cloud link forms so a copied design cannot write to the
+  original remote history. See editor/versions/README.md.
+- Validation: 44 persistence/version tests, web typecheck and scoped lint
+  passed, as did the full monorepo build (existing bundle-size warning).
+  Video QA passed beginning/middle/end playback and seek checks with no
+  media/page errors or dropped frames. The actual recording had no page
+  errors. Build/render/checkpoint logs are under logs/moonlit-market-*.

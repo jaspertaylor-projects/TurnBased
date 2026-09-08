@@ -44,6 +44,8 @@ interface NumericInputProps {
   allowDecimal?: boolean;
   placeholder?: string;
   style?: CSSProperties;
+  'aria-label'?: string;
+  'aria-labelledby'?: string;
 }
 
 export function NumericInput({
@@ -55,6 +57,8 @@ export function NumericInput({
   allowDecimal,
   placeholder,
   style,
+  'aria-label': ariaLabel,
+  'aria-labelledby': ariaLabelledBy,
 }: NumericInputProps) {
   const [draft, setDraft] = useState(() => formatNumericValue(value));
   const [isFocused, setIsFocused] = useState(false);
@@ -85,6 +89,8 @@ export function NumericInput({
   return (
     <input
       type="text"
+      aria-label={ariaLabel}
+      aria-labelledby={ariaLabelledBy}
       inputMode={acceptsDecimal ? 'decimal' : 'numeric'}
       value={displayedValue}
       placeholder={placeholder}

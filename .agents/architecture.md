@@ -25,6 +25,9 @@ The current product supports:
   reusable template JSONs, and table-driven copy generation.
 - Named checkpoints, experiment branches, design comparisons, safe restores,
   and portable archives containing design history and embedded artwork.
+  Checkpoints are secured locally before optional remote sync, with one
+  five-second deadline spanning authentication, initialization, and upload.
+  Imported archives start separate cloud histories.
 - A bounded, executable two-player market-race lab with seeded heuristic
   agents, replayable transcripts, version-linked findings, and a public JSON
   observation/legal-move contract for external agents.
@@ -36,6 +39,11 @@ The lab does not interpret arbitrary rulebook prose or card abilities, and
 it is not an automatic LLM runner. Broad game-engine coverage, hosted
 multiplayer, marketplace, payments, and an online economy remain longer-term
 work. Keep these boundaries explicit in UI copy and architecture decisions.
+
+The [Moonlit Market walkthrough](../docs/demos/README.md) demonstrates the
+real workflow using the dev account for AI writing and artwork. Reusable
+recording, rendering, and playback-check tools live in `scripts/demo/`;
+large local videos and exported prototypes are ignored under `artifacts/demos/`.
 
 ## 2. Monorepo layout
 

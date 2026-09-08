@@ -8,6 +8,11 @@ Architecture and current scope live in [.agents/architecture.md](.agents/archite
 The current workflow is **idea → prototype → playtest → revise → print**.
 Supplier checkout, production fulfillment, and a marketplace remain future work.
 
+The [Moonlit Market walkthrough](docs/demos/README.md) records this journey
+through the real development app, including AI-assisted rules and artwork,
+a spreadsheet-driven deck, playtesting, version restore, and printable exports.
+Its recording and rendering tools are reusable for future demos.
+
 ## Try the workshop
 
 After starting the local stack, open `http://127.0.0.1:3000`:
@@ -35,7 +40,9 @@ After starting the local stack, open `http://127.0.0.1:3000`:
 4. In **Version history**, name checkpoints, branch an experiment, compare
    changes, and restore earlier work. Restoring saves uncheckpointed work in
    a safety checkpoint first. Browser drafts survive reloads independently
-   of the selected checkpoint.
+   of the selected checkpoint. Checkpoints save locally before optional cloud
+   synchronization, which has a shared five-second deadline. A remote failure
+   leaves the local checkpoint available and reports the sync failure.
 5. In **Print & share**, select any component and download A4 or US Letter
    sheets with physical dimensions and shaped cutting guides. Print one face,
    every face separately, or duplex fronts/backs with mirrored placements.

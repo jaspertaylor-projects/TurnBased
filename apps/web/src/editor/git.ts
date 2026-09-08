@@ -36,7 +36,9 @@ import { createWorkspaceFiles } from './shipping';
 import type { EditorProject, PreviewRuntime } from './types';
 import { saveProjectWorkspace } from './workspace';
 
-export type ProjectGitCommitRecord = StoredCommitRecord;
+// Cloud linkage persists with local history. Portable archive imports omit it
+// so a copied game cannot write checkpoints into the original cloud project.
+export type ProjectGitCommitRecord = StoredCommitRecord & { remoteProjectId?: string | null };
 export type { ProjectVersionState };
 
 export interface ProjectGitStatus {
@@ -62,6 +64,11 @@ export interface ProjectVersionGraph {
 }
 
 export const DEFAULT_VERSION_BRANCH_NAME = 'initial musings';
+export const REMOTE_CHECKPOINT_TIMEOUT_MS = 5000;
+
+function checkRemoteSync(signal: AbortSignal): void {
+  if (signal.aborted) throw new Error('Remote sync did not finish within 5 seconds. Your checkpoint is safely stored in this browser.');
+}
 
 function toShortCommit(hash: number): string {
   return hash.toString(16).padStart(8, '0').slice(0, 8);
@@ -151,26 +158,13 @@ function slugifyProjectName(name: string): string {
   return normalized || 'turnbased-project';
 }
 
-function withRemoteProjectId(project: EditorProject, remoteProjectId: string): EditorProject {
-  if (project.manifest.remoteProjectId === remoteProjectId) {
-    return project;
-  }
-
-  return ensureProjectManifest({
-    ...project,
-    manifest: {
-      ...project.manifest,
-      remoteProjectId,
-    },
-  });
-}
-
-async function ensureRemoteProject(project: EditorProject): Promise<string | null> {
+async function ensureRemoteProject(project: EditorProject, signal: AbortSignal): Promise<string | null> {
   if (!hasSupabaseConfig()) {
     return null;
   }
 
   const { data: { session } } = await supabase.auth.getSession();
+  checkRemoteSync(signal);
   if (!session || session.user.is_anonymous) {
     return null;
   }
@@ -178,6 +172,12 @@ async function ensureRemoteProject(project: EditorProject): Promise<string | nul
   if (project.manifest.remoteProjectId) {
     return project.manifest.remoteProjectId;
   }
+
+  // Cloud linkage is sync metadata, not a change to the saved game design.
+  // Older projects still carry their link in the manifest.
+  const linked = (await listProjectGitCommits(project.id)).find((commit) => commit.remoteProjectId);
+  checkRemoteSync(signal);
+  if (linked?.remoteProjectId) return linked.remoteProjectId;
 
   const { data: projectRow, error: projectError } = await supabase
     .from('projects')
@@ -191,7 +191,10 @@ async function ensureRemoteProject(project: EditorProject): Promise<string | nul
       editor_snapshot: project,
     })
     .select('id')
+    .abortSignal(signal)
     .single();
+
+  checkRemoteSync(signal);
 
   if (projectError || !projectRow) {
     throw new Error(projectError?.message ?? 'Unable to create the remote project record.');
@@ -203,7 +206,10 @@ async function ensureRemoteProject(project: EditorProject): Promise<string | nul
       project_id: projectRow.id,
       git_repo_ref: `user_${session.user.id.slice(0, 8)}/${slugifyProjectName(project.name)}-${projectRow.id.slice(0, 8)}`,
       is_private: true,
-    });
+    })
+    .abortSignal(signal);
+
+  checkRemoteSync(signal);
 
   if (repoError) {
     throw new Error(repoError.message);
@@ -340,62 +346,66 @@ export async function commitProjectVersion(
     createdAt?: string;
   } = {},
 ): Promise<CommitProjectVersionResult> {
-  let nextProject = project;
+  // Never let authentication or an optional cloud request prevent a local save.
+  const commit = await commitProjectToGit(project, runtime, message, options);
   let remoteProjectId: string | null = project.manifest.remoteProjectId;
   let remoteError: string | null = null;
+  let remoteCommitted = false;
 
-  try {
-    const resolvedRemoteProjectId = await ensureRemoteProject(project);
-    if (resolvedRemoteProjectId) {
-      remoteProjectId = resolvedRemoteProjectId;
-      nextProject = withRemoteProjectId(project, resolvedRemoteProjectId);
-      const deflated = await deflateProjectImages(nextProject);
-      await saveProjectWorkspace(nextProject.id, createWorkspaceFiles(deflated, runtime));
-    }
-  } catch (error) {
-    remoteError = error instanceof Error ? error.message : 'Unable to initialize the remote git project.';
-  }
-
-  const commit = await commitProjectToGit(nextProject, runtime, message, options);
-
-  if (remoteProjectId) {
+  if (hasSupabaseConfig()) {
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      // The remote copy must be self-contained: re-inline the project JSON
-      // from the in-memory (image-inflated) project so no idb-image:// refs
-      // — resolvable only by this browser's IndexedDB — leak into Supabase.
-      const files = {
-        ...await loadCommitFiles(commit),
-        [PROJECT_JSON_PATH]: canonicalSerialize(nextProject),
-      };
-      const { error } = await supabase.functions.invoke('git-proxy', {
-        body: {
-          action: 'commit',
-          projectId: remoteProjectId,
-          message,
-          files,
-          projectSnapshot: nextProject,
-          commitSha: commit.commitSha,
-        },
-      });
-
-      if (error) {
-        throw error;
-      }
-
-      commit.syncStatus = 'synced';
-      commit.remoteBranchName = commit.branchName ?? null;
-      commit.remoteCommitSha = commit.commitSha;
-      await idbPut(COMMITS_STORE, commit);
+      remoteCommitted = await Promise.race([
+        (async () => {
+          const resolvedId = await ensureRemoteProject(project, controller.signal);
+          checkRemoteSync(controller.signal);
+          if (!resolvedId) return false;
+          remoteProjectId = resolvedId;
+          // Remote snapshots remain self-contained; local image references
+          // in the saved project JSON cannot be resolved by another browser.
+          const files = {
+            ...await loadCommitFiles(commit),
+            [PROJECT_JSON_PATH]: canonicalSerialize(project),
+          };
+          checkRemoteSync(controller.signal);
+          const { error } = await supabase.functions.invoke('git-proxy', {
+            body: { action: 'commit', projectId: resolvedId, message, files, projectSnapshot: project, commitSha: commit.commitSha },
+            signal: controller.signal,
+          });
+          checkRemoteSync(controller.signal);
+          if (error) throw error;
+          return true;
+        })(),
+        new Promise<never>((_resolve, reject) => {
+          timer = setTimeout(() => {
+            controller.abort();
+            reject(new Error('Remote sync did not finish within 5 seconds. Your checkpoint is safely stored in this browser.'));
+          }, REMOTE_CHECKPOINT_TIMEOUT_MS);
+        }),
+      ]);
     } catch (error) {
       remoteError = error instanceof Error ? error.message : 'Unable to sync the remote git commit.';
+    } finally {
+      clearTimeout(timer);
     }
+  }
+
+  // The task above performs no local writes. A late response after timeout
+  // cannot mark a failed sync successful, move the head, or replace a draft.
+  if (remoteProjectId || remoteError) {
+    commit.remoteProjectId = remoteProjectId;
+    commit.syncStatus = remoteCommitted ? 'synced' : remoteError ? 'sync_failed' : 'local';
+    commit.remoteBranchName = remoteCommitted ? commit.branchName ?? null : null;
+    commit.remoteCommitSha = remoteCommitted ? commit.commitSha : null;
+    await idbPut(COMMITS_STORE, commit);
   }
 
   return {
-    project: nextProject,
+    project,
     commit,
     remoteProjectId,
-    remoteCommitted: Boolean(remoteProjectId) && !remoteError,
+    remoteCommitted,
     remoteError,
   };
 }

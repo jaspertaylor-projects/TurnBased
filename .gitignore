@@ -47,3 +47,7 @@ coverage/
 
 # Local database migration backups
 *.dump
+
+# Local walkthrough recordings and exported prototype artifacts
+/artifacts/demos/
+__pycache__/
