@@ -66,6 +66,7 @@ Run from the repository root:
 ```bash
 npm run test:workshop # Node tests: tables, editable templates, all-family printing, agents
 npm run test:versions # Vitest + fake IndexedDB: persistence, versions and archives
+npm run test:rules:api # Rules writer: auth, model selection, prompts and mocked provider calls
 npm run typecheck    # Typecheck all workspaces
 ```
 
@@ -87,6 +88,20 @@ isolated context. It uses the same app and CDP browser defaults; override
 `CODEX_BROWSER_URL`, `CODEX_BROWSER_CDP_URL`, or `PLAYWRIGHT_MODULE_PATH` as
 needed. Screenshots and downloads go to `/tmp/turnbased-component-templates`,
 or `COMPONENT_TEMPLATE_ARTIFACT_DIR` when set.
+
+`npm run test:rules:browser` checks supplier edits, icon descriptions, saved
+AI controls, AI undo, delayed replies during edits and checkpoint restores,
+and returning safely from Settings. It mocks catalog and AI responses in an
+isolated browser context and makes no paid AI calls. Artifacts go to
+`/tmp/turnbased-rules-fixes`; the same browser/app overrides above apply.
+
+The rulebook's **AI assist** remembers its prompt, model, mode, context
+weights, theme/style selections, and Creativity setting per project. Models
+that do not support Creativity show the control as unavailable. A delayed
+reply cannot overwrite newer section text or a restored checkpoint. Icon
+descriptions are shared with Art Studio and included in printable rulebooks.
+Changing a component's supplier size updates its printable template dimensions
+while preserving its identity, table rows, and authored layers.
 
 Component templates are stored in `EditorProject.componentDesigns`, keyed by
 the existing physical component instance ID. This keeps the component, its
@@ -320,6 +335,16 @@ Codex can inspect or screenshot that browser through the approved helper scripts
 ```bash
 node scripts/codex-browser-inspect.mjs http://127.0.0.1:3000/#/settings
 node scripts/codex-browser-screenshot.mjs http://127.0.0.1:3000/#/settings settings.png
+```
+
+For simple headed-browser interactions, use the action helper instead of ad-hoc
+`node -e` snippets:
+
+```bash
+node scripts/codex-browser-action.mjs create-project "Codex UI Check"
+node scripts/codex-browser-action.mjs open '#/settings'
+node scripts/codex-browser-action.mjs click-text "AI models" '#/settings'
+node scripts/codex-browser-action.mjs fill-label "Game name" "Test Project" '#/new'
 ```
 
 Useful overrides:

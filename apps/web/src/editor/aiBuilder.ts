@@ -1,12 +1,5 @@
-import {
-  builtInCatalog,
-  getBuiltInComponentManifest,
-} from '@turnbased/engine-components';
-import type {
-  BuiltInComponentType,
-  ComponentInstanceModel,
-  ComponentLayout,
-} from '@turnbased/engine-components';
+import { builtInCatalog, getBuiltInComponentManifest } from '@turnbased/engine-components';
+import type { BuiltInComponentType, ComponentInstanceModel } from '@turnbased/engine-components';
 
 import {
   addProjectComponent,
@@ -17,132 +10,15 @@ import {
 } from './project';
 import type { EditorProject, RulesBuilderBrief } from './types';
 
-export interface RulesBriefSuggestion {
-  title: string;
-  body: string;
-}
-
-export interface AIBuildPromptPack {
-  brief: RulesBuilderBrief;
-  engineGrounding: string[];
-  componentCatalog: Array<{
-    type: string;
-    displayName: string;
-    description: string;
-    allowedParents: string[];
-    allowedChildren: string[];
-    keyProperties: string[];
-    tags: string[];
-  }>;
-  acceptanceChecklist: string[];
-  previewRuntimeContract: string[];
-  workspacePolicy: string[];
-}
-
-export interface AIGameBlueprint {
-  projectName?: string;
-  description?: string;
-  rulesText?: string;
-  designerNotes?: string[];
-  playerRange?: {
-    min?: number;
-    max?: number;
-    hasDistinctSoloMode?: boolean;
-    isCampaignGame?: boolean;
-  };
-  playerIdentities?: Array<{
-    seatId?: string;
-    badgeLabel?: string;
-    iconKey?: string;
-    color?: string;
-    resourceLabel?: string;
-    startingBlocks?: number;
-  }>;
-  views?: {
-    defaultViewId?: string;
-    selectedViewId?: string;
-    sharedView?: {
-      label?: string;
-      description?: string;
-    };
-    playerViews?: Array<{
-      seatId?: string;
-      label?: string;
-      description?: string;
-    }>;
-  };
-  appLayout?: Partial<EditorProject['appLayout']>;
-  board?: {
-    label?: string;
-    layout?: ComponentLayout;
-    width?: number;
-    height?: number;
-    spaceCount?: number;
-    spaceLabels?: string[];
-    terrainPattern?: string[];
-  };
-  playerAreas?: Array<{
-    ownerId?: string;
-    resourceLabel?: string;
-    reserveLabel?: string;
-    startingPieces?: number;
-    pieceLabelPrefix?: string;
-    pieceType?: 'piece' | 'token';
-    supplyMode?: 'finite' | 'infinite';
-  }>;
-  sharedZones?: Array<{
-    label?: string;
-    ownerId?: string | null;
-    maxCapacity?: number | null;
-    pieceCount?: number;
-    pieceLabelPrefix?: string;
-    pieceType?: 'piece' | 'token';
-    supplyMode?: 'finite' | 'infinite';
-  }>;
-}
-
-const SIMPLE_EXAMPLE_BRIEF: RulesBuilderBrief = {
-  name: 'Lantern Blocks',
-  minPlayers: 2,
-  maxPlayers: 4,
-  hasDistinctSoloMode: true,
-  isCampaignGame: false,
-  theme: 'harbor lantern guilds',
-  artStyle: 'cozy painted woodcut',
-};
-
-const ENGINE_GROUNDING = [
-  'Use built-in components and declarative rules whenever possible.',
-  'Every generated starter project should open in a linked multi-view shell with one shared board view and one player-linked view per seat.',
-  'A previewable project needs at least one public destination surface and at least one owned movable block resource per player.',
-  'Prefer the reusable engine-ui linked-view assets for startup chrome: LinkedSeatSummaryStrip, LinkedViewStage, and PlayerLinkedViewStage.',
-  'Generated projects should preserve the lightweight setup brief and stay easy to refine in the component editor.',
-  'Prefer a minimal playable interpretation when the setup brief is underspecified.',
-];
-
-const ACCEPTANCE_CHECKLIST = [
-  'Project manifest and setup brief are preserved in project metadata.',
-  'Requested player count range and solo/campaign flags are preserved.',
-  'One shared board view exists and one linked player view exists per seat.',
-  'Player summaries show seat identity, Lucide-first avatar fallback, and compact resource counts.',
-  'Each player starts with 6 block resources unless the blueprint explicitly asks for a higher valid amount.',
-  'Preview runtime compiles without blocking requirements.',
-  'The active player has at least one legal move in the initial preview state.',
-  'App layout fields exist for summary strip, linked view navigation, and resource presentation.',
-];
-
-const PREVIEW_RUNTIME_CONTRACT = [
-  'The shared shell keeps the player summary strip visible while the main content swaps between the board and player-linked views.',
-  'Public spaces or zones become destination surfaces in preview.',
-  'Owned block resources placed in a player resources area can move into open public destinations.',
-  'Target score and turn cap should match the board size and pace.',
-];
-
-const WORKSPACE_POLICY = [
-  'Generate only project-workspace artifacts, never shared engine changes.',
-  'Stay inside documented component and rules boundaries.',
-  'Prefer a shared board plus player-owned resource areas plus one shared game supply for the first playable build.',
-];
+import {
+  SIMPLE_EXAMPLE_BRIEF,
+  ENGINE_GROUNDING,
+  ACCEPTANCE_CHECKLIST,
+  PREVIEW_RUNTIME_CONTRACT,
+  WORKSPACE_POLICY,
+} from './aiBuilderContracts';
+import type { RulesBriefSuggestion, AIBuildPromptPack, AIGameBlueprint } from './aiBuilderContracts';
+export type { RulesBriefSuggestion, AIBuildPromptPack, AIGameBlueprint } from './aiBuilderContracts';
 
 function toTitleCase(value: string): string {
   return value
@@ -276,7 +152,10 @@ function createProjectShell(
   };
 }
 
-function applyPlayerIdentityPlan(project: EditorProject, plan: AIGameBlueprint['playerIdentities']): EditorProject {
+function applyPlayerIdentityPlan(
+  project: EditorProject,
+  plan: AIGameBlueprint['playerIdentities'],
+): EditorProject {
   if (!plan || plan.length === 0) {
     return project;
   }
@@ -299,7 +178,9 @@ function applyPlayerIdentityPlan(project: EditorProject, plan: AIGameBlueprint['
         ...seat.resources,
         resourceLabel: normalizeText(match.resourceLabel, seat.resources.resourceLabel),
         startingBlocks: clamp(
-          Number.isFinite(match.startingBlocks) ? Math.trunc(match.startingBlocks ?? 0) : seat.resources.startingBlocks,
+          Number.isFinite(match.startingBlocks)
+            ? Math.trunc(match.startingBlocks ?? 0)
+            : seat.resources.startingBlocks,
           1,
           12,
         ),
@@ -333,14 +214,14 @@ function applyViewPlan(project: EditorProject, plan: AIGameBlueprint['views']): 
     };
   });
   const validIds = new Set(items.map((item) => item.id));
-  const defaultViewId = plan?.defaultViewId && validIds.has(plan.defaultViewId)
-    ? plan.defaultViewId
-    : nextViews.defaultViewId;
-  const selectedViewId = plan?.selectedViewId && validIds.has(plan.selectedViewId)
-    ? plan.selectedViewId
-    : plan?.defaultViewId && validIds.has(plan.defaultViewId)
-      ? plan.defaultViewId
-      : nextViews.selectedViewId;
+  const defaultViewId =
+    plan?.defaultViewId && validIds.has(plan.defaultViewId) ? plan.defaultViewId : nextViews.defaultViewId;
+  const selectedViewId =
+    plan?.selectedViewId && validIds.has(plan.selectedViewId)
+      ? plan.selectedViewId
+      : plan?.defaultViewId && validIds.has(plan.defaultViewId)
+        ? plan.defaultViewId
+        : nextViews.selectedViewId;
 
   return {
     ...project,
@@ -369,7 +250,8 @@ function addBoardFromPlan(
   const width = 1;
   const height = 1;
   const boardLabel = normalizeText(plan?.label, `${nextProject.name} Board`);
-  const layout = plan?.layout && ['grid', 'hex', 'graph', 'custom'].includes(plan.layout) ? plan.layout : 'grid';
+  const layout =
+    plan?.layout && ['grid', 'hex', 'graph', 'custom'].includes(plan.layout) ? plan.layout : 'grid';
   const terrainPattern = (plan?.terrainPattern ?? []).map((value) => value.trim()).filter(Boolean);
   const spaceLabels = (plan?.spaceLabels ?? []).map((value) => value.trim()).filter(Boolean);
 
@@ -484,7 +366,9 @@ export function getRulesBriefSuggestions(brief: RulesBuilderBrief): RulesBriefSu
   const hints: string[] = [];
 
   if (!brief.name.trim()) {
-    hints.push('Give the project a name so the shared shell, board, and player views have a strong default label.');
+    hints.push(
+      'Give the project a name so the shared shell, board, and player views have a strong default label.',
+    );
   }
 
   if (!brief.theme.trim()) {
@@ -492,7 +376,9 @@ export function getRulesBriefSuggestions(brief: RulesBuilderBrief): RulesBriefSu
   }
 
   if (!brief.artStyle.trim()) {
-    hints.push('Choose an art style so the shell copy and Lucide-first chrome know what visual mood to follow.');
+    hints.push(
+      'Choose an art style so the shell copy and Lucide-first chrome know what visual mood to follow.',
+    );
   }
 
   if (brief.minPlayers > brief.maxPlayers) {
@@ -500,7 +386,9 @@ export function getRulesBriefSuggestions(brief: RulesBuilderBrief): RulesBriefSu
   }
 
   if (brief.hasDistinctSoloMode && brief.minPlayers > 1) {
-    hints.push('If solo mode is distinct, let the player range include 1 so the project metadata stays consistent.');
+    hints.push(
+      'If solo mode is distinct, let the player range include 1 so the project metadata stays consistent.',
+    );
   }
 
   if (hints.length === 0) {
@@ -531,7 +419,10 @@ export function buildProjectScaffoldFromBrief(brief: RulesBuilderBrief): EditorP
   return createProjectShell(brief);
 }
 
-export function buildProjectFromAIBlueprint(brief: RulesBuilderBrief, blueprint: AIGameBlueprint): EditorProject {
+export function buildProjectFromAIBlueprint(
+  brief: RulesBuilderBrief,
+  blueprint: AIGameBlueprint,
+): EditorProject {
   let project = createProjectShell(brief, {
     projectName: blueprint.projectName,
     description: blueprint.description,
@@ -553,9 +444,17 @@ export function buildProjectFromAIBlueprint(brief: RulesBuilderBrief, blueprint:
   for (const sharedZone of blueprint.sharedZones ?? []) {
     project = addZoneWithPieces(project, {
       label: normalizeText(sharedZone.label, `${project.name} Shared Zone`),
-      ownerId: sharedZone.ownerId && project.seats.some((seat) => seat.id === sharedZone.ownerId) ? sharedZone.ownerId : null,
-      maxCapacity: typeof sharedZone.maxCapacity === 'number' ? Math.max(1, Math.trunc(sharedZone.maxCapacity)) : null,
-      pieceCount: clamp(Number.isFinite(sharedZone.pieceCount) ? Math.trunc(sharedZone.pieceCount ?? 0) : 0, 0, 12),
+      ownerId:
+        sharedZone.ownerId && project.seats.some((seat) => seat.id === sharedZone.ownerId)
+          ? sharedZone.ownerId
+          : null,
+      maxCapacity:
+        typeof sharedZone.maxCapacity === 'number' ? Math.max(1, Math.trunc(sharedZone.maxCapacity)) : null,
+      pieceCount: clamp(
+        Number.isFinite(sharedZone.pieceCount) ? Math.trunc(sharedZone.pieceCount ?? 0) : 0,
+        0,
+        12,
+      ),
       pieceType: sharedZone.pieceType === 'token' ? 'token' : 'piece',
       pieceLabelPrefix: normalizeText(sharedZone.pieceLabelPrefix, 'Shared Piece'),
       supplyMode: sharedZone.supplyMode === 'infinite' ? 'infinite' : 'finite',
@@ -570,7 +469,9 @@ export function buildProjectFromAIBlueprint(brief: RulesBuilderBrief, blueprint:
       ownerId: seat.id,
       maxCapacity: null,
       pieceCount: clamp(
-        Number.isFinite(area.startingPieces) ? Math.trunc(area.startingPieces ?? 0) : seat.resources.startingBlocks,
+        Number.isFinite(area.startingPieces)
+          ? Math.trunc(area.startingPieces ?? 0)
+          : seat.resources.startingBlocks,
         1,
         12,
       ),

@@ -30,7 +30,9 @@ function ContextChipRow({
     const isOn = selected.some((s) => s.toLowerCase() === lower);
     onChange(isOn ? selected.filter((s) => s.toLowerCase() !== lower) : [...selected, entry]);
   }
-  const allOn = available.length > 0 && available.every((entry) => selected.some((s) => s.toLowerCase() === entry.toLowerCase()));
+  const allOn =
+    available.length > 0 &&
+    available.every((entry) => selected.some((s) => s.toLowerCase() === entry.toLowerCase()));
   function toggleAll() {
     if (loading) return;
     onChange(allOn ? [] : [...available]);
@@ -60,8 +62,20 @@ function ContextChipRow({
   }
 
   return (
-    <div data-layout="aiContextChipRow" data-context-label={label} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-      <span style={{ color: '#3b2412', fontFamily: SERIF_STACK, fontWeight: 700, fontSize: '0.76rem', flexShrink: 0 }}>
+    <div
+      data-layout="aiContextChipRow"
+      data-context-label={label}
+      style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}
+    >
+      <span
+        style={{
+          color: '#3b2412',
+          fontFamily: SERIF_STACK,
+          fontWeight: 700,
+          fontSize: '0.76rem',
+          flexShrink: 0,
+        }}
+      >
         {label}:
       </span>
       {available.length > 0 ? (
@@ -69,13 +83,20 @@ function ContextChipRow({
           type="button"
           onClick={toggleAll}
           disabled={loading}
-          title={allOn ? `Hide all ${label.toLowerCase()} from this generation` : `Send all ${label.toLowerCase()} to the AI`}
+          title={
+            allOn
+              ? `Hide all ${label.toLowerCase()} from this generation`
+              : `Send all ${label.toLowerCase()} to the AI`
+          }
           style={{
-            padding: '0.18rem 0.5rem', borderRadius: '999px',
+            padding: '0.18rem 0.5rem',
+            borderRadius: '999px',
             border: '1px dashed rgba(120,95,50,0.35)',
             background: 'transparent',
             color: 'rgba(80,55,25,0.7)',
-            fontFamily: SERIF_STACK, fontWeight: 600, fontSize: '0.7rem',
+            fontFamily: SERIF_STACK,
+            fontWeight: 600,
+            fontSize: '0.7rem',
             cursor: loading ? 'wait' : 'pointer',
           }}
         >
@@ -92,11 +113,14 @@ function ContextChipRow({
             disabled={loading}
             aria-pressed={isOn}
             style={{
-              padding: '0.22rem 0.6rem', borderRadius: '999px',
+              padding: '0.22rem 0.6rem',
+              borderRadius: '999px',
               border: isOn ? '1px solid rgba(13,148,136,0.7)' : '1px solid rgba(120,95,50,0.3)',
               background: isOn ? 'rgba(13,148,136,0.16)' : 'rgba(255,253,246,0.85)',
               color: isOn ? '#064e3b' : 'rgba(80,55,25,0.55)',
-              fontFamily: SERIF_STACK, fontWeight: 700, fontSize: '0.74rem',
+              fontFamily: SERIF_STACK,
+              fontWeight: 700,
+              fontSize: '0.74rem',
               cursor: loading ? 'wait' : 'pointer',
               textDecoration: isOn ? 'none' : 'line-through',
               textDecorationColor: 'rgba(120,95,50,0.4)',
@@ -109,7 +133,14 @@ function ContextChipRow({
 
       {onAppend ? (
         drafting ? (
-          <div data-layout="aiContextChipDraft" /* inline input for a new chip */ style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+          <div
+            data-layout="aiContextChipDraft"
+            /* inline input for a new chip */ style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.25rem',
+            }}
+          >
             <input
               autoFocus
               value={draft}
@@ -142,10 +173,16 @@ function ContextChipRow({
               aria-label={`Save new ${label.toLowerCase()}`}
               title="Add to project"
               style={{
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                width: '22px', height: '22px', borderRadius: '999px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '22px',
+                height: '22px',
+                borderRadius: '999px',
                 border: 'none',
-                background: !draft.trim() ? 'rgba(13,148,136,0.35)' : 'linear-gradient(135deg, #064e3b, #0d9488)',
+                background: !draft.trim()
+                  ? 'rgba(13,148,136,0.35)'
+                  : 'linear-gradient(135deg, #064e3b, #0d9488)',
                 color: 'white',
                 cursor: !draft.trim() ? 'not-allowed' : 'pointer',
               }}
@@ -160,13 +197,17 @@ function ContextChipRow({
             disabled={loading}
             title={addPlaceholder ?? `Add a new ${label.toLowerCase()} to this project`}
             style={{
-              display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.25rem',
               padding: '0.18rem 0.55rem',
               borderRadius: '999px',
               border: '1px dashed rgba(13,148,136,0.55)',
               background: 'transparent',
               color: '#0d9488',
-              fontFamily: SERIF_STACK, fontWeight: 700, fontSize: '0.72rem',
+              fontFamily: SERIF_STACK,
+              fontWeight: 700,
+              fontSize: '0.72rem',
               cursor: loading ? 'wait' : 'pointer',
             }}
           >
@@ -182,25 +223,56 @@ function ContextChipRow({
 function ImportanceSlider({
   label,
   value,
+  min = 0,
+  max = 100,
+  step = 5,
+  formatValue,
+  hint,
   disabled,
   onChange,
 }: {
   label: string;
   value: number;
+  /* Lets the slider double for non-0-100 ranges. Defaults match the
+     existing weight sliders so existing callers don't change behavior. */
+  min?: number;
+  max?: number;
+  step?: number;
+  /* Custom value-display formatter — used by the temperature slider to
+     render `0.85` instead of the raw float. */
+  formatValue?: (value: number) => string;
+  /* Optional title tooltip for the row, e.g. brief explanation of what
+     the slider does. */
+  hint?: string;
   disabled: boolean;
   onChange: (value: number) => void;
 }) {
   return (
-    <label data-layout="aiImportanceSlider" style={{ display: 'grid', gap: '0.18rem', minWidth: 0 }}>
-      <span style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', color: '#3b2412', fontFamily: SERIF_STACK, fontWeight: 700, fontSize: '0.74rem' }}>
+    <label
+      data-layout="aiImportanceSlider"
+      title={hint}
+      style={{ display: 'grid', gap: '0.18rem', minWidth: 0 }}
+    >
+      <span
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          gap: '0.5rem',
+          color: '#3b2412',
+          fontFamily: SERIF_STACK,
+          fontWeight: 700,
+          fontSize: '0.74rem',
+        }}
+      >
         <span>{label}</span>
-        <span style={{ color: '#0d9488' }}>{value}</span>
+        <span style={{ color: '#0d9488' }}>{formatValue ? formatValue(value) : value}</span>
       </span>
       <input
         type="range"
-        min={0}
-        max={100}
-        step={5}
+        aria-label={label}
+        min={min}
+        max={max}
+        step={step}
         value={value}
         disabled={disabled}
         onChange={(event) => onChange(Number(event.target.value))}
@@ -216,10 +288,13 @@ export function AIAssistContextControls({
   availableThemes,
   availableArtStyles,
   contextWeights,
+  temperature,
+  temperatureSupported = true,
   loading,
   onSelectedThemesChange,
   onSelectedArtStylesChange,
   onWeightsChange,
+  onTemperatureChange,
   onAppendTheme,
   onAppendArtStyle,
 }: {
@@ -228,15 +303,31 @@ export function AIAssistContextControls({
   availableThemes: string[];
   availableArtStyles: string[];
   contextWeights: AIRulesContextWeights;
+  /* Current sampling temperature. 0.0 = deterministic, 1.0 = wide. The
+     edge function default kicks in only when this is null/undefined upstream
+     — at this layer we always have a number. */
+  temperature: number;
+  temperatureSupported?: boolean;
   loading: boolean;
   onSelectedThemesChange: (next: string[]) => void;
   onSelectedArtStylesChange: (next: string[]) => void;
   onWeightsChange: (next: AIRulesContextWeights) => void;
+  onTemperatureChange: (next: number) => void;
   onAppendTheme: (value: string) => void;
   onAppendArtStyle: (value: string) => void;
 }) {
   return (
-    <div data-layout="aiContextControls" /* selectable chips plus relative source weights */ style={{ display: 'grid', gap: '0.5rem', padding: '0.5rem 0.6rem', borderRadius: '10px', background: 'rgba(255,253,246,0.55)', border: '1px solid rgba(120,95,50,0.18)' }}>
+    <div
+      data-layout="aiContextControls"
+      /* selectable chips plus relative source weights */ style={{
+        display: 'grid',
+        gap: '0.5rem',
+        padding: '0.5rem 0.6rem',
+        borderRadius: '10px',
+        background: 'rgba(255,253,246,0.55)',
+        border: '1px solid rgba(120,95,50,0.18)',
+      }}
+    >
       <ContextChipRow
         label="Themes"
         available={availableThemes}
@@ -255,26 +346,53 @@ export function AIAssistContextControls({
         addPlaceholder="New art style..."
         loading={loading}
       />
-      <div data-layout="aiImportanceSliders" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '0.6rem', paddingTop: '0.15rem' }}>
+      <div
+        data-layout="aiImportanceSliders"
+        /* four sliders: three source weights + the temperature knob */ style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+          gap: '0.6rem',
+          paddingTop: '0.15rem',
+        }}
+      >
         <ImportanceSlider
           label="Rulebook"
           value={contextWeights.rulebook}
+          hint="How much weight to give the rest of the rulebook (other sections' text) when generating."
           disabled={loading}
           onChange={(rulebook) => onWeightsChange({ ...contextWeights, rulebook })}
         />
         <ImportanceSlider
           label="Prompt"
           value={contextWeights.prompt}
+          hint="How much weight to give your typed guidance for this run."
           disabled={loading}
           onChange={(prompt) => onWeightsChange({ ...contextWeights, prompt })}
         />
         <ImportanceSlider
-          label="Chips"
+          label="Tags"
           value={contextWeights.chips}
+          hint="How much weight to give the project's themes and art-style tags."
           disabled={loading}
           onChange={(chips) => onWeightsChange({ ...contextWeights, chips })}
         />
+        <ImportanceSlider
+          label="Creativity"
+          value={temperature}
+          min={0}
+          max={1.5}
+          step={0.05}
+          formatValue={(value) => value.toFixed(2)}
+          hint="How loose the model is allowed to be. Lower = more deterministic / on-prompt. Higher = more varied output."
+          disabled={loading || !temperatureSupported}
+          onChange={onTemperatureChange}
+        />
       </div>
+      {!temperatureSupported && (
+        <p data-layout="aiTemperatureCapability" style={{ margin: 0, color: '#6b6049', fontSize: '0.75rem' }}>
+          This model sets creativity automatically.
+        </p>
+      )}
     </div>
   );
 }

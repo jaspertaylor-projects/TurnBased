@@ -322,6 +322,24 @@ manifest) and creates the first version checkpoint.
 Subsequent AI assistance (rule suggestions, art generation) follows the same
 shape: edge function → structured payload → workspace mutation.
 
+Rulebook AI assist persists validated per-project controls in localStorage.
+Its hook applies replies through the latest rules updater, protects newer
+typing, and invalidates requests when the panel closes, the section unmounts,
+or a checkpoint restores. RulesSection uses the restore epoch as part of its
+React key. AI undo belongs to the current editing session.
+
+The rules writer edge entrypoint delegates to handler.ts (auth/provider/usage),
+prompt.ts (context/modes), models.ts (supported models and parameters), and
+protocol.ts (shared parsing). Browser/backend model choices are checked
+together; unsupported temperature is omitted and disabled model rows remain
+disabled. Recorded usage is the source for historical costs.
+
+Rules and Art Studio share icon descriptions. Structured Iconography is
+included in printed rulebooks. Legacy normalization preserves authored
+Glossary prose and explicit standard chapter kinds. Supplier edits from Rules
+keep component identities and authored rows/layers, synchronizing printable
+template dimensions with the selected physical product.
+
 ## 6. Prototype printing and supplier direction
 
 `PrintSection` closes the current iteration loop with a selector for every
@@ -417,6 +435,12 @@ From the repository root:
   every component family's authored documents, legacy migration, and independent
   component duplication/removal.
 - `npm run typecheck` — all workspace TypeScript checks.
+- `npm run test:rules:api` — authenticated rules requests, model/capability
+  alignment, prompt weighting, and mocked provider/usage/error paths.
+- `npm run test:rules:browser` — catalog edits, icon sync, AI draft controls,
+  undo, delayed replies across edits/restores, and safe Settings return. It
+  mocks AI/catalog responses and uses an isolated CDP context; artifacts default
+  to `/tmp/turnbased-rules-fixes` (`RULES_FIXES_ARTIFACT_DIR` overrides it).
 - `npm run test:workshop:browser` runs the general workshop smoke in an
   isolated CDP browser context.
 - `npm run test:components:browser` is the dedicated

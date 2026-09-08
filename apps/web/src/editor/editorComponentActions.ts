@@ -4,9 +4,27 @@ import type { EditorProject } from './types';
 import type { EditorSection } from './constants';
 import type { CatalogComponentSelection } from './sections/rules/ComponentPicker';
 import type { NewComponentCatalog } from './sections/rules/NewComponentDialog';
-import { addProjectComponent, duplicateComponentSubtree, listValidParents, removeComponentInstance, syncGeneratedBoardChildren, updateComponentInstance } from './project';
+import {
+  addProjectComponent,
+  duplicateComponentSubtree,
+  listValidParents,
+  removeComponentInstance,
+  syncGeneratedBoardChildren,
+  updateComponentInstance,
+} from './project';
+import { getComponentDesignKind, setProjectComponentDesign } from './componentStudio/model';
+import { createTemplateDocument, migrateCardTemplate } from './templateStudio/model';
+import { resizeTemplateDocument } from './templateStudio/resize';
 
-export function createEditorComponentActions({ project: currentProject, paletteOwnerId, selectedComponentId, setSelectedComponentId, setActiveSection, onChange: commitProject, setNotice: setEditorNotice }: {
+export function createEditorComponentActions({
+  project: currentProject,
+  paletteOwnerId,
+  selectedComponentId,
+  setSelectedComponentId,
+  setActiveSection,
+  onChange: commitProject,
+  setNotice: setEditorNotice,
+}: {
   project: EditorProject;
   paletteOwnerId: string | null;
   selectedComponentId: string | null;
@@ -25,14 +43,15 @@ export function createEditorComponentActions({ project: currentProject, paletteO
   ) {
     const focusNewComponent = options.focusNewComponent ?? true;
     const initializeComponent = options.initializeComponent;
-    const validParentIds = listValidParents(currentProject, type).map((instance) => String(instance.instanceId));
-    const resolvedParentId = preferredParentId === undefined
-      ? (
-        selectedComponentId && validParentIds.includes(selectedComponentId)
+    const validParentIds = listValidParents(currentProject, type).map((instance) =>
+      String(instance.instanceId),
+    );
+    const resolvedParentId =
+      preferredParentId === undefined
+        ? selectedComponentId && validParentIds.includes(selectedComponentId)
           ? selectedComponentId
-          : validParentIds[0] ?? null
-      )
-      : preferredParentId;
+          : (validParentIds[0] ?? null)
+        : preferredParentId;
     const result = addProjectComponent(currentProject, type, resolvedParentId, paletteOwnerId);
 
     if (result.issue) {
@@ -40,9 +59,10 @@ export function createEditorComponentActions({ project: currentProject, paletteO
       return null;
     }
 
-    const initializedProject = result.instanceId && initializeComponent
-      ? updateComponentInstance(result.project, result.instanceId, initializeComponent)
-      : result.project;
+    const initializedProject =
+      result.instanceId && initializeComponent
+        ? updateComponentInstance(result.project, result.instanceId, initializeComponent)
+        : result.project;
     const nextProject = result.instanceId
       ? syncGeneratedBoardChildren(initializedProject, result.instanceId)
       : initializedProject;
@@ -84,7 +104,7 @@ export function createEditorComponentActions({ project: currentProject, paletteO
       return;
     }
 
-    updateComponent(instanceId, (instance) => ({
+    let nextProject = updateComponentInstance(currentProject, instanceId, (instance) => ({
       ...instance,
       displayName: selection.componentName,
       notes: selection.gameDescription,
@@ -100,6 +120,29 @@ export function createEditorComponentActions({ project: currentProject, paletteO
         ...(selection.maxCards ? { maxCards: selection.maxCards } : {}),
       },
     }));
+    const studio = currentProject.componentDesigns?.[instanceId];
+    const updated = nextProject.instances[instanceId];
+    const kind = getComponentDesignKind(updated);
+    if (studio && kind) {
+      const document =
+        studio.template.document ??
+        (kind === 'card' ? migrateCardTemplate(studio.template) : createTemplateDocument(kind));
+      const width = Number(updated.properties.physicalWidthMm);
+      const height = Number(updated.properties.physicalHeightMm);
+      nextProject = setProjectComponentDesign(nextProject, instanceId, {
+        ...studio,
+        template: {
+          ...studio.template,
+          document: resizeTemplateDocument(
+            document,
+            Number.isFinite(width) && width > 0 ? width : document.widthMm,
+            Number.isFinite(height) && height > 0 ? height : document.heightMm,
+            false,
+          ),
+        },
+      });
+    }
+    commitProject(syncGeneratedBoardChildren(nextProject, instanceId));
   }
 
   function updateComponent(
@@ -191,5 +234,16 @@ export function createEditorComponentActions({ project: currentProject, paletteO
     });
   }
 
-  return { handleAddComponent, handleAddCatalogComponent, handleUpdateCatalogComponent, updateComponent, removeComponent, duplicateComponent, openComponentEditor, selectComponent, createTopLevelComponent, createCatalogTopLevelComponent };
+  return {
+    handleAddComponent,
+    handleAddCatalogComponent,
+    handleUpdateCatalogComponent,
+    updateComponent,
+    removeComponent,
+    duplicateComponent,
+    openComponentEditor,
+    selectComponent,
+    createTopLevelComponent,
+    createCatalogTopLevelComponent,
+  };
 }

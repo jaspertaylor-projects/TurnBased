@@ -11,6 +11,7 @@ This documentation covers the endpoints exposed by the BoardGameMaker API Server
 - [Health](#health)
 - [Admin](#admin)
 - [Catalog](#catalog)
+  - [Product Object](#product-object)
 - [Quotes](#quotes)
 
 ---
@@ -73,6 +74,8 @@ Retrieves a paginated list of catalog products.
 - `pageSize` (number, optional, default: 20)
 - `activeOnly` (boolean, optional, default: true)
 
+Each returned product includes an `imageUrl` field (see [Product Object](#product-object)).
+
 ### `GET /products/:slug`
 Fetches a specific product and its default variant matrix based on its unique slug identifier.
 
@@ -89,6 +92,26 @@ Retrieves physical layout metadata for the specified product.
 
 ### `GET /variants/:variantId/pricing`
 Retrieves the tiered volume discount pricing array for a specific product variant. 
+
+### Product Object
+Catalog product responses (`GET /products` items and `GET /products/:slug`) have the following shape:
+```json
+{
+  "id": "uuid",
+  "supplierId": "uuid",
+  "externalProductId": "fi-8975",
+  "slug": "custom-mini-us-game-deck",
+  "title": "Custom 2.2X3.43 US Game Deck",
+  "category": "cards",
+  "subcategory": "standard",
+  "shape": null,
+  "sourceUrl": "https://www.boardgamesmaker.com/print/custom-mini-us-game-deck.html",
+  "imageUrl": "https://cd2.boardgamesmaker.com/AttachFiles/WebsiteImages/Product_Show/FI_8974.jpg",
+  "currency": "USD",
+  "status": "active"
+}
+```
+`imageUrl` is the primary preview image for the product, captured during ingestion. The BoardGamesMaker adapter uses `og:image`, falling back to the main gallery image; other suppliers use their API preview or curated image URL. It is an absolute supplier image URL and may be `null` if no image was found. Clients can render it directly; the API does not proxy or host the image.
 
 ---
 

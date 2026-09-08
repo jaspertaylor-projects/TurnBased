@@ -7,12 +7,10 @@ export const corsHeaders = {
 };
 
 const IMAGE_MODEL_COST_CENTS: Record<string, number> = {
-  'microsoft/mai-image-2.5': 2,
   'google/gemini-2.5-flash-image': 3,
-  'black-forest-labs/flux.2-pro': 5,
 };
 
-const DEFAULT_IMAGE_MODEL_ID = 'microsoft/mai-image-2.5';
+const DEFAULT_IMAGE_MODEL_ID = 'google/gemini-2.5-flash-image';
 const OPENROUTER_CHAT_COMPLETIONS_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
 function normalizeImageModelId(value: unknown): string {

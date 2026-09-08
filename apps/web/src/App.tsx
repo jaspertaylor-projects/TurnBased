@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Leaf, Plus, Settings as SettingsIcon } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabaseClient';
@@ -24,6 +24,8 @@ function isLandingRoute(route: string) {
 
 function App() {
   const [route, setRoute] = useState(window.location.hash);
+  const lastRoute = useRef(window.location.hash || '#/');
+  const settingsReturnRoute = useRef('#/dashboard');
   const [session, setSession] = useState<Session | null>(null);
   const isLanding = isLandingRoute(route);
 
@@ -37,6 +39,12 @@ function App() {
         window.location.hash = '#/new';
         return;
       }
+      if (nextRoute === '#/settings' && lastRoute.current !== '#/settings') {
+        // Only return to a route observed inside this app. Browser history may
+        // contain another site, and direct Settings visits have no known origin.
+        settingsReturnRoute.current = lastRoute.current.startsWith('#/') ? lastRoute.current : '#/dashboard';
+      }
+      lastRoute.current = nextRoute;
       setRoute(nextRoute);
     };
     window.addEventListener('hashchange', onHashChange);
@@ -103,7 +111,13 @@ function App() {
       case '#/marketplace':
         return <Marketplace />;
       case '#/settings':
-        return <Settings />;
+        return (
+          <Settings
+            onClose={() => {
+              window.location.hash = settingsReturnRoute.current;
+            }}
+          />
+        );
       case '#/dashboard':
         return <Dashboard />;
       default:

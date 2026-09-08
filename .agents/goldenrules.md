@@ -26,7 +26,9 @@ These are the golden rules that you absolutley must follow :
 
 10. Write code that is meant to be a base to grow from this project is still in its infancy and we need to make sure everything is being written with future growth in mind 
 
-11. Have Fun! Lets make somethign that will bring joy to this world.
+11. Update .agents/memories.md  other coding agents are also working on this project and htey need to learn what you learn.
+
+12. Have Fun! Lets make something that will bring joy to this world.
 
 ---
 

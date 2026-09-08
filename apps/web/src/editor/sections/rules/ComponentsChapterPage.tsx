@@ -1,26 +1,19 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import type { CSSProperties } from 'react';
-import { AlertTriangle, Plus, Trash2 } from 'lucide-react';
+import { AlertTriangle, Pencil, Trash2 } from 'lucide-react';
 
-import {
-  getBuiltInComponentManifest,
-} from '@turnbased/engine-components';
-import type {
-  BuiltInComponentType,
-} from '@turnbased/engine-components';
+import { getBuiltInComponentManifest } from '@turnbased/engine-components';
+import type { BuiltInComponentType } from '@turnbased/engine-components';
 
 import { renderComponentIcon } from '../../componentMeta';
 import type { CustomRulebookComponent, EditorProject } from '../../types';
+import { formatDimensions } from '../../units';
+import { useCatalogProductDetail } from '../../useSupplierCatalog';
+import { useUserSettings } from '../../../userSettings';
 import { SERIF_STACK } from './rulebookStyles';
-import { ComponentPicker } from './ComponentPicker';
-import { CustomComponentModal, type CustomComponentDraft } from './CustomComponentModal';
 
 export interface ComponentsChapterPageProps {
   project: EditorProject;
-  /* When the user picks a catalog type from the "+ Add" picker. The editor
-     owns the actual addProjectComponent call so the new instance shows up in
-     the gallery as well. */
-  onAddCatalogComponent: (type: BuiltInComponentType) => void;
   /* When the user edits the inline description for a real catalog instance.
      Stored on `ComponentInstanceModel.notes` so the gallery / inspector sees
      the same string. */
@@ -28,9 +21,9 @@ export interface ComponentsChapterPageProps {
   /* When the user edits the inline name for a real catalog instance. */
   onUpdateInstanceName: (instanceId: string, displayName: string) => void;
   onRemoveInstance: (instanceId: string) => void;
+  onEditCatalogItem: (instanceId: string) => void;
 
   /* Custom-only entries — live solely in EditorRuleConfig.customComponents. */
-  onAddCustomComponent: (entry: CustomRulebookComponent) => void;
   onUpdateCustomComponent: (id: string, patch: Partial<Omit<CustomRulebookComponent, 'id'>>) => void;
   onRemoveCustomComponent: (id: string) => void;
 }
@@ -41,6 +34,12 @@ interface CatalogListing {
   componentType: string;
   name: string;
   description: string;
+  catalogProductTitle: string;
+  catalogVariantTitle: string;
+  catalogSlug: string;
+  catalogVariantId: string;
+  physicalWidthMm: number | null;
+  physicalHeightMm: number | null;
 }
 
 interface CustomListing {
@@ -51,6 +50,16 @@ interface CustomListing {
 }
 
 type Listing = CatalogListing | CustomListing;
+
+function removeSizeFromCatalogName(name: string): string {
+  return name
+    .replace(
+      /\s+\d+(?:\.\d+)?\s*(?:"|″|in|inch|inches)?\s*(?:x|×)\s*\d+(?:\.\d+)?\s*(?:"|″|in|inch|inches)?\s*$/i,
+      '',
+    )
+    .replace(/\s+\d+(?:\.\d+)?\s*(?:"|″|in|inch|inches)\s*$/i, '')
+    .trim();
+}
 
 function buildListings(project: EditorProject): Listing[] {
   // Top-level instances (no parent) represent the physical pieces the user
@@ -69,6 +78,32 @@ function buildListings(project: EditorProject): Listing[] {
         componentType: instance.componentType,
         name: String(instance.displayName ?? instance.properties?.label ?? manifest.displayName),
         description: typeof instance.notes === 'string' ? instance.notes : '',
+        catalogProductTitle:
+          typeof instance.properties?.catalogProductTitle === 'string'
+            ? instance.properties.catalogProductTitle
+            : typeof instance.properties?.catalogSlug === 'string'
+              ? instance.properties.catalogSlug
+              : manifest.displayName,
+        catalogVariantTitle:
+          typeof instance.properties?.catalogVariantTitle === 'string'
+            ? instance.properties.catalogVariantTitle
+            : typeof instance.properties?.catalogVariantId === 'string'
+              ? instance.properties.catalogVariantId
+              : '',
+        catalogSlug:
+          typeof instance.properties?.catalogSlug === 'string' ? instance.properties.catalogSlug : '',
+        catalogVariantId:
+          typeof instance.properties?.catalogVariantId === 'string'
+            ? instance.properties.catalogVariantId
+            : '',
+        physicalWidthMm:
+          typeof instance.properties?.physicalWidthMm === 'number'
+            ? instance.properties.physicalWidthMm
+            : null,
+        physicalHeightMm:
+          typeof instance.properties?.physicalHeightMm === 'number'
+            ? instance.properties.physicalHeightMm
+            : null,
       };
     });
 
@@ -107,6 +142,7 @@ const cardHeaderStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   gap: '0.55rem',
+  flexWrap: 'wrap',
 };
 
 const typeBadgeStyle: CSSProperties = {
@@ -174,57 +210,16 @@ const removeButtonStyle: CSSProperties = {
   flexShrink: 0,
 };
 
-const addButtonStyle: CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: '0.4rem',
-  padding: '0.55rem 0.9rem',
-  borderRadius: '999px',
-  border: '1px dashed rgba(15, 118, 110, 0.5)',
-  background: 'rgba(236, 253, 245, 0.6)',
-  color: '#0f766e',
-  cursor: 'pointer',
-  fontFamily: SERIF_STACK,
-  fontWeight: 700,
-  fontSize: '0.86rem',
-  alignSelf: 'flex-start',
-};
-
 export function ComponentsChapterPage({
   project,
-  onAddCatalogComponent,
   onUpdateInstanceNotes,
   onUpdateInstanceName,
   onRemoveInstance,
-  onAddCustomComponent,
+  onEditCatalogItem,
   onUpdateCustomComponent,
   onRemoveCustomComponent,
 }: ComponentsChapterPageProps) {
   const listings = useMemo(() => buildListings(project), [project]);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [customDraft, setCustomDraft] = useState<CustomComponentDraft | null>(null);
-
-  function handlePickerSelect(type: BuiltInComponentType) {
-    setPickerOpen(false);
-    onAddCatalogComponent(type);
-  }
-
-  function openCustomModal() {
-    setPickerOpen(false);
-    setCustomDraft({ name: '', description: '' });
-  }
-
-  function submitCustomDraft() {
-    if (!customDraft) return;
-    const trimmedName = customDraft.name.trim();
-    if (!trimmedName) return;
-    onAddCustomComponent({
-      id: `custom_component_${Date.now()}_${Math.floor(Math.random() * 1e6)}`,
-      name: trimmedName,
-      description: customDraft.description.trim(),
-    });
-    setCustomDraft(null);
-  }
 
   return (
     <div
@@ -248,8 +243,8 @@ export function ComponentsChapterPage({
           lineHeight: 1.45,
         }}
       >
-        Pick the physical pieces that come in the box. Catalog picks show up in the
-        Component Editor automatically; descriptions live next to each piece in the rulebook.
+        Pick the physical pieces that come in the box. Catalog picks show up in the Component Editor
+        automatically; descriptions live next to each piece in the rulebook.
       </div>
 
       <div data-layout="componentsChapterList" style={listScrollStyle}>
@@ -264,7 +259,7 @@ export function ComponentsChapterPage({
               padding: '0.6rem 0.2rem',
             }}
           >
-            No components yet. Add one from the catalog below.
+            No components yet. Use Add component in the page header.
           </div>
         ) : (
           listings.map((listing) => (
@@ -274,47 +269,13 @@ export function ComponentsChapterPage({
               onUpdateInstanceNotes={onUpdateInstanceNotes}
               onUpdateInstanceName={onUpdateInstanceName}
               onRemoveInstance={onRemoveInstance}
+              onEditCatalogItem={onEditCatalogItem}
               onUpdateCustomComponent={onUpdateCustomComponent}
               onRemoveCustomComponent={onRemoveCustomComponent}
             />
           ))
         )}
       </div>
-
-      <div
-        data-layout="componentsChapterPickerRow"
-        /* sits below the scrolling list; the picker pops upward so the
-           list never gets squashed. */
-        style={{ flex: '0 0 auto', position: 'relative' }}
-      >
-        <button
-          type="button"
-          onClick={() => setPickerOpen((open) => !open)}
-          style={addButtonStyle}
-          aria-haspopup="menu"
-          aria-expanded={pickerOpen}
-        >
-          <Plus size={14} />
-          Add component
-        </button>
-
-        {pickerOpen ? (
-          <ComponentPicker
-            onSelect={handlePickerSelect}
-            onChooseCustom={openCustomModal}
-            onClose={() => setPickerOpen(false)}
-          />
-        ) : null}
-      </div>
-
-      {customDraft ? (
-        <CustomComponentModal
-          draft={customDraft}
-          onChange={setCustomDraft}
-          onCancel={() => setCustomDraft(null)}
-          onSubmit={submitCustomDraft}
-        />
-      ) : null}
     </div>
   );
 }
@@ -324,6 +285,7 @@ interface ListingCardProps {
   onUpdateInstanceNotes: (instanceId: string, notes: string) => void;
   onUpdateInstanceName: (instanceId: string, displayName: string) => void;
   onRemoveInstance: (instanceId: string) => void;
+  onEditCatalogItem: (instanceId: string) => void;
   onUpdateCustomComponent: (id: string, patch: Partial<Omit<CustomRulebookComponent, 'id'>>) => void;
   onRemoveCustomComponent: (id: string) => void;
 }
@@ -333,14 +295,41 @@ function ListingCard({
   onUpdateInstanceNotes,
   onUpdateInstanceName,
   onRemoveInstance,
+  onEditCatalogItem,
   onUpdateCustomComponent,
   onRemoveCustomComponent,
 }: ListingCardProps) {
+  const { preferredUnits } = useUserSettings();
+  const catalogSlug = listing.kind === 'catalog' ? listing.catalogSlug : '';
+  const catalogVariantId = listing.kind === 'catalog' ? listing.catalogVariantId : '';
+  const { detail } = useCatalogProductDetail(catalogSlug || null);
+
   if (listing.kind === 'catalog') {
     const manifest = getBuiltInComponentManifest(listing.componentType as BuiltInComponentType);
+    const fetchedProductTitle = detail ? detail.customTitle || detail.title || detail.slug : '';
+    const fetchedVariantTitle = detail?.productVariants.find(
+      (variant) => variant.id === catalogVariantId,
+    )?.title;
+    const dimensionText =
+      listing.physicalWidthMm && listing.physicalHeightMm
+        ? formatDimensions(listing.physicalWidthMm, listing.physicalHeightMm, preferredUnits)
+        : '';
+    const linkedItemName = removeSizeFromCatalogName(fetchedProductTitle || listing.catalogProductTitle);
+    const linkedItemText = [
+      linkedItemName || fetchedProductTitle || listing.catalogProductTitle,
+      dimensionText,
+      fetchedVariantTitle || listing.catalogVariantTitle,
+    ]
+      .filter(Boolean)
+      .join(' · ');
     return (
       <div data-layout="componentsChapterCard" data-card-kind="catalog" style={cardStyle}>
-        <div data-layout="componentsChapterCardHeader" style={cardHeaderStyle}>
+        <div
+          data-layout="componentsChapterCatalogHeader"
+          /* first row keeps supplier item/edit and remove controls together,
+             so the destructive action visually belongs to the physical item. */
+          style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}
+        >
           <span
             style={{
               width: '26px',
@@ -355,16 +344,32 @@ function ListingCard({
           >
             {renderComponentIcon(listing.componentType, { size: 14, style: { color: '#0f766e' } })}
           </span>
-          <input
-            value={listing.name}
-            onChange={(event) => onUpdateInstanceName(listing.instanceId, event.target.value)}
-            placeholder="Component name"
-            aria-label="Component name"
-            style={nameInputStyle}
-          />
-          <span style={typeBadgeStyle} title={manifest.description}>
-            {manifest.displayName}
+          <span
+            style={{
+              ...typeBadgeStyle,
+              fontStyle: 'normal',
+              flex: '0 1 auto',
+              minWidth: 0,
+              width: 'fit-content',
+              maxWidth: '100%',
+              whiteSpace: 'normal',
+              lineHeight: 1.35,
+              textAlign: 'left',
+            }}
+          >
+            {linkedItemText || 'item'}
           </span>
+          {['board', 'deck', 'tile'].includes(listing.componentType) && (
+            <button
+              type="button"
+              onClick={() => onEditCatalogItem(listing.instanceId)}
+              aria-label={`Edit linked catalog item for ${listing.name || manifest.displayName}`}
+              title={`Edit linked catalog item: ${linkedItemText || listing.catalogSlug || manifest.displayName}`}
+              style={removeButtonStyle}
+            >
+              <Pencil size={13} />
+            </button>
+          )}
           <button
             type="button"
             onClick={() => onRemoveInstance(listing.instanceId)}
@@ -375,10 +380,23 @@ function ListingCard({
             <Trash2 size={13} />
           </button>
         </div>
+        <div
+          data-layout="componentsChapterComponentNameRow"
+          /* second row is the user-facing component identity used in the
+             game text, separate from the supplier catalog item above. */
+        >
+          <input
+            value={listing.name}
+            onChange={(event) => onUpdateInstanceName(listing.instanceId, event.target.value)}
+            placeholder="Player-facing component name"
+            aria-label="Component name"
+            style={{ ...nameInputStyle, width: '100%', boxSizing: 'border-box' }}
+          />
+        </div>
         <textarea
           value={listing.description}
           onChange={(event) => onUpdateInstanceNotes(listing.instanceId, event.target.value)}
-          placeholder="Describe this component for the rulebook…"
+          placeholder="In-game description: what players call this and how it is used…"
           aria-label="Component description"
           style={descriptionInputStyle}
         />

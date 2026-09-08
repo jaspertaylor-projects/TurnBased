@@ -110,15 +110,14 @@ export interface RulesBuilderBrief {
   playtimeMaxMinutes: number;
 }
 
-export type RulesChapterKind = 'standard' | 'components';
+export type RulesChapterKind = 'standard' | 'components' | 'iconography';
 
 export interface RulesChapter {
   id: string;
   title: string;
   body: string;
-  /* When `'components'`, the rulebook spread swaps the freeform textarea
-     for the catalog picker + component list described in
-     ComponentsChapterPage. Standard chapters keep the freeform body. */
+  /* Special chapters swap the freeform textarea for structured lists:
+     components use the catalog picker, iconography mirrors Art icons. */
   kind?: RulesChapterKind;
 }
 

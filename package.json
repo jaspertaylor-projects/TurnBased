@@ -19,7 +19,9 @@
     "test:workshop": "tsx --test apps/web/src/editor/cardStudio/*.test.ts apps/web/src/editor/playtest/*.test.ts apps/web/src/editor/templateStudio/*.test.ts apps/web/src/editor/componentStudio/*.test.ts",
     "test:versions": "vitest run --config scripts/vitest.versions.config.ts",
     "test:workshop:browser": "node scripts/check-workshop-browser.mjs",
-    "test:components:browser": "node scripts/check-component-templates-browser.mjs"
+    "test:components:browser": "node scripts/check-component-templates-browser.mjs",
+    "test:rules:api": "tsx --test supabase/functions/ai-rules-writer/*.test.ts",
+    "test:rules:browser": "node scripts/check-rules-fixes-browser.mjs"
   },
   "engines": {
     "node": ">=22.12.0"

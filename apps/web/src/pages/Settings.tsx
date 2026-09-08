@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
-import { CreditCard, Ruler, Sparkles } from 'lucide-react';
+import { CreditCard, Ruler, Sparkles, X } from 'lucide-react';
 
 import { AppPageFrame } from '../components/AppPageFrame';
 import { supabase } from '../lib/supabaseClient';
@@ -103,9 +103,14 @@ function ModelSelect({
   );
 }
 
-export const Settings = () => {
+export const Settings = ({ onClose }: { onClose?: () => void } = {}) => {
   const userSettings = useUserSettings();
   const [activeTab, setActiveTab] = useState<SettingsTab>('ai');
+  function handleClose() {
+    if (typeof window === 'undefined') return;
+    if (onClose) onClose();
+    else window.location.hash = '#/dashboard';
+  }
   const [refreshKey, setRefreshKey] = useState(0);
   const [expandedPriceId, setExpandedPriceId] = useState<string | null>(null);
   const [billing, setBilling] = useState<{
@@ -114,10 +119,19 @@ export const Settings = () => {
     walletCents: number | null;
     history: BillingLedgerRow[];
   }>({ loading: false, error: null, walletCents: null, history: [] });
-  const totalSpentCents = useMemo(
+  const totalSpentUsd = useMemo(
     () => billing.history.reduce((sum, row) => sum + getTotalChargedUsd(row), 0),
     [billing.history],
   );
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      setBilling({ loading: false, error: null, walletCents: null, history: [] });
+      setExpandedPriceId(null);
+      setRefreshKey((value) => value + 1);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   useEffect(() => {
     if (activeTab !== 'payments') return;
@@ -132,6 +146,7 @@ export const Settings = () => {
           supabase
             .from('ai_usage_ledger')
             .select('id, provider, model_id, modality, provider_cost_cents, platform_fee_cents, total_charged_cents, request_meta, response_meta, created_at')
+            .eq('user_id', session.user.id)
             .order('created_at', { ascending: false }),
         ]);
         if (profileError) throw new Error(profileError.message);
@@ -149,6 +164,8 @@ export const Settings = () => {
           setBilling((prev) => ({
             ...prev,
             loading: false,
+            walletCents: null,
+            history: [],
             error: error instanceof Error ? error.message : 'Unable to load billing history.',
           }));
         }
@@ -160,7 +177,36 @@ export const Settings = () => {
 
   return (
     <AppPageFrame contentStyle={{ maxWidth: '960px', margin: '0 auto' }}>
-      <h1>Account Settings</h1>
+      <div
+        data-layout="accountSettingsHeader"
+        /* page title on the left + close button pinned to the right so the
+           user can always escape back to where they came from */
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}
+      >
+        <h1 style={{ margin: 0 }}>Account Settings</h1>
+        <button
+          type="button"
+          onClick={handleClose}
+          aria-label="Close settings and return to previous screen"
+          title="Close (back to previous screen)"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.4rem',
+            padding: '0.45rem 0.85rem 0.45rem 0.75rem',
+            borderRadius: '999px',
+            border: '1px solid rgba(15,118,110,0.22)',
+            background: 'rgba(255,255,255,0.86)',
+            color: '#064e3b',
+            fontWeight: 800,
+            fontSize: '0.9rem',
+            cursor: 'pointer',
+          }}
+        >
+          <X size={16} />
+          Close
+        </button>
+      </div>
 
       <div data-layout="accountSettingsTabs" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '1.5rem' }}>
         <button type="button" onClick={() => setActiveTab('ai')} style={tabStyle(activeTab === 'ai')}><Sparkles size={15} /> AI models</button>
@@ -206,12 +252,12 @@ export const Settings = () => {
           {billing.error ? <div data-layout="accountPaymentsError" style={{ color: '#991b1b', background: 'rgba(254,226,226,0.9)', borderRadius: '10px', padding: '0.7rem' }}>{billing.error}</div> : null}
           <div data-layout="accountPaymentsSummary" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.75rem' }}>
             <div data-layout="accountBalanceCard" style={{ borderRadius: '14px', background: 'rgba(240,253,244,0.8)', border: '1px solid rgba(15,118,110,0.14)', padding: '1rem' }}>
-              <div style={{ color: '#0f766e', fontWeight: 800 }}>Account balance</div>
-              <div style={{ color: '#064e3b', fontSize: '2rem', fontWeight: 900 }}>{billing.loading ? '...' : formatCents(billing.walletCents)}</div>
+              <div data-layout="accountBalanceLabel" style={{ color: '#0f766e', fontWeight: 800 }}>Account balance</div>
+              <div data-layout="accountBalanceValue" style={{ color: '#064e3b', fontSize: '2rem', fontWeight: 900 }}>{billing.loading ? '...' : formatCents(billing.walletCents)}</div>
             </div>
             <div data-layout="accountSpendCard" style={{ borderRadius: '14px', background: 'rgba(255,253,246,0.9)', border: '1px solid rgba(120,95,50,0.16)', padding: '1rem' }}>
-              <div style={{ color: '#8a6a34', fontWeight: 800 }}>Total model charges</div>
-              <div style={{ color: '#3b2412', fontSize: '2rem', fontWeight: 900 }}>{formatUsdEstimate(totalSpentCents)}</div>
+              <div data-layout="accountSpendLabel" style={{ color: '#8a6a34', fontWeight: 800 }}>Total model charges</div>
+              <div data-layout="accountSpendValue" style={{ color: '#3b2412', fontSize: '2rem', fontWeight: 900 }}>{formatUsdEstimate(totalSpentUsd)}</div>
             </div>
           </div>
           <div data-layout="accountModelHistory" style={{ display: 'grid', gap: '0.5rem' }}>
@@ -222,16 +268,16 @@ export const Settings = () => {
               const completionTokens = getCompletionTokens(row);
               return (
               <div key={row.id} data-layout="accountModelHistoryRow" style={{ display: 'grid', gap: '0.6rem', borderRadius: '12px', border: '1px solid rgba(15,118,110,0.1)', background: 'rgba(255,255,255,0.86)', padding: '0.75rem' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: '0.75rem' }}>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ color: '#064e3b', fontWeight: 900 }}>{getModelLabel(row.model_id)}</div>
-                  <div style={{ color: '#0f766e', fontSize: '0.82rem' }}>{row.provider} / {row.modality} - {readSurface(row.request_meta)}</div>
-                  <div style={{ color: '#64748b', fontSize: '0.78rem' }}>{formatDate(row.created_at)}</div>
+                <div data-layout="accountModelHistorySummary" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: '0.75rem' }}>
+                <div data-layout="accountModelHistoryDetails" style={{ minWidth: 0 }}>
+                  <div data-layout="accountModelHistoryName" style={{ color: '#064e3b', fontWeight: 900 }}>{getModelLabel(row.model_id)}</div>
+                  <div data-layout="accountModelHistorySource" style={{ color: '#0f766e', fontSize: '0.82rem' }}>{row.provider} / {row.modality} - {readSurface(row.request_meta)}</div>
+                  <div data-layout="accountModelHistoryDate" style={{ color: '#64748b', fontSize: '0.78rem' }}>{formatDate(row.created_at)}</div>
                 </div>
-                <div style={{ textAlign: 'right', color: '#334155', fontSize: '0.8rem' }}>
+                <div data-layout="accountModelHistoryCharges" style={{ textAlign: 'right', color: '#334155', fontSize: '0.8rem' }}>
                   <strong style={{ color: '#3b2412', fontSize: '0.94rem' }}>{formatUsdEstimate(getTotalChargedUsd(row))}</strong>
-                  <div>Provider {formatUsdEstimate(getProviderUsd(row))}</div>
-                  <div>Fee {formatUsdEstimate(getPlatformFeeUsd(row))}</div>
+                  <div data-layout="accountModelHistoryProviderCharge">Provider {formatUsdEstimate(getProviderUsd(row))}</div>
+                  <div data-layout="accountModelHistoryPlatformFee">Fee {formatUsdEstimate(getPlatformFeeUsd(row))}</div>
                   <button type="button" onClick={() => setExpandedPriceId(expanded ? null : row.id)} style={{ marginTop: '0.3rem', border: '1px solid rgba(15,118,110,0.24)', borderRadius: '999px', background: 'rgba(240,253,244,0.82)', color: '#064e3b', padding: '0.22rem 0.55rem', fontWeight: 800, fontSize: '0.72rem', cursor: 'pointer' }}>
                     {expanded ? 'Hide exact' : 'Exact price'}
                   </button>
@@ -239,12 +285,12 @@ export const Settings = () => {
               </div>
                 {expanded ? (
                   <div data-layout="accountExactPrice" style={{ borderRadius: '10px', background: 'rgba(240,253,244,0.72)', border: '1px solid rgba(15,118,110,0.12)', padding: '0.6rem 0.7rem', color: '#064e3b', fontSize: '0.78rem', lineHeight: 1.55 }}>
-                    <div><strong>Exact total:</strong> {formatExactUsd(getTotalChargedUsd(row))}</div>
-                    <div><strong>Exact provider cost:</strong> {formatExactUsd(getProviderUsd(row))}</div>
-                    <div><strong>Exact platform fee:</strong> {formatExactUsd(getPlatformFeeUsd(row))}</div>
-                    <div><strong>Wallet debit:</strong> {formatCents(row.total_charged_cents)}{getWalletDebitUsd(row) !== getTotalChargedUsd(row) ? ' rounded to whole cents' : ''}</div>
+                    <div data-layout="accountExactTotal"><strong>Exact total:</strong> {formatExactUsd(getTotalChargedUsd(row))}</div>
+                    <div data-layout="accountExactProviderCost"><strong>Exact provider cost:</strong> {formatExactUsd(getProviderUsd(row))}</div>
+                    <div data-layout="accountExactPlatformFee"><strong>Exact platform fee:</strong> {formatExactUsd(getPlatformFeeUsd(row))}</div>
+                    <div data-layout="accountExactWalletDebit"><strong>Wallet debit:</strong> {formatCents(row.total_charged_cents)}{getWalletDebitUsd(row) !== getTotalChargedUsd(row) ? ' rounded to whole cents' : ''}</div>
                     {promptTokens !== null || completionTokens !== null ? (
-                      <div><strong>Tokens:</strong> {promptTokens ?? 0} prompt / {completionTokens ?? 0} completion</div>
+                      <div data-layout="accountExactTokenUsage"><strong>Tokens:</strong> {promptTokens ?? 0} prompt / {completionTokens ?? 0} completion</div>
                     ) : null}
                   </div>
                 ) : null}
@@ -263,8 +309,8 @@ export const Settings = () => {
           <h2>Preferences</h2>
           <div data-layout="measurementUnitsRow" style={{ display: 'grid', gap: '0.55rem', marginTop: '0.75rem' }}>
             <div data-layout="measurementUnitsHeader" style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
-              <div style={{ fontWeight: 700, color: '#064e3b' }}>Measurement Units</div>
-              <div style={{ color: '#0f766e', fontSize: '0.85rem' }}>Applied to every board, tile, and deck dimension shown in the editor.</div>
+              <div data-layout="measurementUnitsTitle" style={{ fontWeight: 700, color: '#064e3b' }}>Measurement Units</div>
+              <div data-layout="measurementUnitsDescription" style={{ color: '#0f766e', fontSize: '0.85rem' }}>Applied to every board, tile, and deck dimension shown in the editor.</div>
             </div>
             <div data-layout="measurementUnitsControls" role="radiogroup" aria-label="Preferred units" style={{ display: 'inline-flex', gap: '0.5rem' }}>
               {UNIT_OPTIONS.map(({ value, label }) => {

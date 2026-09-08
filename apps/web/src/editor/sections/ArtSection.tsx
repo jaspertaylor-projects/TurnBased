@@ -12,6 +12,7 @@ import { STUDIO_BG_STYLE, STUDIO_BG_VALUE } from './art/studioBackground';
 import { SubPageShell } from './art/SubPageShell';
 import { getFunctionErrorMessage } from '../aiFunctionErrors';
 import { AIImageGenerationModal, type AIImagePromptContextOption, type GeneratedImageAssetPayload } from '../components/AIImageGenerationModal';
+import { buildImagePromptContextOptions } from '../components/imagePromptContext';
 import { supabase } from '../../lib/supabaseClient';
 import { generateId } from '@turnbased/shared-utils';
 
@@ -62,7 +63,7 @@ function StudioTile({
         transform: hovered ? 'translateY(-2px) scale(1.01)' : 'none',
       }}
     >
-      <div style={{
+      <div data-layout="artStudioTilePreview" style={{
         padding: '1.5rem 1rem',
         display: 'grid',
         placeItems: 'center',
@@ -72,7 +73,7 @@ function StudioTile({
         )}
       </div>
 
-      <div style={{
+      <div data-layout="artStudioTileFooter" style={{
         padding: '0.7rem 1rem',
         display: 'flex',
         alignItems: 'center',
@@ -150,8 +151,8 @@ function ImagesContent({
   }
 
   return (
-    <div style={{ display: 'grid', gap: '0.85rem' }}>
-      <div style={{ display: 'flex', gap: '0.4rem' }}>
+    <div data-layout="artImagesContent" style={{ display: 'grid', gap: '0.85rem' }}>
+      <div data-layout="artImageActions" style={{ display: 'flex', gap: '0.4rem' }}>
         <button type="button" onClick={() => setShowImageGenerator(true)} style={{
           display: 'inline-flex', alignItems: 'center', gap: '0.35rem', borderRadius: '999px', border: 'none',
           background: 'linear-gradient(135deg, #6d28d9, #8b5cf6)',
@@ -176,17 +177,17 @@ function ImagesContent({
       />
 
       {error ? (
-        <div style={{ padding: '0.6rem 0.8rem', borderRadius: '12px', background: 'rgba(254,242,242,0.95)', border: '1px solid rgba(239,68,68,0.18)', color: '#b91c1c', fontSize: '0.78rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div data-layout="artImageError" style={{ padding: '0.6rem 0.8rem', borderRadius: '12px', background: 'rgba(254,242,242,0.95)', border: '1px solid rgba(239,68,68,0.18)', color: '#b91c1c', fontSize: '0.78rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>{error}</span>
           <button type="button" onClick={() => setError(null)} style={{ border: 'none', background: 'none', color: '#b91c1c', cursor: 'pointer' }}><X size={14} /></button>
         </div>
       ) : null}
 
       {images.length > 0 ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '0.6rem' }}>
+        <div data-layout="artImageGallery" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '0.6rem' }}>
           {images.map((image) => (
-            <div key={image.id} style={{ borderRadius: '16px', border: '1px solid rgba(15,118,110,0.08)', background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(8px)', overflow: 'hidden' }}>
-              <div style={{ aspectRatio: '4 / 3', background: 'linear-gradient(135deg, rgba(240,253,244,0.9), rgba(236,254,255,0.9))', display: 'grid', placeItems: 'center', position: 'relative' }}>
+            <div data-layout="artImageCard" key={image.id} style={{ borderRadius: '16px', border: '1px solid rgba(15,118,110,0.08)', background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(8px)', overflow: 'hidden' }}>
+              <div data-layout="artImagePreview" style={{ aspectRatio: '4 / 3', background: 'linear-gradient(135deg, rgba(240,253,244,0.9), rgba(236,254,255,0.9))', display: 'grid', placeItems: 'center', position: 'relative' }}>
                 {getImagePreviewSource(image) ? (
                   <img
                     src={getImagePreviewSource(image) ?? undefined}
@@ -197,15 +198,15 @@ function ImagesContent({
                 <button type="button" onClick={() => onUpdateImages((c) => c.filter((i) => i.id !== image.id))} title="Remove"
                   style={{ position: 'absolute', top: '0.35rem', right: '0.35rem', width: '24px', height: '24px', borderRadius: '999px', border: 'none', background: 'rgba(0,0,0,0.25)', color: 'white', display: 'grid', placeItems: 'center', cursor: 'pointer' }}><X size={11} /></button>
               </div>
-              <div style={{ padding: '0.5rem 0.6rem' }}>
-                <div style={{ fontSize: '0.76rem', fontWeight: 700, color: '#064e3b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{image.name || 'Untitled'}</div>
-                <div style={{ fontSize: '0.66rem', color: '#6b7280', marginTop: '0.15rem' }}>{image.aiPrompt ? 'AI' : `${(image.bytes / 1024).toFixed(0)} KB`}</div>
+              <div data-layout="artImageMetadata" style={{ padding: '0.5rem 0.6rem' }}>
+                <div data-layout="artImageName" style={{ fontSize: '0.76rem', fontWeight: 700, color: '#064e3b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{image.name || 'Untitled'}</div>
+                <div data-layout="artImageSource" style={{ fontSize: '0.66rem', color: '#6b7280', marginTop: '0.15rem' }}>{image.aiPrompt ? 'AI' : `${(image.bytes / 1024).toFixed(0)} KB`}</div>
               </div>
             </div>
           ))}
         </div>
       ) : (
-        <div style={{ padding: '2.5rem 1rem', borderRadius: '18px', border: '1px dashed rgba(15,118,110,0.12)', background: 'rgba(255,255,255,0.4)', backdropFilter: 'blur(8px)', color: '#0f766e', fontSize: '0.85rem', textAlign: 'center', lineHeight: 1.6 }}>
+        <div data-layout="artImagesEmpty" style={{ padding: '2.5rem 1rem', borderRadius: '18px', border: '1px dashed rgba(15,118,110,0.12)', background: 'rgba(255,255,255,0.4)', backdropFilter: 'blur(8px)', color: '#0f766e', fontSize: '0.85rem', textAlign: 'center', lineHeight: 1.6 }}>
           Upload files or generate art with AI<br />to build your visual library.
         </div>
       )}
@@ -242,47 +243,19 @@ export function ArtSection({
   const assetCount = project.art.recurringAssets.length;
   const iconCount = project.art.icons.length;
   const imageCount = (project.art.images ?? []).length;
-  const imagePromptContextOptions = useMemo<AIImagePromptContextOption[]>(() => {
-    const options: AIImagePromptContextOption[] = [];
-    const theme = (project.art.theme.trim() || project.brief.theme.trim());
-    if (theme.length > 0) {
-      options.push({
-        id: 'project-theme',
-        kind: 'theme',
-        label: theme,
-        value: theme,
-      });
-    }
-    const briefStyle = project.brief.artStyle.trim();
-    if (briefStyle.length > 0) {
-      options.push({
-        id: 'brief-art-style',
-        kind: 'style',
-        label: briefStyle,
-        value: briefStyle,
-      });
-    }
-    project.art.definedArtStyles.forEach((style) => {
-      const label = style.name.trim() || 'Untitled style';
-      const description = style.description.trim();
-      options.push({
-        id: `style-${style.id}`,
-        kind: 'style',
-        label,
-        value: description.length > 0 ? description : label,
-      });
-    });
-    return options;
-  }, [project.art.definedArtStyles, project.art.theme, project.brief.artStyle, project.brief.theme]);
+  const imagePromptContextOptions = useMemo<AIImagePromptContextOption[]>(
+    () => buildImagePromptContextOptions(project),
+    [project],
+  );
 
   // ── Home ──
   if (page === 'home') {
     return (
-      <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        <div style={STUDIO_BG} />
+      <div data-layout="artStudioHome" style={{ position: 'relative', width: '100%', height: '100%', minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div data-layout="artStudioBackground" style={STUDIO_BG} />
 
         {/* Header */}
-        <div style={{
+        <div data-layout="artStudioHeader" style={{
           position: 'relative', zIndex: 1,
           padding: '1.2rem 1rem 0 1rem',
           display: 'flex', alignItems: 'center', gap: '0.5rem',
@@ -294,7 +267,7 @@ export function ArtSection({
           }}>Art</span>
         </div>
 
-        <div style={{
+        <div data-layout="artStudioTiles" style={{
           position: 'relative', zIndex: 1,
           width: '100%', flex: '1 1 0',
           minHeight: 0,
@@ -308,7 +281,7 @@ export function ArtSection({
         }}>
             {/* Palette */}
             <StudioTile icon={<Palette size={22} />} label="Palette" onClick={() => setPage('palette')}>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', justifyContent: 'center', padding: '0.5rem' }}>
+              <div data-layout="artPaletteTileSwatches" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', justifyContent: 'center', padding: '0.5rem' }}>
                 {PROJECT_PALETTE_ORDER.map((paletteId) => (
                   <span
                     key={paletteId}
@@ -327,7 +300,7 @@ export function ArtSection({
             {/* Themes & Styles */}
             <StudioTile icon={<Sparkles size={22} />} label="Themes & Styles" count={styleCount || undefined} onClick={() => setPage('themes')}>
               {styleCount > 0 ? (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', justifyContent: 'center', padding: '0.5rem' }}>
+                <div data-layout="artStylesTilePreview" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', justifyContent: 'center', padding: '0.5rem' }}>
                   {project.art.definedArtStyles.slice(0, 5).map((s) => (
                     <span key={s.id} style={{ padding: '0.28rem 0.6rem', borderRadius: '999px', fontSize: '0.7rem', fontWeight: 700, background: 'rgba(255,255,255,0.8)', color: '#064e3b', border: '1px solid rgba(15,118,110,0.1)', maxWidth: '130px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {s.name || 'Untitled'}
@@ -336,7 +309,7 @@ export function ArtSection({
                   {styleCount > 5 ? <span style={{ fontSize: '0.7rem', color: '#0d9488', fontWeight: 600, padding: '0.28rem' }}>+{styleCount - 5}</span> : null}
                 </div>
               ) : (
-                <div style={{ color: '#0d9488', opacity: 0.45, fontSize: '0.76rem', textAlign: 'center', lineHeight: 1.5 }}>
+                <div data-layout="artStylesTileEmpty" style={{ color: '#0d9488', opacity: 0.45, fontSize: '0.76rem', textAlign: 'center', lineHeight: 1.5 }}>
                   Define the visual<br />language of your game
                 </div>
               )}
@@ -345,7 +318,7 @@ export function ArtSection({
             {/* Reusable Characters & More */}
             <StudioTile icon={<BookImage size={22} />} label="Reusable Characters & More" count={assetCount || undefined} onClick={() => setPage('assets')}>
               {assetCount > 0 ? (
-                <div style={{ display: 'grid', gap: '0.25rem', justifyItems: 'center', padding: '0.5rem' }}>
+                <div data-layout="artAssetsTilePreview" style={{ display: 'grid', gap: '0.25rem', justifyItems: 'center', padding: '0.5rem' }}>
                   {project.art.recurringAssets.slice(0, 4).map((a) => (
                     <span key={a.id} style={{ fontSize: '0.74rem', fontWeight: 600, color: '#064e3b', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {a.name || 'Untitled'}
@@ -355,7 +328,7 @@ export function ArtSection({
                   {assetCount > 4 ? <span style={{ fontSize: '0.7rem', color: '#0d9488', fontWeight: 600 }}>+{assetCount - 4} more</span> : null}
                 </div>
               ) : (
-                <div style={{ color: '#0d9488', opacity: 0.45, fontSize: '0.76rem', textAlign: 'center', lineHeight: 1.5 }}>
+                <div data-layout="artAssetsTileEmpty" style={{ color: '#0d9488', opacity: 0.45, fontSize: '0.76rem', textAlign: 'center', lineHeight: 1.5 }}>
                   Characters, factions,<br />locations, and props
                 </div>
               )}
@@ -364,14 +337,14 @@ export function ArtSection({
             {/* Icons */}
             <StudioTile icon={<Hexagon size={22} />} label="Icons" count={iconCount || undefined} onClick={() => setPage('icons')}>
               {iconCount > 0 ? (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem', justifyContent: 'center', padding: '0.5rem' }}>
+                <div data-layout="artIconsTilePreview" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem', justifyContent: 'center', padding: '0.5rem' }}>
                   {project.art.icons.slice(0, 8).map((icon) => (
                     <IconArtworkPreview key={icon.id} item={icon} project={project} size={38} />
                   ))}
                   {iconCount > 8 ? <span style={{ fontSize: '0.7rem', color: '#0d9488', fontWeight: 600, alignSelf: 'center' }}>+{iconCount - 8}</span> : null}
                 </div>
               ) : (
-                <div style={{ color: '#0d9488', opacity: 0.45, fontSize: '0.76rem', textAlign: 'center', lineHeight: 1.5 }}>
+                <div data-layout="artIconsTileEmpty" style={{ color: '#0d9488', opacity: 0.45, fontSize: '0.76rem', textAlign: 'center', lineHeight: 1.5 }}>
                   Gameplay symbols<br />like :attack: or :vp:
                 </div>
               )}
@@ -380,9 +353,9 @@ export function ArtSection({
             {/* Images */}
             <StudioTile icon={<ImagePlus size={22} />} label="Images" count={imageCount || undefined} onClick={() => setPage('images')}>
               {imageCount > 0 ? (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', justifyContent: 'center', padding: '0.5rem' }}>
+                <div data-layout="artImagesTilePreview" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', justifyContent: 'center', padding: '0.5rem' }}>
                   {(project.art.images ?? []).slice(0, 6).map((img) => (
-                    <div key={img.id} style={{ width: '52px', height: '40px', borderRadius: '10px', background: 'linear-gradient(135deg, rgba(240,253,244,0.9), rgba(236,254,255,0.9))', border: '1px solid rgba(15,118,110,0.08)', display: 'grid', placeItems: 'center' }}>
+                    <div data-layout="artImagesTileThumbnail" key={img.id} style={{ width: '52px', height: '40px', borderRadius: '10px', background: 'linear-gradient(135deg, rgba(240,253,244,0.9), rgba(236,254,255,0.9))', border: '1px solid rgba(15,118,110,0.08)', display: 'grid', placeItems: 'center' }}>
                       {img.imageDataUrl || img.r2Key.startsWith('data:image/') ? (
                         <img
                           src={img.imageDataUrl ?? img.r2Key}
@@ -395,7 +368,7 @@ export function ArtSection({
                   {imageCount > 6 ? <span style={{ fontSize: '0.7rem', color: '#0d9488', fontWeight: 600, alignSelf: 'center' }}>+{imageCount - 6}</span> : null}
                 </div>
               ) : (
-                <div style={{ color: '#0d9488', opacity: 0.45, fontSize: '0.76rem', textAlign: 'center', lineHeight: 1.5 }}>
+                <div data-layout="artImagesTileEmpty" style={{ color: '#0d9488', opacity: 0.45, fontSize: '0.76rem', textAlign: 'center', lineHeight: 1.5 }}>
                   Upload or AI-generate<br />art for your game
                 </div>
               )}
@@ -427,13 +400,13 @@ export function ArtSection({
         }
       >
         {/* Theme input */}
-        <div style={{ marginBottom: '1rem', padding: '0.8rem', borderRadius: '16px', background: 'rgba(255,255,255,0.6)', backdropFilter: 'blur(8px)', border: '1px solid rgba(15,118,110,0.06)' }}>
-          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#0d9488', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.4rem' }}>Theme</div>
+        <div data-layout="artThemeEditor" style={{ marginBottom: '1rem', padding: '0.8rem', borderRadius: '16px', background: 'rgba(255,255,255,0.6)', backdropFilter: 'blur(8px)', border: '1px solid rgba(15,118,110,0.06)' }}>
+          <div data-layout="artThemeLabel" style={{ fontSize: '0.72rem', fontWeight: 700, color: '#0d9488', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.4rem' }}>Theme</div>
           <input value={project.art.theme} onChange={(e) => onUpdateTheme(e.target.value)} placeholder="Clockwork jungle rebellion..."
             style={{ ...inputStyle, border: 'none', background: 'rgba(255,255,255,0.7)', padding: '0.6rem 0.8rem', fontSize: '0.88rem', borderRadius: '12px', width: '100%', boxSizing: 'border-box' }} />
         </div>
 
-        <div style={{ display: 'grid', gap: '0.6rem' }}>
+        <div data-layout="artStyleList" style={{ display: 'grid', gap: '0.6rem' }}>
           {project.art.definedArtStyles.length > 0 ? (
             project.art.definedArtStyles.map((style) => (
               <ArtReferenceCard key={style.id} item={{ ...style, category: '', tags: [] }} showCategory={false} showTags={false} showHeader={false} collapsible
@@ -442,7 +415,7 @@ export function ArtSection({
                 onRemove={() => onUpdateArt((art) => ({ ...art, definedArtStyles: art.definedArtStyles.filter((e) => e.id !== style.id) }))} />
             ))
           ) : (
-            <div style={{ padding: '2rem 1rem', borderRadius: '18px', border: '1px dashed rgba(15,118,110,0.12)', background: 'rgba(255,255,255,0.4)', backdropFilter: 'blur(8px)', color: '#0f766e', fontSize: '0.85rem', textAlign: 'center', lineHeight: 1.6 }}>
+            <div data-layout="artStylesEmpty" style={{ padding: '2rem 1rem', borderRadius: '18px', border: '1px dashed rgba(15,118,110,0.12)', background: 'rgba(255,255,255,0.4)', backdropFilter: 'blur(8px)', color: '#0f766e', fontSize: '0.85rem', textAlign: 'center', lineHeight: 1.6 }}>
               Add art styles to define visual lanes like<br />painterly boards, flat icons, or monochrome cards.
             </div>
           )}
@@ -461,7 +434,7 @@ export function ArtSection({
           </button>
         }
       >
-        <div style={{ display: 'grid', gap: '0.6rem' }}>
+        <div data-layout="artAssetList" style={{ display: 'grid', gap: '0.6rem' }}>
           {project.art.recurringAssets.length > 0 ? (
             project.art.recurringAssets.map((asset) => (
               <ArtReferenceCard key={asset.id} item={asset} categoryLabel="Asset Type" categoryPlaceholder="Character, location, monster, relic"
@@ -469,7 +442,7 @@ export function ArtSection({
                 onRemove={() => onUpdateArt((art) => ({ ...art, recurringAssets: art.recurringAssets.filter((e) => e.id !== asset.id) }))} />
             ))
           ) : (
-            <div style={{ padding: '2rem 1rem', borderRadius: '18px', border: '1px dashed rgba(15,118,110,0.12)', background: 'rgba(255,255,255,0.4)', backdropFilter: 'blur(8px)', color: '#0f766e', fontSize: '0.85rem', textAlign: 'center', lineHeight: 1.6 }}>
+            <div data-layout="artAssetsEmpty" style={{ padding: '2rem 1rem', borderRadius: '18px', border: '1px dashed rgba(15,118,110,0.12)', background: 'rgba(255,255,255,0.4)', backdropFilter: 'blur(8px)', color: '#0f766e', fontSize: '0.85rem', textAlign: 'center', lineHeight: 1.6 }}>
               Add the monsters, heroes, locations,<br />and props that need visual continuity.
             </div>
           )}
@@ -488,7 +461,7 @@ export function ArtSection({
           </button>
         }
       >
-        <div style={{ display: 'grid', gap: '0.6rem' }}>
+        <div data-layout="artIconList" style={{ display: 'grid', gap: '0.6rem' }}>
           {project.art.icons.length > 0 ? (
             project.art.icons.map((icon) => (
               <IconAssetCard key={icon.id} project={project} item={icon}
@@ -497,7 +470,7 @@ export function ArtSection({
                 onAssignPaletteColor={onAssignPaletteColor} />
             ))
           ) : (
-            <div style={{ padding: '2rem 1rem', borderRadius: '18px', border: '1px dashed rgba(15,118,110,0.12)', background: 'rgba(255,255,255,0.4)', backdropFilter: 'blur(8px)', color: '#0f766e', fontSize: '0.85rem', textAlign: 'center', lineHeight: 1.6 }}>
+            <div data-layout="artIconsEmpty" style={{ padding: '2rem 1rem', borderRadius: '18px', border: '1px dashed rgba(15,118,110,0.12)', background: 'rgba(255,255,255,0.4)', backdropFilter: 'blur(8px)', color: '#0f766e', fontSize: '0.85rem', textAlign: 'center', lineHeight: 1.6 }}>
               Add gameplay symbols like :attack:, :move:,<br />or :vp: as reusable game primitives.
             </div>
           )}

@@ -1,16 +1,15 @@
-import type { EditorArtReference, EditorIconAsset, EditorProject, RulesChapter } from './types';
+import { normalizeRules } from './rulebookStorage';
+import type { EditorArtReference, EditorIconAsset, EditorProject } from './types';
 import { normalizeCardStudioState } from './cardStudio/model';
 import { normalizeProjectComponentDesigns } from './componentStudio/model';
 import { ensureProjectManifest } from './manifest';
 import { normalizeProjectAIModels } from './aiModelCatalog';
 import {
-  createBlankChapter,
   createDefaultAppLayout,
   createDefaultProjectArtDirection,
   createDefaultProjectSettings,
   createDefaultProjectViews,
   createDefaultRulesBrief,
-  createDefaultRulesChapters,
   createDefaultSeats,
   syncProjectViews,
 } from './project';
@@ -46,43 +45,49 @@ function normalizeArtReference(
   };
 }
 
-function normalizeIconAsset(
-  item: Partial<EditorIconAsset> | undefined,
-  fallbackId: string,
-): EditorIconAsset {
+function normalizeIconAsset(item: Partial<EditorIconAsset> | undefined, fallbackId: string): EditorIconAsset {
   return {
     id: typeof item?.id === 'string' && item.id.trim().length > 0 ? item.id : fallbackId,
     mode: item?.mode === 'custom' ? 'custom' : 'library',
     name: typeof item?.name === 'string' ? item.name : '',
     iconKey: typeof item?.iconKey === 'string' && item.iconKey.trim().length > 0 ? item.iconKey : 'shield',
-    iconColor: typeof item?.iconColor === 'string' && item.iconColor.trim().length > 0
-      ? item.iconColor
-      : createProjectPaletteReference('primary'),
-    iconFillColor: typeof item?.iconFillColor === 'string' && item.iconFillColor.trim().length > 0
-      ? item.iconFillColor
-      : 'rgba(0,0,0,0)',
-    iconStrokeWidth: typeof item?.iconStrokeWidth === 'number' && Number.isFinite(item.iconStrokeWidth)
-      ? Math.max(0.5, item.iconStrokeWidth)
-      : 1,
-    iconScale: typeof item?.iconScale === 'number' && Number.isFinite(item.iconScale)
-      ? Math.max(0.3, Math.min(1.5, item.iconScale))
-      : 1,
-    backgroundColor: typeof item?.backgroundColor === 'string' && item.backgroundColor.trim().length > 0
-      ? item.backgroundColor
-      : 'rgba(255,255,255,0.94)',
+    iconColor:
+      typeof item?.iconColor === 'string' && item.iconColor.trim().length > 0
+        ? item.iconColor
+        : createProjectPaletteReference('primary'),
+    iconFillColor:
+      typeof item?.iconFillColor === 'string' && item.iconFillColor.trim().length > 0
+        ? item.iconFillColor
+        : 'rgba(0,0,0,0)',
+    iconStrokeWidth:
+      typeof item?.iconStrokeWidth === 'number' && Number.isFinite(item.iconStrokeWidth)
+        ? Math.max(0.5, item.iconStrokeWidth)
+        : 1,
+    iconScale:
+      typeof item?.iconScale === 'number' && Number.isFinite(item.iconScale)
+        ? Math.max(0.3, Math.min(1.5, item.iconScale))
+        : 1,
+    backgroundColor:
+      typeof item?.backgroundColor === 'string' && item.backgroundColor.trim().length > 0
+        ? item.backgroundColor
+        : 'rgba(255,255,255,0.94)',
     backgroundTextureId: typeof item?.backgroundTextureId === 'string' ? item.backgroundTextureId : 'none',
-    backgroundTextureOpacity: typeof item?.backgroundTextureOpacity === 'number' && Number.isFinite(item.backgroundTextureOpacity)
-      ? Math.max(0, Math.min(1, item.backgroundTextureOpacity))
-      : 0.35,
-    borderColor: typeof item?.borderColor === 'string' && item.borderColor.trim().length > 0
-      ? item.borderColor
-      : createProjectPaletteReference('secondary'),
-    borderWidth: typeof item?.borderWidth === 'number' && Number.isFinite(item.borderWidth)
-      ? Math.max(0, item.borderWidth)
-      : 1,
-    borderRadius: typeof item?.borderRadius === 'number' && Number.isFinite(item.borderRadius)
-      ? Math.max(0, item.borderRadius)
-      : 20,
+    backgroundTextureOpacity:
+      typeof item?.backgroundTextureOpacity === 'number' && Number.isFinite(item.backgroundTextureOpacity)
+        ? Math.max(0, Math.min(1, item.backgroundTextureOpacity))
+        : 0.35,
+    borderColor:
+      typeof item?.borderColor === 'string' && item.borderColor.trim().length > 0
+        ? item.borderColor
+        : createProjectPaletteReference('secondary'),
+    borderWidth:
+      typeof item?.borderWidth === 'number' && Number.isFinite(item.borderWidth)
+        ? Math.max(0, item.borderWidth)
+        : 1,
+    borderRadius:
+      typeof item?.borderRadius === 'number' && Number.isFinite(item.borderRadius)
+        ? Math.max(0, item.borderRadius)
+        : 20,
     customSvgMarkup: typeof item?.customSvgMarkup === 'string' ? item.customSvgMarkup : '',
     inlineCode: typeof item?.inlineCode === 'string' ? item.inlineCode : '',
     description: typeof item?.description === 'string' ? item.description : '',
@@ -90,70 +95,12 @@ function normalizeIconAsset(
   };
 }
 
-function normalizeRules(rules: EditorProject['rules'] | undefined): EditorProject['rules'] {
-  const safe = rules ?? ({} as Partial<EditorProject['rules']>);
-  const legacyChapters = Array.isArray(safe.chapters) ? safe.chapters : [];
-
-  // Migration: if no chapters but legacy rulesText is present, lift it into a
-  // single "Rules" chapter so existing projects don't appear empty after the
-  // rulebook switch. If both are empty, seed the 7 default chapters.
-  let chapters: RulesChapter[] = legacyChapters
-    .filter((chapter) => chapter && typeof chapter.id === 'string')
-    .map((chapter) => {
-      const title = typeof chapter.title === 'string' ? chapter.title : 'Untitled Chapter';
-      // Stored projects from before the components-chapter migration won't have
-      // a `kind` field — infer it from the title so the catalog picker shows up.
-      const storedKind = (chapter as { kind?: unknown }).kind;
-      const kind: 'standard' | 'components' = storedKind === 'components'
-        ? 'components'
-        : storedKind === 'standard'
-          ? 'standard'
-          : title.trim().toLowerCase() === 'components'
-            ? 'components'
-            : 'standard';
-      return {
-        id: chapter.id,
-        title,
-        body: typeof chapter.body === 'string' ? chapter.body : '',
-        kind,
-      };
-    });
-
-  if (chapters.length === 0) {
-    if (typeof safe.rulesText === 'string' && safe.rulesText.trim().length > 0) {
-      const seeded = createBlankChapter('Rules');
-      chapters = [{ ...seeded, body: safe.rulesText, kind: 'standard' }];
-    } else {
-      chapters = createDefaultRulesChapters();
-    }
-  }
-
-  const rawCustom = Array.isArray((safe as { customComponents?: unknown }).customComponents)
-    ? (safe as { customComponents: unknown[] }).customComponents
-    : [];
-  const customComponents = rawCustom
-    .filter((entry): entry is { id?: unknown; name?: unknown; description?: unknown } => (
-      typeof entry === 'object' && entry !== null
-    ))
-    .map((entry, index) => ({
-      id: typeof entry.id === 'string' && entry.id.trim().length > 0
-        ? entry.id
-        : `custom_component_${index + 1}`,
-      name: typeof entry.name === 'string' ? entry.name : '',
-      description: typeof entry.description === 'string' ? entry.description : '',
-    }));
-
-  return {
-    rulesText: typeof safe.rulesText === 'string' ? safe.rulesText : '',
-    designerNotes: typeof safe.designerNotes === 'string' ? safe.designerNotes : '',
-    chapters,
-    customComponents,
-  };
-}
-
 function normalizeEditorProject(project: EditorProject): EditorProject {
   const defaultBrief = createDefaultRulesBrief();
-  const legacyPlayerCount = clampPlayerCount((project.brief as Partial<Record<'playerCount', number>> | undefined)?.playerCount, project.seats?.length ?? 2);
+  const legacyPlayerCount = clampPlayerCount(
+    (project.brief as Partial<Record<'playerCount', number>> | undefined)?.playerCount,
+    project.seats?.length ?? 2,
+  );
   const minPlayers = clampPlayerCount(project.brief?.minPlayers, Math.min(2, legacyPlayerCount));
   const maxPlayers = clampPlayerCount(project.brief?.maxPlayers, legacyPlayerCount);
   const clampInt = (value: unknown, lo: number, hi: number, fallback: number): number => {
@@ -214,10 +161,14 @@ function normalizeEditorProject(project: EditorProject): EditorProject {
       ...(project.art ?? {}),
       theme: project.art?.theme ?? project.brief?.theme ?? defaultBrief.theme,
       definedArtStyles: Array.isArray(project.art?.definedArtStyles)
-        ? project.art.definedArtStyles.map((item, index) => normalizeArtReference(item, `art_style_${index + 1}`))
+        ? project.art.definedArtStyles.map((item, index) =>
+            normalizeArtReference(item, `art_style_${index + 1}`),
+          )
         : [],
       recurringAssets: Array.isArray(project.art?.recurringAssets)
-        ? project.art.recurringAssets.map((item, index) => normalizeArtReference(item, `art_asset_${index + 1}`))
+        ? project.art.recurringAssets.map((item, index) =>
+            normalizeArtReference(item, `art_asset_${index + 1}`),
+          )
         : [],
       icons: Array.isArray(project.art?.icons)
         ? project.art.icons.map((item, index) => normalizeIconAsset(item, `art_icon_${index + 1}`))
@@ -255,8 +206,11 @@ export async function loadEditorProject(projectId: string): Promise<EditorProjec
   await ensureStorageMigrated();
   const raw = await readLiveProject(projectId);
   if (!raw) return null;
-  try { return await hydrateStoredProject(raw); }
-  catch (cause) { throw new ProjectReadError(raw.id, raw.name, cause); }
+  try {
+    return await hydrateStoredProject(raw);
+  } catch (cause) {
+    throw new ProjectReadError(raw.id, raw.name, cause);
+  }
 }
 
 // Saves are chained so rapid autosaves can't interleave their async

@@ -1,22 +1,11 @@
 import { useEffect, useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { ChevronLeft, ChevronRight, Plus, SpellCheck, X } from 'lucide-react';
 
-import type { BuiltInComponentType } from '@turnbased/engine-components';
-
-import { addChapter, createBlankChapter, removeChapter, splitBriefList, updateChapter } from '../project';
-import {
-  DEFAULT_AI_RULES_CONTEXT_WEIGHTS,
-  brainstormRulesIdeas,
-  generateRulesChapterText,
-} from '../aiRulesService';
-import { saveRecentPrompt } from '../aiPromptHistory';
-import type {
-  CustomRulebookComponent,
-  EditorProject,
-  EditorRuleConfig,
-  RulesChapter,
-} from '../types';
-import { RulebookPage, type AIDraftState } from './rules/RulebookPage';
+import { addChapter, createBlankChapter, removeChapter, updateChapter } from '../project';
+import { useRulesAIAssist } from './rules/useRulesAIAssist';
+import type { CustomRulebookComponent, EditorProject, EditorRuleConfig } from '../types';
+import { RulebookPage } from './rules/RulebookPage';
+import type { CatalogComponentSelection } from './rules/ComponentPicker';
 import { SERIF_STACK } from './rules/rulebookStyles';
 import {
   ReplaceAllDialog,
@@ -35,16 +24,17 @@ function clampSpread(index: number, totalChapters: number): number {
   return index;
 }
 
-
 export function RulesSection({
   project,
   onUpdateRules,
   onAppendProjectTheme,
   onAppendProjectArtStyle,
   onAddCatalogComponent,
+  onUpdateCatalogComponent,
   onUpdateInstanceNotes,
   onUpdateInstanceName,
   onRemoveInstance,
+  onUpdateIconDescription,
 }: {
   project: EditorProject;
   onUpdateRules: (updater: (rules: EditorRuleConfig) => EditorRuleConfig) => void;
@@ -58,20 +48,27 @@ export function RulesSection({
      inside the rulebook show up in the gallery and vice-versa. Custom
      components stay inside `rules.customComponents` and are handled via
      onUpdateRules below — no separate handler needed. */
-  onAddCatalogComponent: (type: BuiltInComponentType) => void;
+  onAddCatalogComponent: (selection: CatalogComponentSelection) => void;
+  onUpdateCatalogComponent: (instanceId: string, selection: CatalogComponentSelection) => void;
   onUpdateInstanceNotes: (instanceId: string, notes: string) => void;
   onUpdateInstanceName: (instanceId: string, displayName: string) => void;
   onRemoveInstance: (instanceId: string) => void;
+  onUpdateIconDescription: (iconId: string, description: string) => void;
 }) {
   const chapters = project.rules.chapters;
   const totalChapters = chapters.length;
   const [spreadIndex, setSpreadIndex] = useState(0);
-  const [aiState, setAiState] = useState<AIDraftState | null>(null);
-  // Per-chapter pre-AI body snapshot. Set right before we replace the body
-  // with the model's output; cleared when the user clicks Undo. Lives in
-  // local state — we deliberately don't persist this across reloads so the
-  // Undo affordance only lives as long as the editor session.
-  const [aiUndoBodies, setAiUndoBodies] = useState<Record<string, string>>({});
+  const {
+    aiState,
+    setAiState,
+    aiUndoBodies,
+    openAIPanel,
+    cancelAIPanel,
+    updateAIPanel,
+    runAI,
+    undoAI,
+    clearAIUndo,
+  } = useRulesAIAssist(project, onUpdateRules);
 
   // Custom right-click context menu, shown ONLY when the user has text
   // selected inside a body textarea. With no selection we fall through to
@@ -83,8 +80,12 @@ export function RulesSection({
   // Close the context menu when the user clicks anywhere else or hits Esc.
   useEffect(() => {
     if (!contextMenu) return;
-    function close() { setContextMenu(null); }
-    function onKey(event: KeyboardEvent) { if (event.key === 'Escape') close(); }
+    function close() {
+      setContextMenu(null);
+    }
+    function onKey(event: KeyboardEvent) {
+      if (event.key === 'Escape') close();
+    }
     document.addEventListener('mousedown', close);
     document.addEventListener('keydown', onKey);
     return () => {
@@ -148,13 +149,19 @@ export function RulesSection({
   // native spellchecker. Dismiss persists in localStorage.
   const [spellHintVisible, setSpellHintVisible] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
-    try { return window.localStorage.getItem(SPELLCHECK_HINT_KEY) !== '1'; }
-    catch { return true; }
+    try {
+      return window.localStorage.getItem(SPELLCHECK_HINT_KEY) !== '1';
+    } catch {
+      return true;
+    }
   });
   function dismissSpellHint() {
     setSpellHintVisible(false);
-    try { window.localStorage.setItem(SPELLCHECK_HINT_KEY, '1'); }
-    catch { /* localStorage may be unavailable in private/strict modes */ }
+    try {
+      window.localStorage.setItem(SPELLCHECK_HINT_KEY, '1');
+    } catch {
+      /* localStorage may be unavailable in private/strict modes */
+    }
   }
 
   // Clamp spread when chapters shrink (delete) so we never land past the end.
@@ -166,15 +173,6 @@ export function RulesSection({
   }, [totalChapters]);
 
   // Drop AI panel state if its target chapter disappears (delete, etc.).
-  useEffect(() => {
-    if (!aiState) return;
-    const stillThere = chapters.some((chapter) => chapter.id === aiState.chapterId);
-    if (!stillThere) {
-      const t = window.setTimeout(() => setAiState(null), 0);
-      return () => window.clearTimeout(t);
-    }
-    return undefined;
-  }, [aiState, chapters]);
 
   const leftIndex = spreadIndex * 2;
   const rightIndex = leftIndex + 1;
@@ -199,6 +197,7 @@ export function RulesSection({
   }
 
   function setChapterBody(chapterId: string, body: string) {
+    clearAIUndo(chapterId);
     onUpdateRules((rules) => updateChapter(rules, chapterId, { body }));
   }
 
@@ -221,10 +220,15 @@ export function RulesSection({
   const handleUpdateCustomComponent = (id: string, patch: Partial<Omit<CustomRulebookComponent, 'id'>>) =>
     onUpdateRules((rules) => ({
       ...rules,
-      customComponents: rules.customComponents.map((entry) => entry.id === id ? { ...entry, ...patch } : entry),
+      customComponents: rules.customComponents.map((entry) =>
+        entry.id === id ? { ...entry, ...patch } : entry,
+      ),
     }));
   const handleRemoveCustomComponent = (id: string) =>
-    onUpdateRules((rules) => ({ ...rules, customComponents: rules.customComponents.filter((entry) => entry.id !== id) }));
+    onUpdateRules((rules) => ({
+      ...rules,
+      customComponents: rules.customComponents.filter((entry) => entry.id !== id),
+    }));
 
   function handlePrev() {
     if (canGoBack) setSpreadIndex(spreadIndex - 1);
@@ -259,104 +263,6 @@ export function RulesSection({
     });
   }
 
-  function openAIPanel(chapter: RulesChapter) {
-    // normalizeRulesBuilderBrief stores the literal "none" as a placeholder
-    // when the user left themes / art styles blank at project creation.
-    // Filter it out so we don't render an opaque "none" chip the user can't
-    // act on; an empty available[] just shows the + Add affordance.
-    const availableThemes = splitBriefList(project.brief.theme).filter((entry) => entry.toLowerCase() !== 'none');
-    const availableArtStyles = splitBriefList(project.brief.artStyle).filter((entry) => entry.toLowerCase() !== 'none');
-    setAiState({
-      chapterId: chapter.id,
-      prompt: '',
-      mode: chapter.body.trim().length > 0 ? 'expand' : 'draft',
-      loading: false,
-      error: null,
-      // Default: every theme and art style from project creation is included.
-      // The panel renders chip toggles so the user can narrow this on a
-      // per-generation basis.
-      selectedThemes: [...availableThemes],
-      selectedArtStyles: [...availableArtStyles],
-      availableThemes,
-      availableArtStyles,
-      contextWeights: DEFAULT_AI_RULES_CONTEXT_WEIGHTS,
-      brainstormResults: [],
-    });
-  }
-
-  function updateAIPanel(patch: Partial<AIDraftState>) {
-    setAiState((prev) => (prev ? { ...prev, ...patch } : prev));
-  }
-
-  function cancelAIPanel() {
-    setAiState(null);
-  }
-
-  async function runAI(chapter: RulesChapter) {
-    if (!aiState || aiState.chapterId !== chapter.id || aiState.loading) return;
-    const currentState = aiState;
-    // Reset prior brainstorm output on every new run so the chip grid
-    // reflects the current generation, not the previous one.
-    setAiState({ ...currentState, loading: true, error: null, brainstormResults: [] });
-    // Save the prompt to global history BEFORE awaiting the network call —
-    // a user-typed prompt is worth remembering even if the request fails.
-    // Empty prompts are filtered out by saveRecentPrompt itself.
-    saveRecentPrompt(currentState.prompt);
-    try {
-      if (currentState.mode === 'brainstorm') {
-        // Brainstorm is a pure picker — keep the panel open with the chip
-        // grid populated, and DON'T touch the chapter body or push an Undo
-        // snapshot. The user copies what they want from the chips.
-        const result = await brainstormRulesIdeas({
-          project,
-          activeChapter: chapter,
-          userPrompt: currentState.prompt,
-          themes: currentState.selectedThemes,
-          artStyles: currentState.selectedArtStyles,
-          contextWeights: currentState.contextWeights,
-          modelId: project.settings.aiModels.rulesWriter,
-        });
-        setAiState((prev) => (prev && prev.chapterId === chapter.id
-          ? { ...prev, loading: false, error: null, brainstormResults: result.ideas }
-          : prev));
-        return;
-      }
-      const result = await generateRulesChapterText({
-        project,
-        activeChapter: chapter,
-        userPrompt: currentState.prompt,
-        mode: currentState.mode,
-        themes: currentState.selectedThemes,
-        artStyles: currentState.selectedArtStyles,
-        contextWeights: currentState.contextWeights,
-        modelId: project.settings.aiModels.rulesWriter,
-      });
-      // Snapshot the most recent body just before swapping it out, then
-      // replace. The body might differ from the chapter.body we opened the
-      // AI panel with if the user kept typing while the request was in
-      // flight — read fresh from project.rules.chapters by id.
-      const fresh = project.rules.chapters.find((c) => c.id === chapter.id);
-      const previousBody = fresh?.body ?? chapter.body;
-      onUpdateRules((rules) => updateChapter(rules, chapter.id, { body: result.text }));
-      setAiUndoBodies((prev) => ({ ...prev, [chapter.id]: previousBody }));
-      setAiState(null);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'AI request failed';
-      setAiState((prev) => (prev && prev.chapterId === chapter.id ? { ...prev, loading: false, error: message } : prev));
-    }
-  }
-
-  function undoAI(chapterId: string) {
-    setAiUndoBodies((prev) => {
-      const snapshot = prev[chapterId];
-      if (snapshot === undefined) return prev;
-      onUpdateRules((rules) => updateChapter(rules, chapterId, { body: snapshot }));
-      const next = { ...prev };
-      delete next[chapterId];
-      return next;
-    });
-  }
-
   return (
     <div
       data-layout="rulebookRoot"
@@ -374,11 +280,35 @@ export function RulesSection({
         gap: '0.85rem',
       }}
     >
-      <div data-layout="rulebookHeader" /* book title + page indicator */ style={{ flex: '0 0 auto', display: 'flex', alignItems: 'baseline', gap: '0.75rem', flexWrap: 'wrap' }}>
-        <h1 style={{ margin: 0, fontFamily: SERIF_STACK, color: '#3b2412', fontSize: '1.4rem', letterSpacing: '0.02em' }}>
+      <div
+        data-layout="rulebookHeader"
+        /* book title + page indicator */ style={{
+          flex: '0 0 auto',
+          display: 'flex',
+          alignItems: 'baseline',
+          gap: '0.75rem',
+          flexWrap: 'wrap',
+        }}
+      >
+        <h1
+          style={{
+            margin: 0,
+            fontFamily: SERIF_STACK,
+            color: '#3b2412',
+            fontSize: '1.4rem',
+            letterSpacing: '0.02em',
+          }}
+        >
           {project.brief.name || 'Untitled Rulebook'}
         </h1>
-        <span style={{ color: 'rgba(120, 95, 50, 0.7)', fontFamily: SERIF_STACK, fontStyle: 'italic', fontSize: '0.88rem' }}>
+        <span
+          style={{
+            color: 'rgba(120, 95, 50, 0.7)',
+            fontFamily: SERIF_STACK,
+            fontStyle: 'italic',
+            fontSize: '0.88rem',
+          }}
+        >
           {pageLabel}
         </span>
       </div>
@@ -410,27 +340,30 @@ export function RulesSection({
           onUpdateAI={updateAIPanel}
           onCancelAI={cancelAIPanel}
           onRunAI={runAI}
-          aiUndoBody={leftChapter ? aiUndoBodies[leftChapter.id] ?? null : null}
+          aiUndoBody={leftChapter ? (aiUndoBodies[leftChapter.id] ?? null) : null}
           onUndoAI={undoAI}
           onBodyContextMenu={handleBodyContextMenu}
           onAppendTheme={(value) => appendAndSelect('themes', value)}
           onAppendArtStyle={(value) => appendAndSelect('artStyles', value)}
           project={project}
           onAddCatalogComponent={onAddCatalogComponent}
+          onUpdateCatalogComponent={onUpdateCatalogComponent}
+          onAddCustomComponent={handleAddCustomComponent}
           onUpdateInstanceNotes={onUpdateInstanceNotes}
           onUpdateInstanceName={onUpdateInstanceName}
           onRemoveInstance={onRemoveInstance}
-          onAddCustomComponent={handleAddCustomComponent}
           onUpdateCustomComponent={handleUpdateCustomComponent}
           onRemoveCustomComponent={handleRemoveCustomComponent}
+          onUpdateIconDescription={onUpdateIconDescription}
         />
 
         {/* spine shadow between the two pages */}
-        <div
+        <div data-layout="rulebookSpine"
           aria-hidden
           style={{
             width: '2px',
-            background: 'linear-gradient(180deg, rgba(60,40,20,0) 0%, rgba(60,40,20,0.18) 50%, rgba(60,40,20,0) 100%)',
+            background:
+              'linear-gradient(180deg, rgba(60,40,20,0) 0%, rgba(60,40,20,0.18) 50%, rgba(60,40,20,0) 100%)',
             flex: '0 0 auto',
             alignSelf: 'stretch',
           }}
@@ -449,19 +382,21 @@ export function RulesSection({
           onUpdateAI={updateAIPanel}
           onCancelAI={cancelAIPanel}
           onRunAI={runAI}
-          aiUndoBody={rightChapter ? aiUndoBodies[rightChapter.id] ?? null : null}
+          aiUndoBody={rightChapter ? (aiUndoBodies[rightChapter.id] ?? null) : null}
           onUndoAI={undoAI}
           onBodyContextMenu={handleBodyContextMenu}
           onAppendTheme={(value) => appendAndSelect('themes', value)}
           onAppendArtStyle={(value) => appendAndSelect('artStyles', value)}
           project={project}
           onAddCatalogComponent={onAddCatalogComponent}
+          onUpdateCatalogComponent={onUpdateCatalogComponent}
+          onAddCustomComponent={handleAddCustomComponent}
           onUpdateInstanceNotes={onUpdateInstanceNotes}
           onUpdateInstanceName={onUpdateInstanceName}
           onRemoveInstance={onRemoveInstance}
-          onAddCustomComponent={handleAddCustomComponent}
           onUpdateCustomComponent={handleUpdateCustomComponent}
           onRemoveCustomComponent={handleRemoveCustomComponent}
+          onUpdateIconDescription={onUpdateIconDescription}
         />
       </div>
 
@@ -488,7 +423,8 @@ export function RulesSection({
         >
           <SpellCheck size={14} style={{ color: '#0d9488', flexShrink: 0 }} />
           <span style={{ flex: 1 }}>
-            Tip: right-click a red-underlined word to add it to your browser&rsquo;s personal dictionary &mdash; works for proper names, game terms, and anything else.
+            Tip: right-click a red-underlined word to add it to your browser&rsquo;s personal dictionary
+            &mdash; works for proper names, game terms, and anything else.
           </span>
           <button
             type="button"
@@ -496,10 +432,17 @@ export function RulesSection({
             aria-label="Dismiss spellcheck tip"
             title="Dismiss"
             style={{
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              width: '22px', height: '22px', borderRadius: '999px',
-              border: 'none', background: 'rgba(120, 95, 50, 0.1)',
-              color: 'rgba(80, 55, 25, 0.7)', cursor: 'pointer', flexShrink: 0,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '22px',
+              height: '22px',
+              borderRadius: '999px',
+              border: 'none',
+              background: 'rgba(120, 95, 50, 0.1)',
+              color: 'rgba(80, 55, 25, 0.7)',
+              cursor: 'pointer',
+              flexShrink: 0,
             }}
           >
             <X size={12} />
@@ -507,25 +450,47 @@ export function RulesSection({
         </div>
       ) : null}
 
-      <div data-layout="rulebookNav" /* Prev / Next + add-chapter actions */ style={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+      <div
+        data-layout="rulebookNav"
+        /* Prev / Next + add-chapter actions */ style={{
+          flex: '0 0 auto',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.65rem',
+        }}
+      >
         <button
           type="button"
           onClick={handlePrev}
           disabled={!canGoBack}
           style={{
-            display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
-            padding: '0.5rem 0.9rem', borderRadius: '999px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.3rem',
+            padding: '0.5rem 0.9rem',
+            borderRadius: '999px',
             border: '1px solid rgba(120,95,50,0.3)',
             background: canGoBack ? 'rgba(255,253,246,0.95)' : 'rgba(255,253,246,0.55)',
             color: canGoBack ? '#3b2412' : 'rgba(120,95,50,0.45)',
             cursor: canGoBack ? 'pointer' : 'not-allowed',
-            fontFamily: SERIF_STACK, fontWeight: 700, fontSize: '0.85rem',
+            fontFamily: SERIF_STACK,
+            fontWeight: 700,
+            fontSize: '0.85rem',
           }}
         >
           <ChevronLeft size={16} /> Previous
         </button>
 
-        <div style={{ flex: 1, color: 'rgba(120,95,50,0.55)', fontFamily: SERIF_STACK, fontStyle: 'italic', fontSize: '0.8rem', textAlign: 'center' }}>
+        <div data-layout="rulebookPageCounter"
+          style={{
+            flex: 1,
+            color: 'rgba(120,95,50,0.55)',
+            fontFamily: SERIF_STACK,
+            fontStyle: 'italic',
+            fontSize: '0.8rem',
+            textAlign: 'center',
+          }}
+        >
           {pageLabel}
         </div>
 
@@ -533,13 +498,18 @@ export function RulesSection({
           type="button"
           onClick={handleAddChapter}
           style={{
-            display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
-            padding: '0.5rem 0.9rem', borderRadius: '999px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.3rem',
+            padding: '0.5rem 0.9rem',
+            borderRadius: '999px',
             border: '1px solid rgba(120,95,50,0.3)',
             background: 'rgba(255,253,246,0.95)',
             color: '#3b2412',
             cursor: 'pointer',
-            fontFamily: SERIF_STACK, fontWeight: 700, fontSize: '0.85rem',
+            fontFamily: SERIF_STACK,
+            fontWeight: 700,
+            fontSize: '0.85rem',
           }}
         >
           <Plus size={14} /> Add section
@@ -550,13 +520,18 @@ export function RulesSection({
           onClick={handleNext}
           disabled={!canGoForward}
           style={{
-            display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
-            padding: '0.5rem 0.9rem', borderRadius: '999px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.3rem',
+            padding: '0.5rem 0.9rem',
+            borderRadius: '999px',
             border: '1px solid rgba(120,95,50,0.3)',
             background: canGoForward ? 'rgba(255,253,246,0.95)' : 'rgba(255,253,246,0.55)',
             color: canGoForward ? '#3b2412' : 'rgba(120,95,50,0.45)',
             cursor: canGoForward ? 'pointer' : 'not-allowed',
-            fontFamily: SERIF_STACK, fontWeight: 700, fontSize: '0.85rem',
+            fontFamily: SERIF_STACK,
+            fontWeight: 700,
+            fontSize: '0.85rem',
           }}
         >
           Next <ChevronRight size={16} />

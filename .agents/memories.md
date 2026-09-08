@@ -385,11 +385,10 @@ image data URLs) in localStorage — its ~5MB origin quota is what caused the
   never be reported as a design edit. Archive v2 preserves the active head
   independently of the current working draft. Failed restores validate
   executable snapshots and artwork before moving workspace/head pointers.
-- Working-tree build/typecheck pass with the user's existing rule-editor
-  changes. A staged-only source check and the previous HEAD produce the same
-  five pre-existing type diagnostics in aiBuilder, ComponentsChapterPage, and
-  Editor's rule-section props; those unrelated user fixes remain uncommitted.
-  Do not discard or accidentally fold that work into this feature commit.
+- The original workshop commit left five pre-existing type diagnostics in
+  committed source while the working tree contained the user's fixes. Those
+  remaining fixes were subsequently authorized for integration; see the
+  September 2026 rulebook integration entry below for current status.
 
 
 ## Local development sign-in
@@ -461,10 +460,9 @@ image data URLs) in localStorage — its ~5MB origin quota is what caused the
   cards counted once, and a 420×297 mm board retaining its true print size.
 - `npm run build` passed for both the catalog API and web app. The web build
   retains its existing large-chunk warning. Scoped ESLint passed for all source
-  changed by this task. Staged-only source and HEAD checks report the same
-  five pre-existing diagnostics (AI brief fields, catalog callback types,
-  and implicit icon callback arguments). The working-tree build includes the
-  user's existing fixes; preserve those changes uncommitted. Logs:
+  changed by that task. Its staged-only check still needed five pre-existing
+  fixes (AI brief fields, catalog callbacks, icon callback types). Those fixes
+  are now integrated in the subsequent rulebook update below. Historical logs:
   `logs/components-head-source-check.log` and
   `logs/components-staged-source-check.log`.
 - `npm run test:workshop:browser` passed: canonical overview counts and
@@ -490,3 +488,66 @@ image data URLs) in localStorage — its ~5MB origin quota is what caused the
   Override `CODEX_BROWSER_URL`, `CODEX_BROWSER_CDP_URL`, or
   `PLAYWRIGHT_MODULE_PATH`; artifact overrides are `WORKSHOP_ARTIFACT_DIR`
   and `COMPONENT_TEMPLATE_ARTIFACT_DIR`, respectively.
+
+
+## September 2026 — Remaining rulebook fixes integrated
+
+- The user authorized integrating the previously preserved rulebook, AI, and
+  Settings edits. Required brief fields and catalog/icon callback types now
+  belong to committed source; do not preserve the old five-error baseline.
+- Rules uses the shared catalog picker for adding and updating physical
+  components. Supplier updates keep the instance ID, rows, and layers while
+  resizing stored template dimensions to the selected physical size. Changing
+  component families during a supplier update is rejected.
+- Art Studio and Iconography edit the same icon descriptions. Printable
+  rulebooks include structured iconography alongside authored prose. The
+  Glossary migration only converts an empty legacy default placeholder;
+  authored Glossary text and explicitly standard chapters remain editable.
+- AI drafts persist per project in localStorage: prompt, model, mode, weights,
+  selected tags, and temperature. Validate saved values and tolerate blocked
+  or corrupt storage. Deselected art styles must not leak their descriptions
+  into the request context.
+- Rules AI uses a request generation and the latest rules updater. Ignore
+  replies after closing, changing targets, leaving Rules, or restoring a
+  checkpoint; reject a reply when its target body changed during generation.
+  RulesSection is keyed by project/restore epoch so restoring an identical
+  target body still invalidates pending work. AI undo is cleared by manual
+  edits and restore/unmount boundaries.
+- Model IDs/capabilities were checked against OpenRouter's public catalog on
+  2026-09-08. Browser/backend choices and defaults are covered together. The
+  backend validates supported or server-configured models, preserves disabled
+  catalog entries, rejects anonymous auth, and omits unsupported temperature.
+  Settings displays recorded ledger costs; the preference list is not a
+  historical price source. Provider calls are mocked in regression tests.
+- Settings Close uses an observed app route, with My workshop as the fallback
+  after direct visits/reloads. Browser history may lead outside the app and
+  must not determine this button's destination.
+- Project component mutations live in projectComponents.ts and share the
+  small projectUpdates.ts helper; project.ts retains its public exports.
+  Rulebook normalization lives in rulebookStorage.ts; AI runtime controls and
+  floating position are separate hooks. Keep changed source files under 600
+  lines rather than growing project.ts or the edge entrypoint again.
+- Repeatable checks: test:workshop, test:versions, test:rules:api, typecheck,
+  build, and scoped lint. test:rules:browser covers catalog changes, icon sync,
+  AI persistence/undo/concurrent edits/restore, and Settings navigation in an
+  isolated CDP context. Defaults: app port 3000, CDP port 9223; artifacts in
+  /tmp/turnbased-rules-fixes (RULES_FIXES_ARTIFACT_DIR overrides it). Keep logs
+  under logs/remaining-fixes-*. No paid AI calls are required for these tests.
+
+### Integration verification
+
+- All 103 automated tests pass: 59 workshop domain, 38 Vitest
+  storage/version/rulebook/export, and 6 rules API tests. Full workspace
+  typecheck/build and scoped frontend/backend lint pass. Rules and image
+  edge entrypoints pass Deno checks. The build retains the existing large
+  bundle warning.
+- Staged web source passes independently with zero TypeScript diagnostics,
+  including all five previously outstanding errors. Log:
+  logs/remaining-fixes-staged-source-check.log.
+- Rules browser regression, general workshop browser regression, and actual
+  printable rulebook download/render all pass with zero page errors. Custom
+  SVG previews preserve their configured ink when rendered as isolated images.
+- Vitest resolves React from the web workspace and inlines Lucide ESM for
+  export rendering; the monorepo root can contain another React version. Use
+  createRequire from apps/web/package.json instead of hardcoding dependency
+  hoisting locations.

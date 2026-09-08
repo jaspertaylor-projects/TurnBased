@@ -355,6 +355,7 @@ export const Editor = () => {
       case 'rules':
         return (
           <RulesSection
+            key={sectionKey}
             project={currentProject}
             onUpdateRules={(updater) => commitProject(updateProjectRules(currentProject, updater))}
             onAppendProjectTheme={(theme) => commitProject(updateProjectBrief(currentProject, (brief) => ({
