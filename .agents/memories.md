@@ -331,3 +331,70 @@ image data URLs) in localStorage — its ~5MB origin quota is what caused the
   reformat or rewrite its supplier/quote behavior.
 - Updated VersionsSection useSurfaceSize return type to include nullable
   refs, fixing the existing React 19 typecheck error exposed during validation.
+
+
+## 2026-09-07 — Workshop vision, guest creation, and reliable iteration
+
+- **Why:** the user wants a convenient home for amateur designers to make,
+  playtest, revise, and eventually print games. They explicitly prioritized
+  versioning, agent-compatible playtesting, and attractive decks generated
+  from tables. This supersedes older milestone exclusions of AI players or
+  legal-move work; commerce remains future scope.
+- **How to apply:** make workshop/new-game entry primary. `#/new` now creates a
+  local game plus a first checkpoint without auth/AI; `#/new/guided` preserves
+  the older AI form. Little Woodland supplies five rule chapters, four card
+  designs / ten cards, and matching market-race lab settings. Use the public
+  async storage APIs and UI creation paths in browser checks.
+- `EditorProject.cardStudio` and `.playtestLab` belong to the design snapshot:
+  autosave, undo, checkpoints, safety restores, comparisons, and archives must
+  include them. Card rows and generated copy references keep identities;
+  embedded artwork must not be duplicated for every physical copy.
+- **Storage correction:** earlier notes that the editor restores a checkpoint
+  on every reload, stores inline deflated projects in localStorage, or prunes
+  synced checkpoints after 50 are obsolete. Load the saved working draft.
+  localStorage `turnbased.creator.projects` is now a small v2 pointer index;
+  live snapshots, workspaces, checkpoint files, and images are IndexedDB blobs.
+  Old inline projects migrate on their next save. Checkpoints are retained.
+- Restore creates a safety checkpoint when the draft is dirty. New checkpoints
+  preserve parent links and existing forward history; designers can name
+  experiment branches explicitly. Archives preserve ancestry and embedded artwork
+  once; imports create a new game. Current archive bounds are 100 MB / 2,000
+  checkpoints and are validated without silently trimming saved history.
+- Orphan-blob GC is deliberately not called by delete/history maintenance.
+  Future compaction must serialize with saves and include live snapshot,
+  workspace, checkpoint, and nested-image roots. A collector that races a
+  live write can delete the new snapshot before its index is published.
+- **Scope honesty:** the lab currently executes `market-race-v1` for two seats
+  with seeded balanced/greedy/random heuristic agents. Prose/card powers are
+  reference material, not executable rules. Public JSON packets expose state
+  and legal actions; replies validate action IDs and expected step. There is
+  no built-in LLM runner for arbitrary games.
+- Card Studio exports actual-mm A4/Letter HTML sheets with cutting guides;
+  browser printing uses 100% scale. These are prototype fronts. Production
+  bleed, duplex backs, supplier checkout, and fulfillment are still future
+  work. Linked URL artwork requires its source; uploaded artwork travels with
+  the exported files.
+- Checks: `npm run test:workshop` (Node domain tests), `npm run test:versions`
+  (Vitest/fake IndexedDB), and `npm run typecheck`. Use Playwright for the
+  guest/sample workflow and verify bounded non-landing surfaces at desktop,
+  tablet, and phone widths. Keep logs under `logs/`.
+
+
+## Workshop verification — September 2026
+
+- 20 Card Studio / Playtest Lab domain tests and 27 IndexedDB/version/archive
+  tests pass. The browser smoke covers safety restore, valid/invalid agent
+  moves, 20-game batches, findings, printable downloads, full-history import,
+  reload persistence, and bounded desktop layouts. Print proof verified 10
+  cards across 2 actual-size A4 PDF pages.
+- `npm run test:workshop:browser` uses an isolated context in the dedicated
+  CDP browser; screenshots/downloads default to `/tmp/turnbased-workshop-smoke`.
+- Version comparisons use canonical key ordering; serialization order must
+  never be reported as a design edit. Archive v2 preserves the active head
+  independently of the current working draft. Failed restores validate
+  executable snapshots and artwork before moving workspace/head pointers.
+- Working-tree build/typecheck pass with the user's existing rule-editor
+  changes. A staged-only source check and the previous HEAD produce the same
+  five pre-existing type diagnostics in aiBuilder, ComponentsChapterPage, and
+  Editor's rule-section props; those unrelated user fixes remain uncommitted.
+  Do not discard or accidentally fold that work into this feature commit.

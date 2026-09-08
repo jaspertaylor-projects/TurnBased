@@ -1,3 +1,5 @@
+import type { CardStudioState } from './cardStudio/types';
+import type { PlaytestLabState } from './playtest/types';
 import type {
   AIRulesSummarySource,
 } from '@turnbased/engine-ai';
@@ -278,6 +280,8 @@ export interface EditorProject {
   settings: EditorSettings;
   art: EditorArtDirection;
   appLayout: EditorAppLayout;
+  cardStudio?: CardStudioState;
+  playtestLab?: PlaytestLabState;
 }
 
 export interface StoredEditorProjects {

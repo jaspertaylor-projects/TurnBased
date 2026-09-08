@@ -15,12 +15,18 @@
     "dev:catalog": "node scripts/dev-local.mjs --catalog-only",
     "dev:stop": "node scripts/dev-local.mjs --stop",
     "test:dev": "node --test scripts/dev/*.test.mjs",
-    "test:catalog": "npm run test:e2e --workspace @turnbased/catalog-api"
+    "test:catalog": "npm run test:e2e --workspace @turnbased/catalog-api",
+    "test:workshop": "tsx --test apps/web/src/editor/cardStudio/*.test.ts apps/web/src/editor/playtest/*.test.ts",
+    "test:versions": "vitest run --config scripts/vitest.versions.config.ts",
+    "test:workshop:browser": "node scripts/check-workshop-browser.mjs"
   },
   "engines": {
     "node": ">=22.12.0"
   },
   "devDependencies": {
-    "supabase": "2.107.0"
+    "fake-indexeddb": "^6.2.5",
+    "supabase": "2.107.0",
+    "tsx": "^4.23.13",
+    "vitest": "^3.2.4"
   }
 }

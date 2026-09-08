@@ -1,0 +1,216 @@
+.print-workshop {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background: #f8f4e9;
+  color: #304635;
+}
+.print-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 30px 34px 24px;
+  gap: 20px;
+  border-bottom: 1px solid #dedecb;
+  flex-shrink: 0;
+}
+.print-heading > div > span,
+.print-kicker {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  color: #7f8667;
+}
+.print-heading h1 {
+  font:
+    normal 32px Georgia,
+    serif;
+  margin: 8px 0;
+}
+.print-heading p {
+  font-size: 13px;
+  color: #7a816b;
+  margin: 0;
+}
+.print-heading > svg {
+  color: #a5ad85;
+}
+.print-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 27px 34px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.print-exports {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+.print-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 24px;
+  background: #fffdf7;
+  border: 1px solid #dddfcc;
+  border-radius: 15px;
+  box-shadow: 0 7px 14px #35532a05;
+  min-width: 0;
+}
+.print-icon {
+  background: #edf1df;
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 22px;
+  color: #65805a;
+}
+.print-card h2 {
+  font:
+    normal 25px Georgia,
+    serif;
+  margin: 10px 0;
+}
+.print-card p {
+  font-size: 12px;
+  line-height: 1.85;
+  color: #7b826b;
+  min-height: 66px;
+}
+.print-card button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  border: 1px solid #294f34;
+  background: #315a3e;
+  color: #fff7e6;
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 12px;
+  cursor: pointer;
+  margin-top: 14px;
+}
+.print-card button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.print-card .print-link {
+  border: 0;
+  background: transparent;
+  color: #607b53;
+  font-size: 11px;
+  padding: 7px;
+  margin-top: 6px;
+}
+.print-count {
+  font-size: 11px;
+  color: #627458;
+  margin-top: auto;
+  padding-top: 15px;
+}
+.print-paper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  width: 100%;
+  margin: 12px 0;
+}
+.print-paper select {
+  margin-left: auto;
+  border: 1px solid #d5ddc3;
+  padding: 7px;
+  background: #f6f8ed;
+  border-radius: 6px;
+  color: #45633f;
+}
+.print-readiness {
+  background: #ecefdf;
+  border: 1px solid #dbe0c8;
+  padding: 23px 27px;
+  border-radius: 14px;
+}
+.print-readiness h2 {
+  font:
+    normal 22px Georgia,
+    serif;
+  margin: 8px 0 18px;
+}
+.print-readiness ul {
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 25px;
+}
+.print-readiness li {
+  display: flex;
+  gap: 10px;
+  font-size: 11px;
+  line-height: 1.8;
+  color: #7a8269;
+}
+.print-readiness li > svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+  color: #738963;
+}
+.print-readiness strong {
+  display: block;
+  font-size: 12px;
+  color: #42583a;
+  margin-bottom: 3px;
+}
+.print-future {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  border-top: 1px solid #d2d9bd;
+  padding-top: 14px;
+  margin-top: 18px;
+  font-size: 11px;
+  color: #7b826b;
+}
+.print-future p {
+  margin: 0;
+}
+.print-future strong {
+  display: inline;
+}
+.print-warning {
+  font-size: 12px;
+  color: #a25534;
+}
+.print-footer {
+  flex-shrink: 0;
+  border-top: 1px solid #dedecb;
+  padding: 14px 28px;
+  color: #79826d;
+  font-size: 11px;
+}
+@media (max-width: 1080px) {
+  .print-exports {
+    grid-template-columns: 1fr;
+  }
+  .print-card p {
+    min-height: 0;
+  }
+  .print-card {
+    padding: 22px;
+  }
+  .print-readiness ul {
+    grid-template-columns: 1fr;
+  }
+  .print-card button {
+    width: auto;
+  }
+  .print-heading h1 {
+    font-size: 27px;
+  }
+}

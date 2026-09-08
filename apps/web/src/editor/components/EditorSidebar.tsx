@@ -2,7 +2,7 @@ import type { Dispatch, SetStateAction } from 'react';
 import { useEffect, useState } from 'react';
 import {
   BarChart3, BookOpen, Check, ChevronDown, GitBranch, LayoutPanelTop, Palette, Plus,
-  Save, Shapes, Sparkles, X,
+  Save, Shapes, Sparkles, X, Home, Layers3, FlaskConical, Printer,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -12,6 +12,10 @@ import { panelStyle } from '../styles';
 import type { EditorProject } from '../types';
 
 const SECTION_ICONS: Record<EditorSection, LucideIcon> = {
+  workshop: Home,
+  card_studio: Layers3,
+  playtest: FlaskConical,
+  print: Printer,
   rules: BookOpen,
   stats: BarChart3,
   art: Palette,
@@ -64,6 +68,8 @@ function SectionButton({
 
 export function EditorSidebar({
   project,
+  saveStatus = 'saved',
+  versionBusy = false,
   isOpen = true,
   activeSection,
   setActiveSection,
@@ -78,6 +84,8 @@ export function EditorSidebar({
   onDismissNotice,
 }: {
   project: EditorProject;
+  saveStatus?: 'saving' | 'saved' | 'error';
+  versionBusy?: boolean;
   /** Drawer state. When closed the panel slides off to the left and stops
    *  catching clicks; the canvas grid column collapses in parallel. */
   isOpen?: boolean;
@@ -195,6 +203,7 @@ export function EditorSidebar({
           <button
             type="button"
             onClick={onSaveVersion}
+            disabled={versionBusy}
             aria-label="Save current version"
             title="Save current version"
             style={{
@@ -213,11 +222,15 @@ export function EditorSidebar({
           </button>
         </div>
 
+        <p role="status" style={{ margin: '7px 0 0', color: saveStatus === 'error' ? '#a23e2b' : '#52725d', fontSize: '0.7rem' }}>
+          {saveStatus === 'saving' ? 'Saving your draft…' : saveStatus === 'error' ? 'Save failed — export a backup' : 'Draft saved in this browser'}
+        </p>
         <button
           type="button"
           data-layout="editorVersionSwitcher"
           /* version-control pill: opens the version-switch dropdown (and the
              new-version action lives inside it — there is no separate +) */
+          disabled={versionBusy}
           onClick={() => setIsVersionMenuOpen((value) => !value)}
           aria-haspopup="listbox"
           aria-expanded={isVersionMenuOpen}

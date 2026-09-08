@@ -3,7 +3,7 @@ import type { ComponentPropertyDefinition } from '@turnbased/engine-components';
 import type { EditorProject } from './types';
 
 export function readProjectIdFromHash(): string | null {
-  const hash = window.location.hash;
+  const hash = window.location.hash.split('?')[0];
   const parts = hash.split('/');
   return parts.length > 2 ? parts[2] ?? null : null;
 }

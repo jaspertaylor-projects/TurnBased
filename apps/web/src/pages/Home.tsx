@@ -1,345 +1,167 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { ForestWorld } from '../components/ForestScene';
-import { Loader } from '../components/Loader';
+import { ArrowRight, Bot, Check, GitBranch, Layers3, Leaf, Printer, Sparkles } from 'lucide-react';
+import { WorkshopArt } from '../components/workshop/WorkshopArt';
+import '../components/workshop/workshop.css';
 
-function useReveal() {
-  const ref = useRef<HTMLDivElement>(null);
-  const [visible, setVisible] = useState(false);
+const steps = [
+  { number: '01', title: 'Make something', text: 'A few rules. A handful of cards. Enough to find the fun.' },
+  {
+    number: '02',
+    title: 'Bring it to the table',
+    text: 'Try a prototype, record what happened, and test your assumptions.',
+  },
+  {
+    number: '03',
+    title: 'Try another version',
+    text: 'Save the good ideas. Explore a different direction. Keep your history.',
+  },
+  {
+    number: '04',
+    title: 'Make it real',
+    text: 'Print a card sheet, cut it out, and play another round with friends.',
+  },
+];
 
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) setVisible(true);
-      },
-      { threshold: 0.12 }
-    );
-
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-
-  return { ref, visible };
-}
-
-function RevealSection({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
-  const { ref, visible } = useReveal();
-
-  return (
-    <div
-      ref={ref}
-      style={{
-        opacity: visible ? 1 : 0,
-        transform: visible ? 'translateY(0)' : 'translateY(40px)',
-        transition: `opacity 0.8s cubic-bezier(.16,1,.3,1) ${delay}s, transform 0.8s cubic-bezier(.16,1,.3,1) ${delay}s`,
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-function FeatureCard({ icon, title, children, accent }: { icon: string; title: string; children: React.ReactNode; accent: string }) {
-  return (
-    <div
-      style={{
-        padding: '2.5rem 2rem',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '1rem',
-        transition: 'transform 0.3s, box-shadow 0.3s',
-        cursor: 'default',
-        background: 'rgba(255,255,255,0.88)',
-        borderRadius: 'var(--radius-lg)',
-        border: '1px solid rgba(16,185,129,0.15)',
-        boxShadow: '0 8px 32px rgba(6,78,59,0.10)',
-      }}
-      onMouseOver={(event) => {
-        event.currentTarget.style.transform = 'translateY(-6px)';
-        event.currentTarget.style.boxShadow = `0 16px 40px ${accent}30`;
-      }}
-      onMouseOut={(event) => {
-        event.currentTarget.style.transform = 'translateY(0)';
-        event.currentTarget.style.boxShadow = '0 8px 32px rgba(6,78,59,0.10)';
-      }}
-    >
-      <div
-        style={{
-          width: '56px',
-          height: '56px',
-          background: accent,
-          borderRadius: '14px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: '1.6rem',
-          boxShadow: `0 4px 16px ${accent}40`,
-        }}
-      >
-        {icon}
+export const Home = () => (
+  <div data-layout="workshopLanding" className="workshop-home">
+    <section className="workshop-hero" aria-labelledby="workshop-hero-title">
+      <div data-layout="heroIntroduction" className="workshop-hero__copy">
+        <p className="workshop-eyebrow">
+          <Leaf size={15} /> A little workshop for big game ideas
+        </p>
+        <h1 id="workshop-hero-title">
+          Your game.
+          <br />
+          From <em>what if</em>
+          <br />
+          to game night.
+        </h1>
+        <p className="workshop-hero__description">
+          Make a board game. Try it with friends. Make it better. Print it when you’re ready.
+        </p>
+        <div data-layout="heroActions" className="workshop-actions">
+          <a href="#/new" id="cta-start" className="workshop-button workshop-button--primary">
+            Make your first game <ArrowRight size={17} />
+          </a>
+          <a href="#/dashboard" className="workshop-button workshop-button--text">
+            Open my workshop
+          </a>
+        </div>
+        <p className="workshop-hero__assurance">
+          <Check size={14} /> Start without an account <span>·</span> Your ideas stay yours
+        </p>
       </div>
-      <h3 style={{ fontSize: '1.35rem', margin: 0, color: '#064e3b' }}>{title}</h3>
-      <div style={{ color: '#0f766e', lineHeight: 1.7, margin: 0, fontSize: '0.95rem' }}>{children}</div>
-    </div>
-  );
-}
+      <WorkshopArt />
+    </section>
 
-function StepCard({ num, title, desc }: { num: number; title: string; desc: string }) {
-  return (
-    <div
-      style={{
-        display: 'flex',
-        gap: '1.5rem',
-        alignItems: 'flex-start',
-        padding: '1.5rem 2rem',
-        background: 'rgba(255,255,255,0.88)',
-        borderRadius: 'var(--radius-lg)',
-        border: '1px solid rgba(16,185,129,0.15)',
-        boxShadow: '0 8px 32px rgba(6,78,59,0.10)',
-      }}
-    >
-      <div
-        style={{
-          width: '48px',
-          height: '48px',
-          minWidth: '48px',
-          borderRadius: '50%',
-          background: 'var(--gradient-primary)',
-          color: 'white',
-          fontFamily: 'Outfit, sans-serif',
-          fontWeight: 800,
-          fontSize: '1.3rem',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          boxShadow: '0 4px 16px rgba(16,185,129,0.35)',
-        }}
-      >
-        {num}
-      </div>
-      <div>
-        <h4 style={{ fontSize: '1.2rem', margin: '0 0 0.35rem 0', color: '#064e3b' }}>{title}</h4>
-        <p style={{ color: '#0f766e', lineHeight: 1.7, margin: 0 }}>{desc}</p>
-      </div>
-    </div>
-  );
-}
+    <section className="workshop-loop" aria-label="The game design journey">
+      {steps.map((step) => (
+        <article key={step.number}>
+          <span>{step.number}</span>
+          <h2>{step.title}</h2>
+          <p>{step.text}</p>
+        </article>
+      ))}
+    </section>
 
-export const Home = () => {
-  const [scrollProgress, setScrollProgress] = useState(0);
-  const [sceneReady, setSceneReady] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  const handleScroll = useCallback(() => {
-    const el = document.documentElement;
-    const scrollTop = el.scrollTop || document.body.scrollTop;
-    const scrollHeight = el.scrollHeight - el.clientHeight;
-    if (scrollHeight > 0) {
-      setScrollProgress(Math.min(scrollTop / scrollHeight, 1));
-    }
-  }, []);
-
-  useEffect(() => {
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    requestAnimationFrame(handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [handleScroll]);
-
-  return (
-    <>
-      <Loader onReady={sceneReady} />
-      <ForestWorld scrollProgress={scrollProgress} onReady={() => setSceneReady(true)} />
-
-      <div ref={containerRef} style={{ position: 'relative', zIndex: 1 }}>
-        <section
-          style={{
-            minHeight: '100vh',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'flex-start',
-            padding: '12vh 2rem 4rem 2rem',
-            textAlign: 'center',
-          }}
-        >
-          <div className="animate-slide-up" style={{ maxWidth: '800px' }}>
-            <h1
-              style={{
-                fontSize: 'clamp(2.4rem, 7vw, 4.2rem)',
-                lineHeight: 1.1,
-                marginBottom: '1.25rem',
-                fontFamily: 'Outfit, sans-serif',
-                fontWeight: 800,
-                color: '#064e3b',
-              }}
-            >
-              Welcome to Your Home for
-              <br />
-              Everything{' '}
-              <span
-                style={{
-                  background: 'linear-gradient(90deg, #f97316, #facc15, #fb923c)',
-                  backgroundSize: '200% auto',
-                  backgroundClip: 'text',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  animation: 'gradientPan 5s linear infinite',
-                }}
-              >
-                TurnBased
-              </span>
-              .
-            </h1>
-
-            <p
-              style={{
-                fontSize: '1.2rem',
-                color: 'white',
-                maxWidth: '580px',
-                margin: '0 auto 2.5rem auto',
-                lineHeight: 1.7,
-                fontWeight: 500,
-                textShadow: '0 1px 6px rgba(0,0,0,0.3), 0 0 20px rgba(0,0,0,0.15)',
-              }}
-            >
-              Create, iterate, playtest, sell, and play board games.
-            </p>
-
-            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-              <a
-                href="#/new"
-                id="cta-start"
-                style={{
-                  padding: '1rem 2.2rem',
-                  background: '#064e3b',
-                  color: '#fff',
-                  borderRadius: 'var(--radius-md)',
-                  fontWeight: 700,
-                  fontSize: '1.05rem',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  boxShadow: '0 4px 20px rgba(6,78,59,0.35)',
-                  transition: 'transform 0.2s, box-shadow 0.2s',
-                }}
-              >
-                Start Creating
-              </a>
-
-              <a
-                href="#/marketplace"
-                id="cta-browse"
-                style={{
-                  padding: '1rem 2.2rem',
-                  color: '#064e3b',
-                  borderRadius: 'var(--radius-md)',
-                  fontWeight: 700,
-                  fontSize: '1.05rem',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  background: 'rgba(255,255,255,0.85)',
-                  border: '1px solid rgba(16,185,129,0.25)',
-                  boxShadow: '0 4px 16px rgba(6,78,59,0.12)',
-                }}
-              >
-                Browse Games
-              </a>
-            </div>
+    <section className="workshop-tools" aria-labelledby="workshop-tools-title">
+      <header className="workshop-section-heading">
+        <p className="workshop-eyebrow">More making. Less setting things up.</p>
+        <h2 id="workshop-tools-title">
+          A home for every
+          <br />
+          <em>“let’s try that.”</em>
+        </h2>
+        <p>You don’t need a perfect idea to start. You need a place to keep making it better.</p>
+      </header>
+      <div data-layout="workshopFeatureGrid" className="workshop-feature-grid">
+        <article className="workshop-feature workshop-feature--versions">
+          <GitBranch size={25} />
+          <h3>Be brave. Keep your versions.</h3>
+          <p>
+            Save a checkpoint before a big change. Compare your work, try a new branch, and return to an
+            earlier design when you need it.
+          </p>
+          <div
+            data-layout="versionHistoryIllustration"
+            className="workshop-version-demo"
+            aria-label="Example version history"
+          >
+            <span>
+              <i /> First playable idea <small>v1</small>
+            </span>
+            <span>
+              <i /> A shorter, snappier turn <small>v2</small>
+            </span>
+            <span>
+              <i /> What if we add a wild card? <small>v3</small>
+            </span>
           </div>
-        </section>
-
-        <section style={{ padding: '5rem 2rem' }}>
-          <div style={{ maxWidth: '1200px', margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
-            <RevealSection>
-              <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-                <h2
-                  style={{
-                    fontSize: 'clamp(2rem, 4vw, 2.8rem)',
-                    fontWeight: 800,
-                    marginBottom: '0.8rem',
-                    color: 'white',
-                    textShadow: '0 2px 8px rgba(0,0,0,0.3), 0 0 20px rgba(0,0,0,0.15)',
-                  }}
-                >
-                  Everything You Need to Build
-                </h2>
-              </div>
-            </RevealSection>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem', alignItems: 'stretch' }}>
-              <RevealSection delay={0.1}>
-                <FeatureCard icon="AI" title="AI-Powered Browser Editor" accent="#10b981">
-                  <p style={{ margin: 0 }}>
-                    Start with a lightweight setup form, then let AI generate a linked multi-view workspace in the browser.
-                  </p>
-                </FeatureCard>
-              </RevealSection>
-              <RevealSection delay={0.2}>
-                <FeatureCard icon="GO" title="Instant Playtests" accent="#eab308">
-                  <p style={{ margin: 0 }}>
-                    Generate live multiplayer sessions in one click and invite testers without deploying servers.
-                  </p>
-                </FeatureCard>
-              </RevealSection>
-              <RevealSection delay={0.3}>
-                <FeatureCard icon="$" title="Monetize Effortlessly" accent="#84cc16">
-                  <p style={{ margin: 0 }}>
-                    Publish to the marketplace, sell once, and keep game night simple for every table.
-                  </p>
-                </FeatureCard>
-              </RevealSection>
-            </div>
+        </article>
+        <article className="workshop-feature workshop-feature--cards">
+          <Layers3 size={25} />
+          <h3>One template. A whole deck.</h3>
+          <p>
+            Put your card ideas in a table. Choose a design, bind the fields, and make a consistent deck
+            without laying out every card by hand.
+          </p>
+          <div data-layout="cardTableIllustration" className="workshop-table-demo" aria-hidden="true">
+            <span>Name</span>
+            <span>Cost</span>
+            <span>Copies</span>
+            <strong>Wild fern</strong>
+            <span>2</span>
+            <span>4</span>
+            <strong>Moonlit path</strong>
+            <span>3</span>
+            <span>2</span>
+            <strong>A little sunshine</strong>
+            <span>1</span>
+            <span>6</span>
           </div>
-        </section>
-
-        <section style={{ padding: '5rem 2rem' }}>
-          <div style={{ maxWidth: '800px', margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
-            <RevealSection>
-              <h2
-                style={{
-                  fontSize: 'clamp(2rem, 4vw, 2.8rem)',
-                  fontWeight: 800,
-                  textAlign: 'center',
-                  marginBottom: '3rem',
-                  color: 'white',
-                  textShadow: '0 2px 8px rgba(0,0,0,0.3), 0 0 20px rgba(0,0,0,0.15)',
-                }}
-              >
-                From Idea to Game Night in Minutes
-              </h2>
-            </RevealSection>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-              <RevealSection delay={0.1}>
-                <StepCard num={1} title="Start with Setup" desc="Enter the game name, player range, theme, and first rules draft." />
-              </RevealSection>
-              <RevealSection delay={0.2}>
-                <StepCard num={2} title="Build with AI" desc="Generate the first workspace from the setup form and engine APIs." />
-              </RevealSection>
-              <RevealSection delay={0.3}>
-                <StepCard num={3} title="Refine and Playtest" desc="Adjust components, app layout, and version checkpoints while preview stays current." />
-              </RevealSection>
-              <RevealSection delay={0.4}>
-                <StepCard num={4} title="Publish and Sell" desc="List your game on the TurnBased marketplace when it is ready." />
-              </RevealSection>
-            </div>
-          </div>
-        </section>
-
-        <footer
-          style={{
-            padding: '2rem',
-            textAlign: 'center',
-            color: '#0f766e',
-            fontSize: '0.85rem',
-            background: 'rgba(255,255,255,0.7)',
-            borderTop: '1px solid rgba(16,185,129,0.15)',
-          }}
-        >
-          © {new Date().getFullYear()} TurnBased.
-        </footer>
+        </article>
+        <article className="workshop-feature">
+          <Bot size={25} />
+          <h3>A place to ask “is this fun?”</h3>
+          <p>
+            Keep playtest notes beside your design. Run repeatable agent simulations of a supported game
+            model, and export a brief for an AI reviewer.
+          </p>
+          <span className="workshop-feature__note">
+            Test an idea. Inspect the evidence. Decide what changes.
+          </span>
+        </article>
+        <article className="workshop-feature">
+          <Printer size={25} />
+          <h3>From your screen to your table.</h3>
+          <p>
+            Prepare printable card sheets and check your prototype’s readiness. Explore physical components as
+            you work toward a game you can hold.
+          </p>
+          <span className="workshop-feature__note">
+            Home printing now. Physical production is the next chapter.
+          </span>
+        </article>
       </div>
-    </>
-  );
-};
+    </section>
+
+    <section className="workshop-invitation" aria-labelledby="workshop-invitation-title">
+      <Sparkles size={24} />
+      <p className="workshop-eyebrow">For first-time makers and serial tinkerers</p>
+      <h2 id="workshop-invitation-title">
+        The best version of your game
+        <br />
+        starts with the first one.
+      </h2>
+      <a href="#/new" className="workshop-button workshop-button--primary">
+        Let’s make something <ArrowRight size={17} />
+      </a>
+    </section>
+    <footer className="workshop-home-footer">
+      <a href="#/" className="workshop-wordmark">
+        <Leaf size={18} /> TurnBased<span>.</span>
+      </a>
+      <p>A cozy place to make, test, and improve board games.</p>
+      <span>Made for the love of game night.</span>
+    </footer>
+  </div>
+);

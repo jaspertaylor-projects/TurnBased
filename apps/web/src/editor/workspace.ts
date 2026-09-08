@@ -33,7 +33,7 @@ export async function loadProjectWorkspace(projectId: string): Promise<ProjectWo
   };
 }
 
-export async function saveProjectWorkspace(projectId: string, files: Record<string, string>): Promise<ProjectWorkspaceRecord> {
+async function writeProjectWorkspace(projectId: string, files: Record<string, string>): Promise<ProjectWorkspaceRecord> {
   await ensureStorageMigrated();
   const current = await idbGet<StoredWorkspaceRecord>(WORKSPACES_STORE, projectId);
   const now = new Date().toISOString();
@@ -46,6 +46,19 @@ export async function saveProjectWorkspace(projectId: string, files: Record<stri
   await idbPut(WORKSPACES_STORE, record);
 
   return { projectId, files, createdAt: record.createdAt, updatedAt: record.updatedAt };
+}
+
+// Workspace renders can hash different amounts of art. Keep their writes in
+// request order so a slower older render never replaces a newer working tree.
+const workspaceWrites = new Map<string, Promise<unknown>>();
+export function saveProjectWorkspace(projectId: string, files: Record<string, string>): Promise<ProjectWorkspaceRecord> {
+  const previous = workspaceWrites.get(projectId) ?? Promise.resolve();
+  const task = previous.catch(() => undefined).then(() => writeProjectWorkspace(projectId, files));
+  workspaceWrites.set(projectId, task);
+  void task.finally(() => {
+    if (workspaceWrites.get(projectId) === task) workspaceWrites.delete(projectId);
+  }).catch(() => undefined);
+  return task;
 }
 
 export async function deleteProjectWorkspace(projectId: string): Promise<void> {

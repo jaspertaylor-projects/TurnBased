@@ -236,13 +236,15 @@ export function createWorkspaceFiles(project: EditorProject, runtime: PreviewRun
     ...project.views.items.map((view) => `- ${view.label} (${view.kind}${view.linkedSeatId ? ` -> ${view.linkedSeatId}` : ''})`),
     '',
     '## Rules',
-    project.rules.rulesText,
+    project.rules.chapters.map((chapter) => `### ${chapter.title}\n\n${chapter.body}`).join('\n\n') || project.rules.rulesText,
   ].join('\n');
 
   const hookFiles = Object.fromEntries(project.manifest.customHooks.map((hook) => [hook.filePath, hook.code]));
 
   return {
     'turnbased.project.json': projectFile,
+    ...(project.cardStudio ? { 'design/card-studio.json': canonicalSerialize(project.cardStudio) } : {}),
+    ...(project.playtestLab ? { 'playtest/lab.json': canonicalSerialize(project.playtestLab) } : {}),
     'turnbased.brief.json': briefFile,
     'turnbased.views.json': viewsFile,
     'turnbased.app-layout.json': appLayoutFile,

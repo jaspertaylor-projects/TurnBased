@@ -1,4 +1,5 @@
-import type { EditorArtReference, EditorIconAsset, EditorProject, RulesChapter, StoredEditorProjects } from './types';
+import type { EditorArtReference, EditorIconAsset, EditorProject, RulesChapter } from './types';
+import { normalizeCardStudioState } from './cardStudio/model';
 import { ensureProjectManifest } from './manifest';
 import { normalizeProjectAIModels } from './aiModelCatalog';
 import {
@@ -14,18 +15,17 @@ import {
 } from './project';
 import { createDefaultProjectColorPalette, createProjectPaletteReference } from './projectPalette';
 import { deleteProjectVersionData } from './git';
-import { deflateProjectImages, inflateProjectImages } from './persistence/imageBlobs';
+import { inflateProjectImages } from './persistence/imageBlobs';
 import { ensureStorageMigrated } from './persistence/migrate';
-
-const STORAGE_KEY = 'turnbased.creator.projects';
-
-function getStorage(): Storage | null {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-
-  return window.localStorage;
-}
+import {
+  ProjectReadError,
+  readLiveProject,
+  readLiveProjects,
+  writeLiveProject,
+  removeLiveProject,
+  reportProjectReadError,
+  type ProjectReadErrorHandler,
+} from './persistence/liveProjects';
 
 function clampPlayerCount(value: unknown, fallback: number): number {
   const numeric = typeof value === 'number' && Number.isFinite(value) ? Math.trunc(value) : fallback;
@@ -229,44 +229,29 @@ function normalizeEditorProject(project: EditorProject): EditorProject {
   };
 }
 
-/** The raw, at-rest project list (image payloads deflated to blob refs). */
-function readRawProjects(): EditorProject[] {
-  const storage = getStorage();
-  if (!storage) {
-    return [];
-  }
-
-  const raw = storage.getItem(STORAGE_KEY);
-  if (!raw) {
-    return [];
-  }
-
-  try {
-    const parsed = JSON.parse(raw) as StoredEditorProjects;
-    return parsed.projects ?? [];
-  } catch {
-    return [];
-  }
+async function hydrateStoredProject(project: EditorProject): Promise<EditorProject> {
+  const hydrated = await inflateProjectImages(normalizeEditorProject(project));
+  return hydrated.cardStudio ? { ...hydrated, cardStudio: normalizeCardStudioState(hydrated.cardStudio) } : hydrated;
 }
 
-function writeRawProjects(projects: EditorProject[]): void {
-  getStorage()?.setItem(
-    STORAGE_KEY,
-    JSON.stringify({ projects } satisfies StoredEditorProjects),
-  );
-}
-
-export async function loadEditorProjects(): Promise<EditorProject[]> {
+export async function loadEditorProjects(onError?: ProjectReadErrorHandler): Promise<EditorProject[]> {
   await ensureStorageMigrated();
-  return Promise.all(
-    readRawProjects().map((project) => inflateProjectImages(normalizeEditorProject(project))),
-  );
+  const projects = await readLiveProjects(onError);
+  const results = await Promise.allSettled(projects.map((project) => hydrateStoredProject(project)));
+  return results.flatMap((result, index) => {
+    if (result.status === 'fulfilled') return [result.value];
+    const project = projects[index];
+    reportProjectReadError(new ProjectReadError(project.id, project.name, result.reason), onError);
+    return [];
+  });
 }
 
 export async function loadEditorProject(projectId: string): Promise<EditorProject | null> {
   await ensureStorageMigrated();
-  const raw = readRawProjects().find((project) => project.id === projectId);
-  return raw ? inflateProjectImages(normalizeEditorProject(raw)) : null;
+  const raw = await readLiveProject(projectId);
+  if (!raw) return null;
+  try { return await hydrateStoredProject(raw); }
+  catch (cause) { throw new ProjectReadError(raw.id, raw.name, cause); }
 }
 
 // Saves are chained so rapid autosaves can't interleave their async
@@ -276,19 +261,18 @@ let writeQueue: Promise<unknown> = Promise.resolve();
 export function saveEditorProject(project: EditorProject): Promise<void> {
   const task = writeQueue.then(async () => {
     await ensureStorageMigrated();
-    // Large data URLs move to IndexedDB; localStorage keeps only small refs.
-    const deflated = await deflateProjectImages(project);
-    const nextProjects = readRawProjects().filter((entry) => entry.id !== project.id);
-    nextProjects.unshift(deflated);
-    writeRawProjects(nextProjects);
+    await writeLiveProject(project);
   });
   writeQueue = task.catch(() => undefined);
   return task;
 }
 
-export async function deleteEditorProject(projectId: string): Promise<void> {
-  await ensureStorageMigrated();
-  writeRawProjects(readRawProjects().filter((project) => project.id !== projectId));
-  // Also drop the project's commits, workspace, and any orphaned blobs.
-  await deleteProjectVersionData(projectId);
+export function deleteEditorProject(projectId: string): Promise<void> {
+  const task = writeQueue.then(async () => {
+    await ensureStorageMigrated();
+    removeLiveProject(projectId);
+    await deleteProjectVersionData(projectId);
+  });
+  writeQueue = task.catch(() => undefined);
+  return task;
 }

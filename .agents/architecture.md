@@ -7,42 +7,46 @@ matter for the current milestone*. If something here contradicts a doc in
 
 ## 1. Scope
 
-The current product milestone is **Milestone 1: board game design + physical
-prototype order**. Everything else (online play, marketplace, economy) is
-deferred.
+TurnBased is an approachable workshop for amateur board game designers:
+**idea → prototype → playtest → revise → print**. The user explicitly made
+versioning, AI-compatible playtesting, and card templates driven by tables
+current priorities in September 2026. Earlier exclusions of AI players and
+legal-move generation from the active milestone no longer apply.
 
-Concretely, M1 ships a designer who can:
+The current product supports:
 
-- Author a board game project (boards, cards, tiles, dice, tokens, tracks,
-  decks, etc.) with version history.
-- Compose components from a fixed built-in catalog plus templating (decks,
-  resource piles) so repeat assets aren't duplicated by hand.
-- Get AI help for rule text and art assets.
-- See each component priced and validated against the third-party physical
-  catalog (bleed zones, sizes, bulk discounts surfaced to the user).
-- Place a physical prototype order — the user picks pieces, we handle supplier
-  ordering on the backend.
+- Guest/local game creation, a recent-games workshop, and a Little Woodland
+  example with rules, card data, and a configured playtest experiment.
+- Rulebooks, supplier-linked components, art assistance, and table-driven
+  card design with reusable templates and batch generation.
+- Named checkpoints, experiment branches, design comparisons, safe restores,
+  and portable archives containing design history and embedded artwork.
+- A bounded, executable two-player market-race lab with seeded heuristic
+  agents, replayable transcripts, version-linked findings, and a public JSON
+  observation/legal-move contract for external agents.
+- A4/Letter prototype card sheets and printable rulebooks. Supplier checkout
+  and production fulfillment remain future work.
 
-Things explicitly **not** in M1: deterministic engine runtime, legal-move
-generation, AI players, multiplayer rooms, ledger, listings, purchases.
-These have code stubs in `packages/` and `supabase/` but are not the focus
-and should not drive new decisions in the editor.
+The lab does not interpret arbitrary rulebook prose or card abilities, and
+it is not an automatic LLM runner. Broad game-engine coverage, hosted
+multiplayer, marketplace, payments, and an online economy remain longer-term
+work. Keep these boundaries explicit in UI copy and architecture decisions.
 
 ## 2. Monorepo layout
 
 ```
 /apps
-  /catalog-api               supplier catalog + quotes + ingestion (NestJS/Prisma) [M1 ACTIVE]
-  /web                       creator dashboard + editor + (stubbed) play shell
+  /catalog-api               supplier catalog + quotes + ingestion (NestJS/Prisma)
+  /web                       local workshop + editor + playtest lab + prototype exports
 /packages
-  /engine-components         built-in component catalog + schemas       [M1 ACTIVE]
-  /engine-core               reducer, triggers, turn system              [M2]
-  /engine-sdk                author-facing rule APIs                     [M2]
-  /engine-ui                 interaction affordances                     [M2]
-  /engine-ai                 AI player contracts                         [M2]
-  /shared-types              cross-package types                         [M1 ACTIVE]
-  /shared-utils              zod schemas, IDs, serialization             [M1 ACTIVE]
-  /sample-games              reference games                             [M2]
+  /engine-components         built-in component catalog + schemas       [ACTIVE]
+  /engine-core               reducer, triggers, turn system              [ENGINE FOUNDATION]
+  /engine-sdk                author-facing rule APIs                     [ENGINE FOUNDATION]
+  /engine-ui                 interaction affordances                     [ENGINE FOUNDATION]
+  /engine-ai                 AI player contracts                         [ENGINE FOUNDATION]
+  /shared-types              cross-package types                         [ACTIVE]
+  /shared-utils              zod schemas, IDs, serialization             [ACTIVE]
+  /sample-games              reference games                             [ENGINE FOUNDATION]
 /supabase
   /migrations                auth, projects, ledger, builds, multiplayer,
                              commerce, rate-limits, play-sessions
@@ -63,37 +67,45 @@ is needed. The web still uses HTTP `/v1`, proxied by Vite. See the
 1. App code may only import public exports of `packages/*`. No deep imports.
 2. Engine packages may depend on `shared-types` / `shared-utils` but not on
    app code.
-3. `engine-components` is the only engine package that's load-bearing for M1
-   — it defines the catalog the editor renders.
+3. `engine-components` defines the editor catalog. Engine packages also
+   support the existing preview runtime; the current lab has its explicit
+   executable model in `apps/web/src/editor/playtest/`.
 
 ## 3. Web app — editor architecture
 
-The creator is split into two stages so the pre-build flow can evolve
-independently from the post-build editor:
+The entry workflow creates a saved project before optional AI assistance:
 
-- **Pre-build:** [apps/web/src/pages/CreateBlankProject.tsx](../apps/web/src/pages/CreateBlankProject.tsx)
-  collects game name, player-count range, theme, art style, starter presets,
-  and runs `Build with AI`. Until there is a rules brief, there is no
-  project. Legacy `#/templates` redirects to `#/new`.
-- **Post-build:** [apps/web/src/pages/Editor.tsx](../apps/web/src/pages/Editor.tsx)
-  is a thin shell. It owns route parsing, project loading, persistence,
-  active-section state, version-history actions, and workspace syncing —
-  not rendering.
+- [CreateGame.tsx](../apps/web/src/pages/CreateGame.tsx) at `#/new` collects a
+  working title, optional theme, and 1–6 players. It creates a local project
+  and initial checkpoint without auth or AI calls. The Little Woodland sample
+  includes five editable rule chapters, four designs / ten cards, and a
+  matching market-race configuration.
+- `#/dashboard` is available to guests and lists local projects, checkpoint
+  counts, search, next actions, and a copyable sample.
+- [CreateBlankProject.tsx](../apps/web/src/pages/CreateBlankProject.tsx) remains
+  at `#/new/guided` for guided AI setup. Legacy `#/templates` redirects to
+  `#/new`.
+- [Editor.tsx](../apps/web/src/pages/Editor.tsx) coordinates loading, autosave,
+  undo, sections, and version actions. `EditorFrame` owns shared rendering;
+  `editorComponentActions.ts` isolates component actions. The default section
+  is `workshop`; deep links use `#/editor/<id>?section=card_studio` (or another
+  section ID). Load the latest saved draft; selecting a checkpoint is an
+  explicit restore action.
 
 ### Section modules
 
-Every top-level editor surface lives as one file under
+Top-level editor surfaces live under
 [apps/web/src/editor/sections/](../apps/web/src/editor/sections/):
 
-- `VisualsSection` — board appearance, in-canvas placement of spaces /
-  tracks / children with drag-drop and resize.
-- `ComponentEditorSection` — authoring individual components (the workbench).
-- `ComponentGallery` — outline of all components for a project.
-- `ArtSection` — AI art workflow.
-- `AppLayoutSection` — linked multi-view layout (main board + per-seat
-  player views).
-- `SettingsSection` — project settings.
-- `VersionsSection` — git-style version history.
+- `WorkshopSection` — next steps and prototype counts.
+- `RulesSection`, `StatsSection` — rulebook and game details.
+- `CardStudioSection` — data table, template editor, generated deck preview.
+- `PlaytestSection` — executable lab, external-agent turns, sessions, findings.
+- `VersionsSection` — named checkpoints, branches, change comparison, trail map.
+- `PrintSection` — card sheets, rulebook export, portable archive import/export.
+- `VisualsSection`, `ComponentEditorSection`, `ComponentGallery` — component
+  workbench, appearance, placement, and component outline.
+- `ArtSection`, `AppLayoutSection` — art and linked table/player views.
 
 There is intentionally **no separate `PreviewSection`** anymore — preview
 reuses the same board-surface renderer used inside `VisualsSection` so the
@@ -108,16 +120,73 @@ out of view files:
 - `project.ts` — project mutation primitives.
 - `runtime.ts` — compile authored project → preview runtime state.
 - `storage.ts`, `workspace.ts`, `git.ts` — persistence layers (all async).
-  Version history, workspace file maps, and image payloads live in
-  **IndexedDB** via `persistence/` (content-addressed sha-256 blob store +
-  commit/workspace records + data-URL deflate/inflate + legacy-localStorage
-  migration). localStorage holds only small metadata — never file maps or
-  base64 images (its ~5MB quota is what broke saving in 2026-07).
+  Live project snapshots, version history, workspace files, and images live
+  in **IndexedDB** via `persistence/`. See the storage contract below.
 - `aiBuilder.ts`, `aiBuildService.ts`, `ai.ts` — AI build orchestration.
-- `supplierCatalog.ts`, `useSupplierCatalog.ts`, `shipping.ts` — physical
-  order pricing + supplier lookup.
+- `supplierCatalog.ts`, `useSupplierCatalog.ts` — supplier lookup and pricing.
+- `shipping.ts` — generated workspace files and preview/release build records.
+- `cardStudio/` — table normalization, CSV/TSV parsing, template rendering,
+  copy expansion, and print HTML.
+- `playtest/` — the executable market-race model, agent packets, replay,
+  batches, and findings.
+- `versions/` — readable design comparison and portable archives.
+- `exports/` — file downloads and printable rulebooks.
 - `boardLayout.ts`, `componentMeta.tsx`, `iconography.tsx` — visual
   conventions.
+
+### Storage and version contract
+
+- `persistence/liveProjects.ts` stores a v2 pointer for each game under
+  localStorage `turnbased.creator.projects`: ID, name, update time, and
+  snapshot hash. Full deflated snapshots live in the IndexedDB blob store.
+  Legacy inline projects remain readable and migrate on their next save.
+- Write the snapshot before updating its index pointer. Keep all public
+  storage APIs async; use `saveEditorProject` / `loadEditorProject` rather
+  than writing localStorage directly.
+- Workspace and checkpoint records hold path → SHA-256 references. Embedded
+  images become `idb-image://<hash>` references at rest and inflate on load.
+  Card Studio normalization runs after image hydration.
+- Checkpoints are immutable and retained locally even after remote sync.
+  Restore preserves a dirty draft in a named safety checkpoint first;
+  new checkpoints retain their parent links without deleting forward
+  history. Designers can name experiment branches explicitly. Remote backup
+  is optional.
+- `versions/archive.ts` exports design archive v2: the live draft, all
+  checkpoints, parent/branch metadata, and a deduplicated embedded-artwork
+  map. Import validates artwork hashes and checkpoint ancestry and creates
+  a new project. The current limits are 100 MB and 2,000 checkpoints per
+  archive; the exporter does not trim history to fit. v1 archives remain
+  importable.
+- Automatic orphan-blob garbage collection is intentionally disabled in
+  project deletion/history maintenance. Blobs may be shared by live drafts,
+  workspaces, and checkpoints, and collecting during an in-flight save can
+  destroy its new snapshot. A future coordinated compaction must capture
+  all roots and serialize against saves; do not reintroduce eager pruning.
+
+### Card and agent contracts
+
+`EditorProject.cardStudio` holds rows, custom columns, a shared template,
+copy counts, and compact generated references. CSV import and pasted TSV
+support custom fields; imports validate before replacing/appending data.
+One SVG renderer produces live previews, individual card files, and A4 or
+Letter HTML sheets with explicit millimeter dimensions, page breaks, and
+cutting guides. Uploaded artwork is embedded and reused across copies;
+linked remote artwork remains dependent on its URL. These exports are
+single-sided home prototypes, not supplier-approved manufacturing files.
+
+`EditorProject.playtestLab` holds the lab configuration, session transcripts,
+batches, and version-linked findings. `market-race-v1` supports exactly two
+seats gathering a resource, buying public-market cards by numeric cost,
+scoring points, and ending turns. It offers balanced/greedy/random heuristic
+strategies, deterministic seeds, batch results, and replay validation.
+Rulebook prose and card ability text are reference material only.
+
+Agent packets include frozen session configuration/card definitions,
+executable rules, public observations, legal action IDs, and a JSON response
+shape. Imported moves must match the current step and a legal action; stale
+or illegal replies are rejected. No LLM API call is made by the built-in
+agents. This contract is a starting point for broader executable games, not
+proof that arbitrary authored games are already machine-playable.
 
 ### Scaling rules
 
@@ -188,44 +257,41 @@ manifest) and creates the first version checkpoint.
 Subsequent AI assistance (rule suggestions, art generation) follows the same
 shape: edge function → structured payload → workspace mutation.
 
-## 6. Physical prototype ordering
+## 6. Prototype printing and supplier direction
 
-This is the M1 endpoint that closes the loop with the user. The flow:
+`PrintSection` closes the current iteration loop with downloadable card
+sheets and a rulebook. Users open the HTML export and print at 100% / actual
+size with browser headers/footers disabled. Designer notes stay out of the
+public rulebook. Readability and supplier-link counts help prepare the next
+paper playtest; they do not certify a manufacturing-ready product.
 
-1. User authors components in the editor.
-2. `useSupplierCatalog` resolves each component against the third-party
-   catalog (sizes, bulk pricing, available stock).
-3. Inspector surfaces unit price and a "bulk discount" indicator (not a
-   full volume table — per [TO_DO.md](../TO_DO.md)).
-4. Bleed zone, dimensions, and product-fixed sizing are visualized in the
-   editor canvas so the user sees what will be printed.
-5. Shipping math lives in `shipping.ts`.
+The component editor already resolves dimensions, finishes, and pricing
+through the integrated catalog API. Keep supplier sizes and bleed/safe-zone
+requirements visible when designing physical components. Checkout,
+production files, order submission, and fulfillment are future work.
 
-The third-party catalog API contract belongs in
-[`.agents/third-party-catalog-pricing-api.md`](./third-party-catalog-pricing-api.md)
-— that file is currently empty and is the single highest-leverage doc gap
-for M1.
+The API contract is documented in
+[third-party-catalog-pricing-api.md](./third-party-catalog-pricing-api.md).
+The running supplier service lives inside `apps/catalog-api`; the editor
+continues to use its HTTP `/v1` boundary.
 
-## 7. Deferred milestones
+## 7. Longer-term engine and economy work
 
-When work eventually starts on these, the parked docs in
-[docs/future/](../docs/future/) become relevant again:
+The broader engine design in [docs/future/](../docs/future/) remains useful
+for extending executable game coverage and hosted play:
 
-- **M2 — online play engine:** `docs/future/engine/architecture.md`,
-  `state-model.md`, `action-grammar.md`, `triggers-and-priority.md`,
-  `turn-system.md`, `legal-move-generation.md`,
-  `ui-interaction-contract.md`, `rules-authoring.md`,
-  `extension-points.md`, plus `docs/future/adr/0002-*` and
-  `docs/future/adr/0003-*`.
-- **M2 — AI players:** `docs/future/engine/ai-player-contract.md`,
-  `agent-engine-api.md`, `packages/engine-ai/`.
-- **M3 — economy:** Supabase tables `listings`, `purchases`, `entitlements`
-  exist in migrations but have no UI yet.
+- `docs/future/engine/` describes state models, actions, triggers, legal moves,
+  rules authoring, visibility, and AI-player contracts.
+- `docs/future/adr/0002-*` and `0003-*` cover engine-first authoring and
+  override policy. The current constrained lab is not an implementation of
+  every proposed engine feature.
+- Listings, purchases, entitlements, multiplayer routes, and related
+  migrations are retained foundations. They are not the product's primary
+  navigation or a completed commerce flow.
 
-Constraint that bleeds back into M1: every authored component must remain
-addressable as a runtime entity so it can be lifted into M2's playable
-runtime without re-authoring. The template/quantity pattern in
-`engine-components` is the load-bearing piece here — don't bypass it.
+Keep authored components addressable and retain source card rows and stable
+identities so later runtime adapters can reuse a design without re-authoring.
+Do not infer executable behavior from unstructured prose silently.
 
 ## 8. UI standards
 
@@ -242,7 +308,7 @@ Do not duplicate these rules into other docs.
 
 ## Doc inventory
 
-**Load-bearing for M1:**
+**Current workshop references:**
 
 - [.agents/goal.md](./goal.md) — product direction.
 - [.agents/goldenrules.md](./goldenrules.md) — coding + UI rules
@@ -252,11 +318,11 @@ Do not duplicate these rules into other docs.
 - [docs/adr/0001-monorepo-engine-boundaries.md](../docs/adr/0001-monorepo-engine-boundaries.md)
   — package boundaries + import rules.
 - [docs/adr/0004-web-editor-composition.md](../docs/adr/0004-web-editor-composition.md)
-  — editor staging.
+  — historical editor staging; the current guest creation path above supersedes its AI-first entry flow.
 - [apps/web/README.md](../apps/web/README.md) — editor structure.
 - [TO_DO.md](../TO_DO.md) — active component-editor backlog.
 - [docs/human-todo.md](../docs/human-todo.md) — pre-launch operational
-  checklist; not M1 code scope but relevant near launch.
+  checklist; not current editor code scope but relevant near launch.
 
 **Parked for future milestones — see [docs/future/](../docs/future/):**
 
@@ -268,10 +334,18 @@ Do not duplicate these rules into other docs.
 - `docs/future/ai/aider-openrouter-workspace-plan.md` (future AI worker
   architecture).
 
-Note: `apps/web/src/editor/ai.ts` and `capabilities.ts` cite
-`docs/future/engine/*` and `docs/future/adr/0003-*` as AI grounding.
-M1 builds still ground the AI in these engine docs because the editor
-expects authored projects to remain runtime-addressable for M2. That
-grounding is fine to keep, but if it ever drifts the project off-scope
-(generating engine rules that don't matter for M1), revisit which
-citations are passed to the AI.
+AI grounding in `ai.ts` and `capabilities.ts` still references the broader
+engine docs. Preserve useful context, but distinguish generated design
+material from executable behavior actually implemented in the current lab.
+
+## Validation
+
+From the repository root:
+
+- `npm run test:workshop` — Node/tsx tests for card data, template/print exports,
+  deterministic simulations, replay, and agent packets.
+- `npm run test:versions` — Vitest with fake IndexedDB for live-draft storage,
+  checkpoint ancestry, restore/branch behavior, archives, and image deduplication.
+- `npm run typecheck` — all workspace TypeScript checks.
+- Playwright verifies guest creation, card imports/generation, version restore,
+  exports, lab actions, and bounded desktop/mobile surfaces. Keep logs in `logs/`.

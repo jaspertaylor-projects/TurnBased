@@ -1,12 +1,67 @@
 # TurnBased
 
-The online home for board game designers. Design components, version your
-rules, get AI help on text and art, and order physical prototypes through
-our supplier integration.
+A cozy workshop for amateur board game designers: **make a game, try it,
+make it better, and print a prototype.** Keep rules, components, card tables,
+playtest findings, and version history together as an idea grows.
 
 Architecture and current scope live in [.agents/architecture.md](.agents/architecture.md).
-Current milestone is board game design + physical prototype ordering;
-online play and the digital marketplace are planned later milestones.
+The current workflow is **idea → prototype → playtest → revise → print**.
+Supplier checkout, production fulfillment, and a marketplace remain future work.
+
+## Try the workshop
+
+After starting the local stack, open `http://127.0.0.1:3000`:
+
+1. Choose **New game** and enter a working title, or open **My workshop**
+   and try **Little Woodland**. Creating a game and its first local checkpoint
+   needs no account or AI generation. The example includes five rules chapters,
+   four card designs, and ten physical cards.
+2. In **Card studio**, edit the table or import CSV / pasted spreadsheet rows.
+   Bind fields to a Woodland, Storybook, or Modern template, then generate
+   the deck. Copy counts, custom fields, artwork, and template settings save
+   with the project.
+3. In **Playtest lab**, record observations or run the supported two-player
+   market-race experiment. Seeded heuristic agents play explicit numeric
+   cost/points rules; they do not interpret arbitrary rulebooks or card powers.
+   Export an agent packet with public state and legal moves, and paste an
+   external agent's JSON reply to take a validated turn. No LLM runner is
+   required for the built-in simulations.
+4. In **Version history**, name checkpoints, branch an experiment, compare
+   changes, and restore earlier work. Restoring saves uncheckpointed work in
+   a safety checkpoint first. Browser drafts survive reloads independently
+   of the selected checkpoint.
+5. In **Print & share**, download A4 or US Letter card sheets with millimeter
+   dimensions and cutting guides, a printable rulebook, or a design archive
+   with history. Open the HTML sheets and print at **100% / actual size**
+   with browser headers and footers off. These are prototype card fronts;
+   manufacturing bleed, duplex backs, and supplier ordering need further work.
+
+`#/new` is the local creation path; `#/new/guided` retains guided AI setup.
+Editor links accept a section, for example
+`#/editor/<project-id>?section=card_studio`.
+
+Live project snapshots, workspace files, checkpoints, and embedded artwork
+are stored in IndexedDB. localStorage contains a small project index and UI
+preferences. Checkpoints are not automatically pruned; download a portable
+backup before clearing browser data or moving to another browser. Archives
+include embedded artwork once and import as a new game. Linked HTTP(S)
+artwork still needs its original source; upload it to make it portable.
+
+## Workshop checks
+
+Run from the repository root:
+
+```bash
+npm run test:workshop # Node tests: card tables, exports, simulation and agent protocol
+npm run test:versions # Vitest + fake IndexedDB: persistence, versions and archives
+npm run typecheck    # Typecheck all workspaces
+```
+
+UI verification uses Playwright; browser helpers and logs are described below.
+With the dev stack and the dedicated browser running, `npm run test:workshop:browser`
+checks cards, checkpoint restore, agent moves, simulations, print downloads, and
+backup import in an isolated browser context. Set `PLAYWRIGHT_MODULE_PATH` if
+Playwright is installed elsewhere; artifacts go to `/tmp/turnbased-workshop-smoke`.
 
 ## Local Dev
 
@@ -152,7 +207,8 @@ http://127.0.0.1:54323
    ```bash
    npm run dev --workspace web -- --host 127.0.0.1 --port 3000
    ```
-7. Open `http://127.0.0.1:3000`, sign in, and use `Build with AI`.
+7. Open `http://127.0.0.1:3000` and create a game or try Little Woodland.
+   Sign in only when exercising an authenticated feature such as AI assistance.
 
 ### Environment variables
 

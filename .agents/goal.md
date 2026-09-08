@@ -1,98 +1,57 @@
-# Turn Based Goal
+# TurnBased Goal
 
-It is our goal to be the go-to online site for board game devs.  
+TurnBased is a convenient, welcoming workshop for amateur board game designers.
+Help someone turn an idea into a playable prototype, learn from trying it,
+and eventually hold a physical copy of their own game.
 
-We want board game developers to be able to come to our site, design a board game,
-order a physical prototype.  Make a playable online version of their game, and playtest their game online.  Eventually, we would like to be able to sell peoples board games both digitally and physically.
+**Make a board game. Try it with friends. Make it better. Print it when you’re ready.**
 
-## Milestones
+The central loop is **idea → prototype → playtest → revise → print**. A maker
+should not need specialist layout tools, manufacturing knowledge, or several
+disconnected apps just to discover whether their idea is fun.
 
-1. Board game design + physical order
-    1. A version controlled way to design components, keep track of rules etc.
-    2. Intelligent board game design components for making (boards, cards, tiles, dice, etc) made from subcomponents tracks, spaces, lines, and incorporating templating for repeat components and decks of cards etc.    
-    3. AI help for writing rules, and making art assets
-    4. Each component should come from our webscraped catalog of assets, and we will handle the ordering on the backend for them.  The bleed zone and everything shoudl be very clear to the user.
-    5. We have a pretty solid 3rd party API that can be used read about it here .agents/third-party-catalog-pricing-api.md
-    6. The project designer should feel simple and fun to use
+## Current priorities
 
-2. AI Board game engine 
-    1. To be desinged later, but we need to be able to keep our assets as interactable items so that they can seemlessly be brought about into a digital version of the game.
-    2. Keep this direction in mind that each board game will eventually need to be playable online when making coding decisions for board game designer + physical order milestone
+The September 2026 direction makes these parts of one active workflow:
 
+1. **Get to the first playable version.** Offer local creation without an
+   account or an AI build, a useful example, clear next steps, and an inviting
+   forest / parchment / oak workspace.
+2. **Keep the history of the game.** Version rules, components, artwork, card
+   data, and playtest findings together. Name checkpoints, branch experiments,
+   compare changes, protect work before restores, and export portable backups.
+3. **Turn tables into attractive decks.** Reusable templates, CSV/spreadsheet
+   import, custom fields, copies, live previews, and batch generation should
+   make a whole deck as convenient to change as one card.
+4. **Make games understandable to agents.** Build toward explicit state,
+   legal moves, reproducible experiments, and AI-agent playtesting. Start with
+   supported executable game models and clearly state their limits; rulebook
+   prose alone is not an executable game. Preserve human playtest observations
+   beside the tested version.
+5. **Move from screen to physical play.** Provide actual-size home prototype
+   exports now. Continue supplier-linked component design, clear dimensions,
+   bleed/safe zones, and pricing toward future physical ordering. The supplier
+   service lives in this monorepo; its contract is in
+   [third-party-catalog-pricing-api.md](./third-party-catalog-pricing-api.md).
+6. **Make assistance optional and useful.** AI rule-writing and art generation
+   support the designer's decisions. The core creation, versioning, card
+   workflow, and current heuristic playtests work without paid AI calls.
 
-3.  Online economy 
-    1. To be designed later, but keep in mind that we will need to be able to have robust user accounts of different types (designer/playtester/user ) etc.   
+## What exists and what comes next
 
+The current Playtest lab executes a two-seat market-race model with numeric
+card costs and points, seeded heuristic agents, transcripts, and an external
+JSON agent protocol. It does not yet execute arbitrary game rules or run an
+LLM automatically. Expand game coverage through explicit, testable contracts.
 
-## Version Control Branching Map Plan
+Current printing produces prototype card fronts and a shareable rulebook.
+Manufacturing-ready duplex/bleed handling, supplier checkout, and fulfillment
+remain future work. Keep supplier-backed components as the path to physical
+orders, while allowing household or custom materials for early playtests.
 
-This section captures the agreed direction for the editor version-control page
-so another agent can continue cleanly if work is interrupted.
+Broader online play and, eventually, digital/physical sales remain part of the
+long-term vision. They should grow naturally from a useful design-and-test
+workshop; marketplace and monetization are not the entry promise.
 
-The version-control page should become a visual branching map on a grassy
-fantasy backdrop. Each version checkpoint is a space/node on the map. The user
-selects the current checkpoint by dragging a meeple marker onto a node. The
-meeple should use the existing app favicon asset at
-`apps/web/public/favicon.png`.
-
-Use a local version graph as the primary UI source of truth. Each graph node
-should store enough data for branch switching to work even without remote git:
-
-- branch/version name
-- numbered commit label
-- commit SHA or local SHA
-- parent commit SHA
-- project snapshot
-- workspace files
-- sync status such as `local`, `synced`, or `sync_failed`
-- optional remote branch name
-- optional real remote SHA
-
-The local graph must let the user move backward, forward, and across branches
-by selecting nodes on the map. Restoring a node should restore that node's
-project snapshot and workspace files. Prefer a confirmation before destructive
-restores so accidental drops do not silently replace the workspace.
-
-Branch/version naming should be user-friendly. The project title remains the
-game name, and a subline beneath it should show the active version name, for
-example:
-
-`My Super Game`
-
-`version: initial musings`
-
-Saving on a version should create numbered commits using the active version
-name:
-
-- `initial musings 1`
-- `initial musings 2`
-- `initial musings 3`
-
-Creating a new version such as `powerful spells` should create a new branch in
-the local graph from the currently selected node. Its commits should then be
-numbered independently:
-
-- `powerful spells 1`
-- `powerful spells 2`
-
-There should be a save icon in the editor sidebar to the right of the project
-name. Clicking it should commit the whole current workspace to the active
-version branch. To guarantee that every save produces a distinct file change
-and SHA, update a per-project/version marker file such as
-`versions/<branch>.json` with the branch name, version number, timestamp, and
-current node id.
-
-Remote git through `git-proxy` is desirable, but should be treated as a backing
-sync/provenance layer rather than the thing required for the UI to work. The
-recommended implementation is hybrid:
-
-- create/update the local graph immediately for responsive branch switching
-- when signed in and a remote project exists, call `git-proxy` to create the
-  corresponding real branch/commit
-- store returned remote branch/SHA on the local graph node
-- if remote sync fails, keep the local node and mark it `sync_failed`
-- allow retrying remote sync later
-
-Do not rewrite history. If the user restores an older node, edits, and then
-saves, prompt them to create a new branch/version from that node rather than
-silently replacing the old branch's forward history.
+Implementation details and current boundaries live in
+[architecture.md](./architecture.md).

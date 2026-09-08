@@ -1,0 +1,213 @@
+.card-studio-panel-heading {
+  flex: 0 0 auto;
+  padding: 14px 16px;
+  border-bottom: 1px solid #e8eade;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.card-studio-panel-heading h2 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 750;
+  color: #345238;
+}
+.card-studio-panel-heading > span {
+  color: #8a9880;
+  font-size: 10px;
+}
+.card-studio-inspector-body {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 15px;
+}
+.card-studio-feature-preview {
+  padding: 12px 20px 17px;
+  background:
+    repeating-linear-gradient(92deg, #c3a27406 0px, #8e6b470a 1px, transparent 4px, transparent 38px), #efe7d8;
+  border: 1px solid #e6dcc9;
+  border-radius: 9px;
+  margin-bottom: 16px;
+}
+.card-studio-card {
+  width: 100%;
+  filter: drop-shadow(0 4px 6px #38240f26);
+}
+.card-studio-card > svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.card-studio-feature-preview .card-studio-error {
+  margin: 10px 0 0;
+  font-size: 10px;
+}
+.card-studio-inspector fieldset {
+  padding: 0;
+  border: 0;
+  margin: 0 0 16px;
+  min-width: 0;
+}
+.card-studio-inspector legend {
+  padding: 0;
+  margin-bottom: 9px;
+  font-size: 10px;
+  font-weight: 750;
+  color: #627657;
+}
+.card-studio-presets {
+  display: grid;
+  gap: 6px;
+}
+.card-studio-preset {
+  position: relative;
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  padding: 7px;
+  border: 1px solid #e3e7d9;
+  border-radius: 7px;
+  cursor: pointer;
+}
+.card-studio-preset.is-selected {
+  border-color: #abc093;
+  background: #f1f6e9;
+  box-shadow: inset 0 0 0 1px #abc09344;
+}
+.card-studio-preset input {
+  position: absolute;
+  right: 8px;
+  width: 12px;
+  accent-color: #557944;
+}
+.card-studio-preset-swatch {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 31px;
+  height: 37px;
+  border: 1px solid;
+  border-radius: 4px;
+  font:
+    600 14px Georgia,
+    serif;
+}
+.card-studio-preset strong {
+  display: block;
+  font-size: 10px;
+  color: #4f6742;
+}
+.card-studio-preset small {
+  display: block;
+  color: #8a977e;
+  font-size: 8px;
+  margin-top: 3px;
+  padding-right: 15px;
+}
+.card-studio-colors {
+  display: flex;
+  gap: 20px;
+}
+.card-studio-colors label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  font-size: 9px;
+  color: #7d8d70;
+}
+.card-studio-colors input {
+  width: 35px;
+  height: 30px;
+  padding: 2px;
+  border: 1px solid #dce2d2;
+  border-radius: 5px;
+  background: white;
+  cursor: pointer;
+}
+.card-studio-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 650;
+  color: #718364;
+  margin-bottom: 12px;
+  min-width: 0;
+}
+.card-studio-field input:not([type="range"]),
+.card-studio-field select,
+.card-studio-field textarea,
+.card-studio-paper-choice select {
+  border: 1px solid #dce3d4;
+  border-radius: 6px;
+  background: #fffef9;
+  padding: 8px 9px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 400;
+  color: #4c6540;
+  width: 100%;
+  min-width: 0;
+}
+.card-studio-field input[type="range"] {
+  width: 100%;
+  accent-color: #5c8149;
+}
+.card-studio-bindings {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+.card-studio-bindings .card-studio-field {
+  margin-bottom: 0;
+}
+.card-studio-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: #79896c;
+  margin-bottom: 17px;
+}
+.card-studio-checkbox input {
+  accent-color: #527642;
+}
+.card-studio-hint {
+  font-size: 12px;
+  color: #8b987e;
+  line-height: 1.7;
+}
+.card-studio-art-fields {
+  border-top: 1px solid #e5e9dc;
+  padding-top: 13px;
+}
+.card-studio-file-button {
+  position: relative;
+  cursor: pointer;
+  overflow: hidden;
+}
+.card-studio-file-button input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.card-studio-file-button:focus-within {
+  outline: 2px solid #408a70;
+  outline-offset: 2px;
+}
+.card-studio-inspector-footer {
+  flex: 0 0 auto;
+  padding: 11px 14px;
+  border-top: 1px solid #e5e9dc;
+  font-size: 9px;
+  color: #8e9b81;
+  background: #fafbf5;
+}

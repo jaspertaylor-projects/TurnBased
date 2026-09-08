@@ -127,7 +127,7 @@ async function migrateWorkspaces(): Promise<void> {
  */
 async function deflateLiveProjects(): Promise<void> {
   const raw = window.localStorage.getItem(PROJECTS_KEY);
-  if (!raw || !raw.includes('data:')) return;
+  if (!raw || !raw.includes('data:') || raw.includes('"storageVersion":2')) return;
 
   let parsed: { projects?: EditorProject[] };
   try {
