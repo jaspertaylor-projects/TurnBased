@@ -647,3 +647,33 @@ image data URLs) in localStorage — its ~5MB origin quota is what caused the
   billing: reject blank titles and merged copy totals over 2,000, including
   untouched context rows. Exactly 2,000 is allowed. Invalid paid-provider output
   is audited without returning partial edits or charging the designer.
+
+### September 2026 presentation and release
+
+- The user requested restrained product copy for a professional presentation.
+  Keep app headings compact (22–24 px), describe concrete actions, and omit
+  oversized slogans. The forest palette remains; the landing page features a
+  real AI rulebook recording at `/demo/turnbased-ai-rules.mp4` with poster and
+  optional captions. Recording helpers and provenance live in `docs/demos/`.
+- The root README is the concise product/engineering entry point. Detailed
+  setup, workshop workflow, and checks live in `docs/development.md`,
+  `docs/workshop-guide.md`, and `docs/verification.md`. Deployment and rollback
+  are documented in `docs/deployment.md`; keep hosted limitations explicit.
+- Production web is Cloudflare Pages project `turnbased` at `turnbased.app`,
+  connected to `main`. Hosted Supabase is `vwyxnvgpofvayjnltzrf`; its existing
+  schema was current at release. AI rule/card/image/project functions and
+  `git-proxy` were deployed with JWT verification. `git-proxy` must pass the
+  caller's JWT explicitly to `getUser` and check ownership before history I/O.
+- The hosted supplier `/v1` gateway is not connected. Vite's local proxy does
+  not deploy with Pages. Catalog HTML fallback now reports unavailability;
+  custom design and printing remain usable. Catalog admin routes must remain
+  private until their authentication boundary is implemented.
+- Catalog lint cleanup keeps its rules enabled and preserves exact output for
+  82 curated TGC products and BGM/TGC parser fixtures. BGM parsing helpers and
+  curated TGC family data have separate modules below the file-size ceiling.
+- Generated `node_modules` files were removed from Git tracking; use the
+  lockfile and a clean `npm ci`. CI now includes workshop, version, production,
+  and mocked AI contract suites plus application builds.
+- Isolated browser/test sessions can share the local dev account. Use
+  `auth.signOut({ scope: 'local' })` in cleanup: the default global sign-out
+  revokes other concurrent sessions and can interrupt a real demo recording.

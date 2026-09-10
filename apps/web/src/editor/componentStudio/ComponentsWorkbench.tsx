@@ -10,7 +10,6 @@ import {
   Pencil,
   Plus,
   Search,
-  Shapes,
   SlidersHorizontal,
   Table2,
   Trash2,
@@ -193,13 +192,9 @@ export function ComponentsWorkbench({
             </>
           ) : (
             <>
-              <p className="component-eyebrow">
-                <Shapes size={14} />
-                Everything your game is made of
-              </p>
-              <h1>A place for every piece.</h1>
+              <h1>Components</h1>
               <p className="component-muted">
-                Cards, boards, tiny tokens. One visual workshop to make them yours.
+                Design cards, boards, tokens, and other pieces with templates and tables.
               </p>
             </>
           )}
@@ -429,7 +424,7 @@ export function ComponentsWorkbench({
             ) : (
               <div data-layout="emptyComponentFamily" className="component-empty">
                 <Layers3 size={36} strokeWidth={1.2} />
-                <h2>{query ? 'No components match that name.' : 'What does your game need?'}</h2>
+                <h2>{query ? 'No matching components' : 'No components yet'}</h2>
                 <p>
                   {query
                     ? 'Try a different name or another family.'

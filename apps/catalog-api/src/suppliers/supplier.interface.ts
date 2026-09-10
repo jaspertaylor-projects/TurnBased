@@ -1,3 +1,5 @@
+import type { Prisma } from '@prisma/client';
+
 export interface RawSupplierPage {
   url: string;
   html: string;
@@ -25,7 +27,7 @@ export type ParsedProduct = {
       optionKey: string;
       optionLabel: string;
       optionValue: string;
-      priceDataJson?: any;
+      priceDataJson?: Prisma.InputJsonValue | null;
     }>;
     layoutConstraints: Array<{
       faceKey: string;

@@ -12,7 +12,9 @@ export class IngestionService {
 
   async startScrapeRun(supplierCode: string, runType: string) {
     try {
-      const supplier = await this.prisma.supplier.findUnique({ where: { code: supplierCode } });
+      const supplier = await this.prisma.supplier.findUnique({
+        where: { code: supplierCode },
+      });
       if (!supplier) throw new Error('Supplier not found');
 
       const scrapeRun = await this.prisma.scrapeRun.create({
@@ -27,11 +29,13 @@ export class IngestionService {
       await this.scrapeQueue.add(
         'discover-products',
         { scrapeRunId: scrapeRun.id, supplierCode },
-        { attempts: 3, backoff: { type: 'exponential', delay: 5000 } }
+        { attempts: 3, backoff: { type: 'exponential', delay: 5000 } },
       );
       return scrapeRun;
-    } catch (error: any) {
-      throw new Error(`Failed to initiate scrape run: ${error.message}`);
+    } catch (error: unknown) {
+      throw new Error(
+        `Failed to initiate scrape run: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 }

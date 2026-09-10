@@ -18,7 +18,9 @@ export class SuppliersService {
   getAdapter(supplierCode: string): SupplierCatalogAdapter {
     const adapter = this.adapters.get(supplierCode);
     if (!adapter) {
-      throw new NotFoundException(`Adapter for supplier ${supplierCode} not found`);
+      throw new NotFoundException(
+        `Adapter for supplier ${supplierCode} not found`,
+      );
     }
     return adapter;
   }

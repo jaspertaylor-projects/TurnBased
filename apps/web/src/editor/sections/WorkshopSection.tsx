@@ -1,4 +1,4 @@
-import { ArrowRight, BookOpen, Bot, GitBranch, Layers3, Leaf, PackageOpen, Printer } from 'lucide-react';
+import { ArrowRight, BookOpen, Bot, GitBranch, Layers3, PackageOpen, Printer } from 'lucide-react';
 import type { EditorProject } from '../types';
 import type { EditorSection } from '../constants';
 import { projectPlayerLabel, summarizeProject } from '../../components/workshop/projectSummary';
@@ -15,16 +15,16 @@ export function WorkshopSection({ project, onNavigate, versionCount = 0 }: Works
   const steps = [
     {
       icon: BookOpen,
-      title: 'Give your idea a few rules',
+      title: 'Rulebook',
       text: summary.rulesStarted
-        ? `${summary.chapters} chapters started. Make the next turn easy to explain.`
-        : 'Start with the goal, what a player does, and how the game ends.',
+        ? `${summary.chapters} chapters started. Edit your rules or ask the AI agent to draft a revision.`
+        : 'Write your rules or ask the AI agent to draft a rulebook from your brief.',
       section: 'rules' as const,
       action: 'Write rules',
     },
     {
       icon: Layers3,
-      title: 'Make the pieces your game needs',
+      title: 'Components',
       text: summary.designSets
         ? `${summary.designSets} component sets · ${summary.componentCopies} physical copies. Edit their layers, refine the data, or generate a new batch.`
         : 'Design cards, boards, tokens, tiles, mats, and pieces with editable templates and tables.',
@@ -33,24 +33,24 @@ export function WorkshopSection({ project, onNavigate, versionCount = 0 }: Works
     },
     {
       icon: Bot,
-      title: 'Find out what needs another try',
+      title: 'Playtests',
       text: 'Record a session, run a supported agent simulation, or export a brief for an AI reviewer.',
       section: 'playtest' as const,
       action: 'Playtest lab',
     },
     {
       icon: GitBranch,
-      title: 'Keep the good ideas. Try new ones.',
+      title: 'Version history',
       text: versionCount
-        ? `${versionCount} saved checkpoint${versionCount === 1 ? '' : 's'}. Give your next experiment a name.`
+        ? `${versionCount} saved checkpoint${versionCount === 1 ? '' : 's'}. Compare changes or start an experiment branch.`
         : 'Save your first checkpoint before you make the next big change.',
       section: 'versions' as const,
       action: 'Save a version',
     },
     {
       icon: Printer,
-      title: 'Put your prototype on the table',
-      text: 'Prepare cards, boards, and other pieces at their real size for the next game night.',
+      title: 'Print and export',
+      text: 'Export actual-size component sheets, a printable rulebook, or a full project backup.',
       section: 'print' as const,
       action: 'Prepare to print',
     },
@@ -60,11 +60,7 @@ export function WorkshopSection({ project, onNavigate, versionCount = 0 }: Works
     <section className="workshop-surface workshop-overview" aria-labelledby="project-workshop-title">
       <header className="workshop-surface__header">
         <div data-layout="projectWorkshopHeading">
-          <p className="workshop-eyebrow">
-            <Leaf size={13} /> A work in progress. A world of possibilities.
-          </p>
-          <h1 id="project-workshop-title">Let’s find the fun.</h1>
-          <p className="workshop-surface__intro">Your next playable version starts with one small step.</p>
+          <h1 id="project-workshop-title">Project overview</h1>
         </div>
       </header>
       <div data-layout="projectWorkshopBody" className="workshop-overview__body">
@@ -104,10 +100,9 @@ export function WorkshopSection({ project, onNavigate, versionCount = 0 }: Works
           </dl>
           <article className="workshop-tip">
             <GitBranch size={20} />
-            <h2>One question per playtest.</h2>
+            <h2>Plan a playtest</h2>
             <p>
-              “Is the first turn too slow?” is easier to learn from than “Is my game good?” Save a version,
-              choose one question, and see what happens.
+              Save a checkpoint, choose a question to test, and record the findings alongside your design.
             </p>
             <button className="workshop-button" onClick={() => onNavigate('playtest')}>
               Plan a playtest <ArrowRight size={12} />
@@ -122,9 +117,9 @@ export function WorkshopSection({ project, onNavigate, versionCount = 0 }: Works
         </aside>
       </div>
       <footer className="workshop-surface__footer">
-        <span>Small steps count. Your prototype doesn’t need to be perfect to be playable.</span>
+        <span>Save checkpoints in Versions to track design changes.</span>
         <span>
-          {projectPlayerLabel(project)} · {project.brief.theme || 'A theme of your own'}
+          {projectPlayerLabel(project)}{project.brief.theme ? ` · ${project.brief.theme}` : ''}
         </span>
       </footer>
     </section>

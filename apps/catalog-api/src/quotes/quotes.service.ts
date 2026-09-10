@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
+import type { Quote } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateQuoteDto } from './dto/create-quote.dto';
 
@@ -19,10 +24,14 @@ export class QuotesService {
     }
 
     // 2. Resolve Product, Supplier, and Variant
-    const supplier = await this.prisma.supplier.findUnique({ where: { code: dto.supplierCode } });
+    const supplier = await this.prisma.supplier.findUnique({
+      where: { code: dto.supplierCode },
+    });
     if (!supplier) throw new NotFoundException('Supplier not found');
 
-    const product = await this.prisma.catalogProduct.findUnique({ where: { slug: dto.productSlug } });
+    const product = await this.prisma.catalogProduct.findUnique({
+      where: { slug: dto.productSlug },
+    });
     if (!product) throw new NotFoundException('Product not found');
 
     const variant = await this.prisma.productVariant.findUnique({
@@ -34,10 +43,15 @@ export class QuotesService {
     }
 
     // 3. Find matching PriceTier
-    const sortedTiers = variant.priceTiers.sort((a: any, b: any) => a.minQuantity - b.minQuantity);
+    const sortedTiers = variant.priceTiers.sort(
+      (a, b) => a.minQuantity - b.minQuantity,
+    );
     let matchedTier = null;
     for (const tier of sortedTiers) {
-      if (dto.quantity >= tier.minQuantity && (!tier.maxQuantity || dto.quantity <= tier.maxQuantity)) {
+      if (
+        dto.quantity >= tier.minQuantity &&
+        (!tier.maxQuantity || dto.quantity <= tier.maxQuantity)
+      ) {
         matchedTier = tier;
         break;
       }
@@ -45,10 +59,15 @@ export class QuotesService {
 
     if (!matchedTier) {
       // Fallback: pick the highest tier if quantity exceeds all max
-      if (sortedTiers.length > 0 && dto.quantity >= sortedTiers[sortedTiers.length - 1].minQuantity) {
+      if (
+        sortedTiers.length > 0 &&
+        dto.quantity >= sortedTiers[sortedTiers.length - 1].minQuantity
+      ) {
         matchedTier = sortedTiers[sortedTiers.length - 1];
       } else {
-        throw new BadRequestException('No applicable pricing tier for requested quantity');
+        throw new BadRequestException(
+          'No applicable pricing tier for requested quantity',
+        );
       }
     }
 
@@ -68,9 +87,13 @@ export class QuotesService {
       },
     };
 
-    const markupRate = (Object.keys(rules.categoryMarkupRates).includes(product.category)
-      ? rules.categoryMarkupRates[product.category as keyof typeof rules.categoryMarkupRates]
-      : rules.defaultMarkupRate);
+    const markupRate = Object.keys(rules.categoryMarkupRates).includes(
+      product.category,
+    )
+      ? rules.categoryMarkupRates[
+          product.category as keyof typeof rules.categoryMarkupRates
+        ]
+      : rules.defaultMarkupRate;
 
     const markupAmount = subtotal * markupRate;
     const riskBufferAmount = subtotal * rules.riskBufferRules.default.value;
@@ -121,7 +144,7 @@ export class QuotesService {
     return this.formatQuoteResponse(quote);
   }
 
-  private formatQuoteResponse(quote: any) {
+  private formatQuoteResponse(quote: Quote) {
     return {
       quoteId: quote.id,
       catalogVersion: quote.catalogVersion,

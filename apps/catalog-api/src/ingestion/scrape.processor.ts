@@ -6,6 +6,19 @@ import { SnapshotService } from './snapshot.service';
 import { SuppliersService } from '../suppliers/suppliers.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+
+interface ScrapeJobData {
+  supplierCode: string;
+  scrapeRunId: string;
+  url?: string;
+}
+
+interface ProductResult {
+  productId: string;
+  slug: string;
+  variantCount: number;
+}
 
 @Processor('scrape-queue')
 export class ScrapeProcessor extends WorkerHost {
@@ -21,7 +34,9 @@ export class ScrapeProcessor extends WorkerHost {
     super();
   }
 
-  async process(job: Job<any, any, string>): Promise<any> {
+  async process(
+    job: Job<ScrapeJobData, unknown, string>,
+  ): Promise<ProductResult | { discoveredCount: number } | undefined> {
     const { supplierCode, scrapeRunId } = job.data;
     const adapter = this.suppliersService.getAdapter(supplierCode);
 
@@ -57,6 +72,7 @@ export class ScrapeProcessor extends WorkerHost {
       this.logger.log(`Processing product ${url}`);
 
       try {
+        if (!url) throw new Error('Product scrape job requires a URL');
         const result = await this.processProduct(
           adapter,
           supplierCode,
@@ -72,11 +88,12 @@ export class ScrapeProcessor extends WorkerHost {
         });
         await this.checkRunComplete(scrapeRunId);
         return result;
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
         const maxAttempts = job.opts.attempts ?? 1;
         const isFinalAttempt = job.attemptsMade >= maxAttempts - 1;
         this.logger.error(
-          `Failed to process ${url} (attempt ${job.attemptsMade + 1}/${maxAttempts}): ${err.message}`,
+          `Failed to process ${url} (attempt ${job.attemptsMade + 1}/${maxAttempts}): ${errorMessage}`,
         );
         // Only record the failure once, on the final attempt, so retries don't double-count.
         if (isFinalAttempt) {
@@ -85,7 +102,7 @@ export class ScrapeProcessor extends WorkerHost {
             data: {
               pagesFetched: { increment: 1 },
               parseFailures: { increment: 1 },
-              errorSummary: `${url}: ${err.message}`.slice(0, 1000),
+              errorSummary: `${url}: ${errorMessage}`.slice(0, 1000),
             },
           });
           await this.checkRunComplete(scrapeRunId);
@@ -122,7 +139,7 @@ export class ScrapeProcessor extends WorkerHost {
     supplierCode: string,
     scrapeRunId: string,
     url: string,
-  ): Promise<any> {
+  ): Promise<ProductResult> {
     const page = await adapter.fetchProduct(url);
 
     await this.snapshotService.createSnapshot(scrapeRunId, url, page.html);
@@ -200,7 +217,7 @@ export class ScrapeProcessor extends WorkerHost {
             optionLabel: o.optionLabel,
             optionValue: o.optionValue,
             displayOrder: i,
-            priceDataJson: o.priceDataJson ?? null,
+            priceDataJson: o.priceDataJson ?? Prisma.DbNull,
           })),
         });
       }

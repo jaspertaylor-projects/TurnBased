@@ -264,6 +264,7 @@ export function renameProject(project: EditorProject, name: string): EditorProje
   return touchProject({
     ...project,
     name,
+    brief: { ...project.brief, name },
   });
 }
 

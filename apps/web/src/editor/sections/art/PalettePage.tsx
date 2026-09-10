@@ -1,4 +1,4 @@
-import { useEffect, useState, type ChangeEvent } from 'react';
+import { useState, type ChangeEvent } from 'react';
 import { Palette, Check, RotateCcw } from 'lucide-react';
 
 import { PROJECT_PALETTE_LABELS, PROJECT_PALETTE_ORDER } from '../../projectPalette';
@@ -26,27 +26,25 @@ function palettesDiffer(a: ProjectColorPalette, b: ProjectColorPalette): boolean
   return PROJECT_PALETTE_ORDER.some((id) => a[id] !== b[id]);
 }
 
-export function PalettePage({
-  project,
-  onBack,
-  onSavePalette,
-}: {
+interface PalettePageProps {
   project: EditorProject;
   onBack: () => void;
   onSavePalette: (palette: ProjectColorPalette) => void;
-}) {
+}
+
+export function PalettePage(props: PalettePageProps) {
+  const palette = props.project.settings.colorPalette;
+  const paletteKey = `${props.project.id}:${PROJECT_PALETTE_ORDER.map((id) => palette[id]).join(':')}`;
+  // An external palette replacement starts a new draft. Unrelated project edits
+  // retain this editor and its unsaved input.
+  return <PaletteEditor key={paletteKey} {...props} />;
+}
+
+function PaletteEditor({ project, onBack, onSavePalette }: PalettePageProps) {
   const persisted = project.settings.colorPalette;
   const [draft, setDraft] = useState<ProjectColorPalette>(() => clonePalette(persisted));
   const [selectedId, setSelectedId] = useState<ProjectPaletteColorId | null>(null);
   const [hexInputs, setHexInputs] = useState<Partial<Record<ProjectPaletteColorId, string>>>({});
-
-  // Reset draft when the project palette changes from outside this page
-  // (e.g. an AI rebuild restores stored colors). Don't fight an external
-  // mutation — sync to it.
-  useEffect(() => {
-    setDraft(clonePalette(persisted));
-    setHexInputs({});
-  }, [persisted]);
 
   const isDirty = palettesDiffer(draft, persisted);
 

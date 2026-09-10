@@ -53,7 +53,7 @@ try {
   await page.goto(`${base}/#/editor/${projectId}?section=rules`);
   await button('Draft rulebook with AI').waitFor();
   const before = await snapshot();
-  const open = async () => { await button('Draft rulebook with AI').click(); await page.getByRole('dialog', { name: 'Write the rules together.' }).waitFor(); };
+  const open = async () => { await button('Draft rulebook with AI').click(); await page.getByRole('dialog', { name: 'AI rulebook draft' }).waitFor(); };
   await open();
   await page.getByLabel('Describe the game and how it should play').fill('Two traders gather coins and buy cards. Race to fifteen prestige.');
   await button('Generate rulebook draft').click();

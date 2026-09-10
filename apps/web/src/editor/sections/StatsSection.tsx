@@ -164,15 +164,7 @@ export function StatsSection({
             <span style={eyebrowStyle}>A tabletop game by you</span>
             <input
               value={displayName}
-              onChange={(event) => {
-                const next = event.target.value;
-                // Keep both top-level name and brief.name in sync — the
-                // sidebar reads project.name, the rulebook header reads
-                // brief.name. Splitting them creates drift the user has to
-                // chase.
-                onRenameProject(next);
-                onUpdateBrief((current) => ({ ...current, name: next }));
-              }}
+              onChange={(event) => onRenameProject(event.target.value)}
               placeholder="Untitled game"
               aria-label="Game title"
               style={titleInputStyle}

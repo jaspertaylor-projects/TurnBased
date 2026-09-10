@@ -82,7 +82,7 @@ export function WorkshopArt({ compact = false }: { compact?: boolean }) {
           <i />
         </span>
       </div>
-      {!compact && <figcaption>Small ideas. Many versions. Your next favorite game.</figcaption>}
+      {!compact && <figcaption>Little Woodland · example prototype</figcaption>}
     </figure>
   );
 }

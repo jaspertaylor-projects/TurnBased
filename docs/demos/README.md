@@ -1,7 +1,13 @@
 # Moonlit Market video walkthrough
 
+For a concise product introduction, watch the new
+[84-second AI rulebook demo](ai-rules-ad.md). It shows the AI drafting five
+chapters, the review/apply step, and the resulting prototype workflow.
+
 The [second walkthrough](moonlit-market-v2.md) adds whole-rulebook AI drafting,
 AI column and cell edits, authored cards on the table, and proportional fullscreen.
+The [third walkthrough](moonlit-market-v3.md) builds cards and coins from blank
+templates, connects both component sets to suppliers, and exports their artwork package.
 
 This walkthrough follows a small game from its first idea through AI-assisted rules and artwork, a table-driven deck, playtesting, checkpoints, and printable exports. The final video is written to `artifacts/demos/moonlit-market/turnbased-game-creation.mp4`.
 

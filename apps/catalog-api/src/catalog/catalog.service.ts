@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, Inject } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import type { Prisma } from '@prisma/client';
 import { GetProductsDto } from './dto/get-products.dto';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
@@ -16,8 +17,15 @@ export class CatalogService {
     const cached = await this.cacheManager.get(cacheKey);
     if (cached) return cached;
 
-    const { category, subcategory, q, page = 1, pageSize = 20, activeOnly = true } = query;
-    const where: any = {};
+    const {
+      category,
+      subcategory,
+      q,
+      page = 1,
+      pageSize = 20,
+      activeOnly = true,
+    } = query;
+    const where: Prisma.CatalogProductWhereInput = {};
     if (category) where.category = category;
     if (subcategory) where.subcategory = subcategory;
     if (activeOnly) where.status = 'active';
@@ -80,9 +88,9 @@ export class CatalogService {
       include: {
         productVariants: {
           where: variantId ? { id: variantId } : { isDefault: true },
-          include: { layoutConstraints: true }
-        }
-      }
+          include: { layoutConstraints: true },
+        },
+      },
     });
 
     if (!product || product.productVariants.length === 0) {
@@ -97,15 +105,15 @@ export class CatalogService {
       faces: variant.layoutConstraints,
       constraints: {
         panelCount: variant.layoutConstraints[0]?.panelCount || 1,
-        cutlineRequired: variant.layoutConstraints[0]?.cutlineRequired || false
-      }
+        cutlineRequired: variant.layoutConstraints[0]?.cutlineRequired || false,
+      },
     };
   }
 
   async getVariantPricing(variantId: string) {
     const variant = await this.prisma.productVariant.findUnique({
       where: { id: variantId },
-      include: { priceTiers: true, catalogProduct: true }
+      include: { priceTiers: true, catalogProduct: true },
     });
 
     if (!variant) throw new NotFoundException('Variant not found');
@@ -113,7 +121,7 @@ export class CatalogService {
     return {
       variantId: variant.id,
       currency: variant.catalogProduct.currency,
-      tiers: variant.priceTiers
+      tiers: variant.priceTiers,
     };
   }
 }

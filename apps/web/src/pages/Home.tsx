@@ -1,23 +1,22 @@
-import { ArrowRight, Bot, Check, GitBranch, Layers3, Leaf, Printer, Sparkles } from 'lucide-react';
-import { WorkshopArt } from '../components/workshop/WorkshopArt';
+import { ArrowRight, Bot, Check, GitBranch, Layers3, Leaf, Printer } from 'lucide-react';
 import '../components/workshop/workshop.css';
 
 const steps = [
-  { number: '01', title: 'Make something', text: 'A few rules. A handful of cards. Enough to find the fun.' },
+  { number: '01', title: 'Draft rules', text: 'Describe your game to an AI agent. Review and apply its rulebook draft.' },
   {
     number: '02',
-    title: 'Bring it to the table',
-    text: 'Try a prototype, record what happened, and test your assumptions.',
+    title: 'Design components',
+    text: 'Build cards, boards, and tokens with editable templates and tables.',
   },
   {
     number: '03',
-    title: 'Try another version',
-    text: 'Save the good ideas. Explore a different direction. Keep your history.',
+    title: 'Test and revise',
+    text: 'Record playtest findings and compare changes across saved versions.',
   },
   {
     number: '04',
-    title: 'Make it real',
-    text: 'Print a card sheet, cut it out, and play another round with friends.',
+    title: 'Export a prototype',
+    text: 'Print components at actual size and export a portable project backup.',
   },
 ];
 
@@ -26,31 +25,41 @@ export const Home = () => (
     <section className="workshop-hero" aria-labelledby="workshop-hero-title">
       <div data-layout="heroIntroduction" className="workshop-hero__copy">
         <p className="workshop-eyebrow">
-          <Leaf size={15} /> A little workshop for big game ideas
+          <Leaf size={15} /> Board game design
         </p>
         <h1 id="workshop-hero-title">
-          Your game.
-          <br />
-          From <em>what if</em>
-          <br />
-          to game night.
+          Rules, components, and playtests in one workspace.
         </h1>
         <p className="workshop-hero__description">
-          Make a board game. Try it with friends. Make it better. Print it when you’re ready.
+          Draft your rules with an AI agent, design the pieces, and track revisions through to a
+          printable prototype.
         </p>
         <div data-layout="heroActions" className="workshop-actions">
           <a href="#/new" id="cta-start" className="workshop-button workshop-button--primary">
-            Make your first game <ArrowRight size={17} />
+            Create a game <ArrowRight size={17} />
           </a>
           <a href="#/dashboard" className="workshop-button workshop-button--text">
             Open my workshop
           </a>
         </div>
         <p className="workshop-hero__assurance">
-          <Check size={14} /> Start without an account <span>·</span> Your ideas stay yours
+          <Check size={14} /> Start without an account <span>·</span> AI tools require sign-in
         </p>
       </div>
-      <WorkshopArt />
+      <figure className="workshop-demo" aria-labelledby="workshop-demo-caption">
+        <video
+          controls
+          playsInline
+          preload="none"
+          poster="/demo/turnbased-ai-rules.jpg"
+          aria-label="Watch an AI agent write a game rulebook in TurnBased"
+        >
+          <source src="/demo/turnbased-ai-rules.mp4" type="video/mp4" />
+          <track kind="captions" src="/demo/turnbased-ai-rules.vtt" srcLang="en" label="English" />
+          <a href="/demo/turnbased-ai-rules.mp4">Watch the AI rulebook demo</a>
+        </video>
+        <figcaption id="workshop-demo-caption">Watch the AI agent draft rules, then review and apply them.</figcaption>
+      </figure>
     </section>
 
     <section className="workshop-loop" aria-label="The game design journey">
@@ -65,18 +74,12 @@ export const Home = () => (
 
     <section className="workshop-tools" aria-labelledby="workshop-tools-title">
       <header className="workshop-section-heading">
-        <p className="workshop-eyebrow">More making. Less setting things up.</p>
-        <h2 id="workshop-tools-title">
-          A home for every
-          <br />
-          <em>“let’s try that.”</em>
-        </h2>
-        <p>You don’t need a perfect idea to start. You need a place to keep making it better.</p>
+        <h2 id="workshop-tools-title">Design and production tools</h2>
       </header>
       <div data-layout="workshopFeatureGrid" className="workshop-feature-grid">
         <article className="workshop-feature workshop-feature--versions">
           <GitBranch size={25} />
-          <h3>Be brave. Keep your versions.</h3>
+          <h3>Version history</h3>
           <p>
             Save a checkpoint before a big change. Compare your work, try a new branch, and return to an
             earlier design when you need it.
@@ -87,19 +90,19 @@ export const Home = () => (
             aria-label="Example version history"
           >
             <span>
-              <i /> First playable idea <small>v1</small>
+              <i /> Initial prototype <small>v1</small>
             </span>
             <span>
-              <i /> A shorter, snappier turn <small>v2</small>
+              <i /> Shorter turns <small>v2</small>
             </span>
             <span>
-              <i /> What if we add a wild card? <small>v3</small>
+              <i /> Wild card experiment <small>v3</small>
             </span>
           </div>
         </article>
         <article className="workshop-feature workshop-feature--cards">
           <Layers3 size={25} />
-          <h3>One template. A whole deck.</h3>
+          <h3>Templates and component data</h3>
           <p>
             Put your card ideas in a table. Choose a design, bind the fields, and make a consistent deck
             without laying out every card by hand.
@@ -114,54 +117,46 @@ export const Home = () => (
             <strong>Moonlit path</strong>
             <span>3</span>
             <span>2</span>
-            <strong>A little sunshine</strong>
+            <strong>Sunlight</strong>
             <span>1</span>
             <span>6</span>
           </div>
         </article>
         <article className="workshop-feature">
           <Bot size={25} />
-          <h3>A place to ask “is this fun?”</h3>
+          <h3>Playtest records and simulations</h3>
           <p>
             Keep playtest notes beside your design. Run repeatable agent simulations of a supported game
             model, and export a brief for an AI reviewer.
           </p>
-          <span className="workshop-feature__note">
-            Test an idea. Inspect the evidence. Decide what changes.
-          </span>
+          <span className="workshop-feature__note">Simulations use the supported two-player market-race model.</span>
         </article>
         <article className="workshop-feature">
           <Printer size={25} />
-          <h3>From your screen to your table.</h3>
+          <h3>Prototype printing</h3>
           <p>
-            Prepare printable card sheets and check your prototype’s readiness. Explore physical components as
-            you work toward a game you can hold.
+            Export actual-size component sheets, duplex card layouts, large tiled boards, and a printable
+            rulebook. Review supplier matches and production estimates.
           </p>
           <span className="workshop-feature__note">
-            Home printing now. Physical production is the next chapter.
+            Supplier orders are prepared for review; checkout happens with the supplier.
           </span>
         </article>
       </div>
     </section>
 
     <section className="workshop-invitation" aria-labelledby="workshop-invitation-title">
-      <Sparkles size={24} />
-      <p className="workshop-eyebrow">For first-time makers and serial tinkerers</p>
-      <h2 id="workshop-invitation-title">
-        The best version of your game
-        <br />
-        starts with the first one.
-      </h2>
+      <h2 id="workshop-invitation-title">Start a new project</h2>
       <a href="#/new" className="workshop-button workshop-button--primary">
-        Let’s make something <ArrowRight size={17} />
+        Create a game <ArrowRight size={17} />
       </a>
     </section>
     <footer className="workshop-home-footer">
       <a href="#/" className="workshop-wordmark">
         <Leaf size={18} /> TurnBased<span>.</span>
       </a>
-      <p>A cozy place to make, test, and improve board games.</p>
-      <span>Made for the love of game night.</span>
+      <p>Board game design and prototyping.</p>
+      <span>Projects are saved in your browser. Export backups to keep a copy.</span>
     </footer>
   </div>
 );

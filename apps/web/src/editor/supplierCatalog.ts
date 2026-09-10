@@ -3,6 +3,15 @@ import { MM_PER_INCH } from './units';
 
 const CATALOG_API_BASE = '/v1';
 
+async function requestCatalog(url: string): Promise<Response> {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Catalog API error: ${response.status}`);
+  if (!response.headers.get('content-type')?.includes('application/json')) {
+    throw new Error('The supplier catalog is unavailable. You can still design custom components and print prototypes.');
+  }
+  return response;
+}
+
 export interface CatalogProduct {
   id: string;
   slug: string;
@@ -58,8 +67,9 @@ export interface ProductLayoutResponse {
 export interface ProductVariant {
   id: string;
   title: string;
+  status?: string;
   isDefault?: boolean;
-  options: { optionGroup: string; optionKey: string; optionValue: string }[];
+  options: { optionGroup: string; optionKey: string; optionValue: string; optionLabel?: string }[];
   layoutConstraints: {
     faceKey: string;
     widthMm: number;
@@ -80,6 +90,13 @@ export interface ProductDetailResponse {
   category: string;
   shape?: string | null;
   imageUrl?: string | null;
+  sourceUrl?: string;
+  supplierId?: string;
+  externalProductId?: string;
+  currency?: string;
+  description?: string;
+  status?: string;
+  lastSeenAt?: string;
   productVariants: ProductVariant[];
 }
 
@@ -373,10 +390,7 @@ export async function fetchCatalogProducts(category: string): Promise<CatalogPro
   const all: CatalogProduct[] = [];
   for (let page = 1; page <= MAX_CATALOG_PAGES; page += 1) {
     const url = `${CATALOG_API_BASE}/products?category=${encodeURIComponent(category)}&page=${page}&pageSize=${pageSize}`;
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`Catalog API error: ${response.status}`);
-    }
+    const response = await requestCatalog(url);
     const data: CatalogProductsResponse = await response.json();
     all.push(...data.items);
     const total = typeof data.total === 'number' ? data.total : all.length;
@@ -391,10 +405,7 @@ const MAX_CATALOG_PAGES = 50;
 export async function fetchProductLayout(slug: string, variantId?: string): Promise<ProductLayoutResponse> {
   const params = variantId ? `?variantId=${encodeURIComponent(variantId)}` : '';
   const url = `${CATALOG_API_BASE}/products/${encodeURIComponent(slug)}/layout${params}`;
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Catalog layout API error: ${response.status}`);
-  }
+  const response = await requestCatalog(url);
   const data = await response.json();
   // Normalize numeric fields — the API may return them as strings.
   data.faces = (data.faces ?? []).map((face: Record<string, unknown>) => ({
@@ -410,9 +421,6 @@ export async function fetchProductLayout(slug: string, variantId?: string): Prom
 
 export async function fetchProductDetail(slug: string): Promise<ProductDetailResponse> {
   const url = `${CATALOG_API_BASE}/products/${encodeURIComponent(slug)}`;
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Catalog detail API error: ${response.status}`);
-  }
+  const response = await requestCatalog(url);
   return response.json();
 }

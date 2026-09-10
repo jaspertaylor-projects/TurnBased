@@ -103,7 +103,7 @@ export function RulebookAIDraft({ project, onUpdateRules, onOpen }: Props) {
     {!open && notice && <span role="status" className="rulebook-draft-notice">{notice}</span>}
     {open && <dialog ref={dialog} className="rulebook-draft-dialog" aria-labelledby="rulebook-draft-title" onCancel={(event) => { event.preventDefault(); close(); }}>
       <header className="rulebook-draft-header">
-        <div data-layout="rulebookDraftTitle"><span className="rulebook-draft-kicker">FROM AN IDEA TO A PLAYABLE FIRST DRAFT</span><h2 id="rulebook-draft-title">Write the rules together.</h2><p>Describe the game. Review a consistent draft across your selected chapters.</p></div>
+        <div data-layout="rulebookDraftTitle"><h2 id="rulebook-draft-title">AI rulebook draft</h2><p>Describe your game. The AI agent writes the selected chapters for you to review.</p></div>
         <button type="button" className="rulebook-draft-button" aria-label="Close rulebook AI" onClick={close}><X size={18} /></button>
       </header>
       <div className="rulebook-draft-body" data-layout="rulebookDraftBody">
@@ -122,7 +122,7 @@ export function RulebookAIDraft({ project, onUpdateRules, onOpen }: Props) {
               <article><h3>Current · {currentPreview?.title}</h3><p>{currentPreview?.body || 'No prose yet. Your draft will start this chapter.'}</p></article>
               <article><h3>AI draft · {currentPreview?.title}</h3><p>{currentEntry?.body}</p></article>
             </div>
-          </> : <div className="rulebook-draft-empty" data-layout="rulebookDraftWelcome"><Sparkles size={36} /><h3>A rulebook that fits together.</h3><p>Generate the selected chapters in one pass, then read the proposal before changing your game.</p></div>}
+          </> : <div className="rulebook-draft-empty" data-layout="rulebookDraftWelcome"><Sparkles size={36} /><h3>Draft your selected chapters</h3><p>The AI agent generates a connected rulebook draft. Review the proposal before applying it to your game.</p></div>}
         </section>
       </div>
       <footer className="rulebook-draft-footer">

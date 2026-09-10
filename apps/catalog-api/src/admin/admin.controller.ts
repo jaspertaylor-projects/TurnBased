@@ -6,7 +6,7 @@ import { IngestionService } from '../ingestion/ingestion.service';
 export class AdminController {
   constructor(
     private readonly adminService: AdminService,
-    private readonly ingestionService: IngestionService
+    private readonly ingestionService: IngestionService,
   ) {}
 
   @Get('scrape-runs')

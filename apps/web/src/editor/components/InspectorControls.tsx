@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { BOARD_SURFACE_TEXTURE_OPTIONS } from '@turnbased/engine-components';
@@ -79,46 +79,13 @@ export function InspectorAccordion({
   children,
 }: InspectorAccordionProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
-  const contentRef = useRef<HTMLDivElement>(null);
-  const [contentHeight, setContentHeight] = useState<number | 'auto'>(defaultOpen ? 'auto' : 0);
-  const didMountRef = useRef(false);
-
-  useEffect(() => {
-    if (!contentRef.current) {
-      return;
-    }
-
-    // Skip the open/close animation on initial mount. Without this guard,
-    // each accordion briefly locks its height to a measured pixel value
-    // right after mount, and when all the inspector accordions do this in
-    // parallel the scroll area's scrollHeight flickers — which clamps the
-    // parent's scrollTop back to 0 for small scrolls.
-    if (!didMountRef.current) {
-      didMountRef.current = true;
-      setContentHeight(isOpen ? 'auto' : 0);
-      return;
-    }
-
-    if (isOpen) {
-      const height = contentRef.current.scrollHeight;
-      setContentHeight(height);
-      const timeout = setTimeout(() => setContentHeight('auto'), 220);
-      return () => clearTimeout(timeout);
-    }
-
-    setContentHeight(contentRef.current.scrollHeight);
-    requestAnimationFrame(() => {
-      setContentHeight(0);
-    });
-
-    return undefined;
-  }, [isOpen]);
 
   return (
-    <div style={{ borderTop: `1px solid ${tabletop.parchment.edge}`, alignSelf: 'start' }}>
+    <div data-layout="inspectorAccordion" style={{ borderTop: `1px solid ${tabletop.parchment.edge}`, alignSelf: 'start' }}>
       <button
         type="button"
         className="inspector-accordion-trigger"
+        aria-expanded={isOpen}
         onClick={() => setIsOpen((current) => !current)}
         style={{
           display: 'flex',
@@ -152,17 +119,15 @@ export function InspectorAccordion({
         />
       </button>
       <div
-        ref={contentRef}
-        style={{
-          overflow: isOpen ? 'visible' : 'hidden',
-          height: typeof contentHeight === 'number' ? `${contentHeight}px` : 'auto',
-          transition: 'height 200ms ease',
-        }}
+        data-layout="inspectorAccordionAnimation"
+        style={{ display: 'grid', gridTemplateRows: isOpen ? '1fr' : '0fr', transition: 'grid-template-rows 200ms ease' }}
       >
+        <div data-layout="inspectorAccordionContent" inert={!isOpen} style={{ minHeight: 0, overflow: isOpen ? 'visible' : 'hidden' }}>
         {/* brass hairline rule under the section heading */}
-        <div style={{ height: 2, borderRadius: 2, background: `linear-gradient(90deg, ${tabletop.brass.base}, ${tabletop.brass.light} 40%, rgba(184,146,78,0))`, marginBottom: '0.45rem' }} />
-        <div style={{ display: 'grid', gap: '0.6rem', paddingBottom: '0.5rem' }}>
+        <div data-layout="inspectorAccordionDivider" style={{ height: 2, borderRadius: 2, background: `linear-gradient(90deg, ${tabletop.brass.base}, ${tabletop.brass.light} 40%, rgba(184,146,78,0))`, marginBottom: '0.45rem' }} />
+        <div data-layout="inspectorAccordionFields" style={{ display: 'grid', gap: '0.6rem', paddingBottom: '0.5rem' }}>
           {children}
+        </div>
         </div>
       </div>
     </div>

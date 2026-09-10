@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { CatalogProduct, ProductDetailResponse, ProductLayoutResponse } from './supplierCatalog';
 import { fetchCatalogProducts, fetchProductDetail, fetchProductLayout } from './supplierCatalog';
 
@@ -6,11 +6,52 @@ import { fetchCatalogProducts, fetchProductDetail, fetchProductLayout } from './
 const productsCache = new Map<string, CatalogProduct[]>();
 const layoutCache = new Map<string, ProductLayoutResponse>();
 const detailCache = new Map<string, ProductDetailResponse>();
+const EMPTY_PRODUCTS: CatalogProduct[] = [];
 
 /** Read a previously fetched layout from cache (synchronous). */
 export function getCachedLayout(slug: string, variantId?: string): ProductLayoutResponse | null {
-  const key = `${slug}::${variantId ?? ''}`;
-  return layoutCache.get(key) ?? null;
+  return layoutCache.get(`${slug}::${variantId ?? ''}`) ?? null;
+}
+
+interface CatalogResult<T> {
+  key: string | null;
+  data: T | null;
+  error: string | null;
+}
+
+/** Keep results tied to their request, including while a new selection loads. */
+function useCachedCatalogResource<T>(
+  key: string | null,
+  cache: Map<string, T>,
+  load: (key: string) => Promise<T>,
+  failureMessage: string,
+) {
+  const [result, setResult] = useState<CatalogResult<T>>({ key, data: null, error: null });
+  if (result.key !== key) {
+    // Reset this hook's state before rendering children for a different request.
+    // No previous product's data, loading status, or error can cross the boundary.
+    setResult({ key, data: null, error: null });
+  }
+  const current = result.key === key ? result : null;
+  const cached = key ? cache.get(key) : undefined;
+  const data = key ? cached ?? current?.data ?? null : null;
+  const error = key && !cached ? current?.error ?? null : null;
+
+  useEffect(() => {
+    if (!key || cache.has(key)) return;
+    let cancelled = false;
+    load(key).then((data) => {
+      if (cancelled) return;
+      cache.set(key, data);
+      setResult({ key, data, error: null });
+    }).catch((cause) => {
+      if (cancelled) return;
+      setResult({ key, data: null, error: cause instanceof Error ? cause.message : failureMessage });
+    });
+    return () => { cancelled = true; };
+  }, [key, cache, load, failureMessage]);
+
+  return { data, loading: Boolean(key && data === null && error === null), error };
 }
 
 export function useCatalogProducts(category: string | null): {
@@ -18,53 +59,10 @@ export function useCatalogProducts(category: string | null): {
   loading: boolean;
   error: string | null;
 } {
-  const [products, setProducts] = useState<CatalogProduct[]>(() =>
-    category ? productsCache.get(category) ?? [] : [],
+  const { data, loading, error } = useCachedCatalogResource(
+    category, productsCache, fetchCatalogProducts, 'Failed to load catalog',
   );
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const categoryRef = useRef(category);
-  categoryRef.current = category;
-
-  useEffect(() => {
-    if (!category) {
-      setProducts([]);
-      setLoading(false);
-      setError(null);
-      return;
-    }
-
-    const cached = productsCache.get(category);
-    if (cached) {
-      setProducts(cached);
-      setLoading(false);
-      setError(null);
-      return;
-    }
-
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-
-    fetchCatalogProducts(category)
-      .then((items) => {
-        if (cancelled) return;
-        productsCache.set(category, items);
-        setProducts(items);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setError(err instanceof Error ? err.message : 'Failed to load catalog');
-        setProducts([]);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => { cancelled = true; };
-  }, [category]);
-
-  return { products, loading, error };
+  return { products: data ?? EMPTY_PRODUCTS, loading, error };
 }
 
 export function useCatalogProductDetail(slug: string | null): {
@@ -72,43 +70,15 @@ export function useCatalogProductDetail(slug: string | null): {
   loading: boolean;
   error: string | null;
 } {
-  // `tick` forces a re-render once an uncached fetch lands in the cache.
-  const [, setTick] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { data, loading, error } = useCachedCatalogResource(
+    slug, detailCache, fetchProductDetail, 'Failed to load product detail',
+  );
+  return { detail: data, loading, error };
+}
 
-  // Derive `detail` from the cache directly so we don't duplicate state. The
-  // cache is the single source of truth — tick-bumps just trigger re-renders
-  // when the cache mutates outside of React.
-  const detail = slug ? (detailCache.get(slug) ?? null) : null;
-
-  useEffect(() => {
-    if (!slug || detailCache.has(slug)) return;
-
-    let cancelled = false;
-    // Matches the pattern used by useCatalogProducts / useCatalogLayout above.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoading(true);
-    setError(null);
-
-    fetchProductDetail(slug)
-      .then((data) => {
-        if (cancelled) return;
-        detailCache.set(slug, data);
-        setTick((t) => t + 1);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setError(err instanceof Error ? err.message : 'Failed to load product detail');
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => { cancelled = true; };
-  }, [slug]);
-
-  return { detail, loading: loading && !detail, error };
+function loadLayout(key: string): Promise<ProductLayoutResponse> {
+  const separator = key.lastIndexOf('::');
+  return fetchProductLayout(key.slice(0, separator), key.slice(separator + 2) || undefined);
 }
 
 export function useCatalogLayout(slug: string | null, variantId?: string): {
@@ -116,52 +86,7 @@ export function useCatalogLayout(slug: string | null, variantId?: string): {
   loading: boolean;
   error: string | null;
 } {
-  const cacheKey = slug ? `${slug}::${variantId ?? ''}` : '';
-  const [fetchedLayout, setFetchedLayout] = useState<ProductLayoutResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // Return cached value synchronously so the layout is always in sync with
-  // the current slug on the same render — no stale-layout-from-previous-slug.
-  const cachedLayout = cacheKey ? layoutCache.get(cacheKey) ?? null : null;
-  const layout = slug ? (cachedLayout ?? fetchedLayout) : null;
-
-  useEffect(() => {
-    if (!slug) {
-      setFetchedLayout(null);
-      setLoading(false);
-      setError(null);
-      return;
-    }
-
-    const key = `${slug}::${variantId ?? ''}`;
-    if (layoutCache.has(key)) {
-      setLoading(false);
-      setError(null);
-      return;
-    }
-
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-
-    fetchProductLayout(slug, variantId)
-      .then((data) => {
-        if (cancelled) return;
-        layoutCache.set(key, data);
-        setFetchedLayout(data);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setError(err instanceof Error ? err.message : 'Failed to load layout');
-        setFetchedLayout(null);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => { cancelled = true; };
-  }, [slug, variantId]);
-
-  return { layout, loading, error };
+  const key = slug ? `${slug}::${variantId ?? ''}` : null;
+  const { data, loading, error } = useCachedCatalogResource(key, layoutCache, loadLayout, 'Failed to load layout');
+  return { layout: data, loading, error };
 }

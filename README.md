@@ -1,430 +1,129 @@
 # TurnBased
 
-A cozy workshop for amateur board game designers: **make a game, try it,
-make it better, and print a prototype.** Keep rules, components, card tables,
-playtest findings, and version history together as an idea grows.
+A browser-based workspace for designing, playtesting, and printing board games.
+Give the AI agent a game brief, review its draft rulebook, and develop the
+components, artwork, and prototype in the same project.
 
-Architecture and current scope live in [.agents/architecture.md](.agents/architecture.md).
-The current workflow is **idea → prototype → playtest → revise → print**.
-Supplier checkout, production fulfillment, and a marketplace remain future work.
+**[Open TurnBased](https://turnbased.app)** ·
+**[Watch the demo](https://turnbased.app/demo/turnbased-ai-rules.mp4)** ·
+[Demo notes](docs/demos/ai-rules-ad.md)
 
-The [Moonlit Market walkthrough](docs/demos/README.md) records this journey
-through the real development app, including AI-assisted rules and artwork,
-a spreadsheet-driven deck, playtesting, version restore, and printable exports.
-Its recording and rendering tools are reusable for future demos.
-The [second walkthrough](docs/demos/moonlit-market-v2.md) adds whole-rulebook
-AI drafting, column/cell AI editing, and authored cards on a proportional
-fullscreen tabletop.
+[![Review an AI-written rulebook in TurnBased](apps/web/public/demo/turnbased-ai-rules.jpg)](https://turnbased.app/demo/turnbased-ai-rules.mp4)
 
-## Try the workshop
+## Product workflow
 
-After starting the local stack, open `http://127.0.0.1:3000`:
+1. **Create a game.** Start locally with a working title or explore the included
+   Little Woodland example. An account is optional for local authoring.
+2. **Write the rules with AI.** Generate selected rulebook chapters from the
+   game brief and existing components. Review the proposal before applying it;
+   revise individual sections or undo the applied draft.
+3. **Design the components.** Cards, boards, tokens, tiles, mats, and pieces
+   share an editor for layers, front/back faces, and physical dimensions.
+   Spreadsheet rows drive repeated designs, with AI suggestions for a column
+   or individual cell.
+4. **Test and revise.** Record findings, run the supported two-player lab,
+   compare checkpoints, branch an experiment, and restore earlier designs.
+5. **Export a prototype.** Download actual-size print sheets, a rulebook,
+   or a portable project archive. Match components to supplier products and
+   prepare an artwork package for manual ordering.
 
-1. Choose **New game** and enter a working title, or open **My workshop**
-   and try **Little Woodland**. Creating a game and its first local checkpoint
-   needs no account or AI generation. The example includes five rules chapters,
-   four card designs, and ten physical cards.
-2. Open **Components** to create cards, boards, tokens, tiles, player mats,
-   or pieces. Card Studio lives inside each card deck: edit its table or
-   import CSV / pasted spreadsheet rows, bind custom fields, and generate
-   copies. Every component uses the same fully editable template workspace.
-   Use a column header's **AI** action or focus a cell and choose **AI edit
-   selected cell**. Review the proposed values, apply them together, and undo
-   the batch. Custom fields are supported; newer edits invalidate stale replies.
-   Add text, images, shapes, grids, or tracks; move, resize, rotate, reorder,
-   align, hide, and lock layers. Edit physical dimensions, trim shape, bleed,
-   safe zones, and front/back faces in millimeters. Preview any data row and
-   export/import template JSON to reuse a layout in another component.
-   The **Placement** view handles interactive spaces and pieces separately
-   from the template's printed artwork.
-3. In **Playtest lab**, record observations or run the supported two-player
-   market-race experiment. Seeded heuristic agents play explicit numeric
-   cost/points rules; they do not interpret arbitrary rulebooks or card powers.
-   Export an agent packet with public state and legal moves, and paste an
-   external agent's JSON reply to take a validated turn. No LLM runner is
-   required for the built-in simulations.
-   New sessions put the designed card fronts and backs on a wooden tabletop,
-   with a shared market, draw pile and each player's acquired cards. Use
-   **Fullscreen table** to fit the whole table with one scale, preserving
-   physical dimensions and proportions. Inspect a card to read either face.
-   Session artwork stays fixed for reproducible replays.
-4. In **Version history**, name checkpoints, branch an experiment, compare
-   changes, and restore earlier work. Restoring saves uncheckpointed work in
-   a safety checkpoint first. Browser drafts survive reloads independently
-   of the selected checkpoint. Checkpoints save locally before optional cloud
-   synchronization, which has a shared five-second deadline. A remote failure
-   leaves the local checkpoint available and reports the sync failure.
-5. In **Print & share**, select any component and download A4 or US Letter
-   sheets with physical dimensions and shaped cutting guides. Print one face,
-   every face separately, or duplex fronts/backs with mirrored placements.
-   Large boards tile across pages with 10 mm overlap and assembly labels;
-   their artwork stays at its original size. Optional bleed is supported.
-   Open the HTML sheets and print at **100% / actual size**, with browser
-   headers and footers off. Duplex uses **flip on the long edge**; check two
-   pages for alignment first. Printable rulebooks and archives with complete
-   design history are also available. Supplier production-file validation,
-   checkout, and fulfillment remain future work.
+The [workshop guide](docs/workshop-guide.md) covers the complete workflow,
+including duplex printing, large-board tiling, and supplier preparation.
 
-`#/new` is the local creation path; `#/new/guided` retains guided AI setup.
-Editor links accept a section, for example
-`#/editor/<project-id>?section=component_editor`. Legacy `card_studio` links
-open the card family within Components.
+## Engineering decisions
 
-Live project snapshots, workspace files, checkpoints, and embedded artwork
-are stored in IndexedDB. localStorage contains a small project index and UI
-preferences. Checkpoints are not automatically pruned; download a portable
-backup before clearing browser data or moving to another browser. Archives
-include embedded artwork once and import as a new game. Linked HTTP(S)
-artwork still needs its original source; upload it to make it portable.
+| Concern | Implementation |
+| --- | --- |
+| Data durability | Working drafts, workspace files, and immutable checkpoints use IndexedDB with content-addressed artwork. Checkpoints save locally before optional cloud synchronization. A shared five-second deadline bounds remote sync; failures leave the local checkpoint available. [Persistence contract](apps/web/src/editor/versions/README.md) |
+| Recovery | Restoring a checkpoint first preserves unsaved changes in a safety checkpoint. Portable archives validate artwork hashes and checkpoint ancestry; imports receive a separate project and cloud history. [Archive implementation](apps/web/src/editor/versions/archive.ts) |
+| Identity and access | Authenticated AI endpoints explicitly verify the caller's JWT. Database migrations define owner-scoped row-level security for projects, repositories, and usage-history reads. [Project policies](supabase/migrations/00000000000001_phase2_projects.sql) · [Rules endpoint](supabase/functions/ai-rules-writer/handler.ts) |
+| AI integration | Provider credentials stay in server-side edge functions. Model selection, request limits, structured responses, and proposal validation are explicit. Browser apply/undo guards prevent delayed replies from replacing newer edits. [Rules workflow](apps/web/src/editor/sections/rules/README.md) · [Card-table API](supabase/functions/ai-card-table/README.md) |
+| Usage accounting | AI handlers record model, token usage, provider cost, and customer charge. Card-table generation distinguishes reported cost from estimates and records invalid provider output without charging the designer. [Billing contract](supabase/functions/ai-card-table/README.md#billing-and-failures) |
+| Service boundaries | React coordinates editor views; domain modules own project operations. A separate NestJS API owns supplier ingestion and quotes, backed by PostgreSQL, Prisma, Redis, and BullMQ. [Editor structure](apps/web/README.md) · [Catalog API](apps/catalog-api/README.md) |
 
-## Workshop checks
+## Repository
 
-Run from the repository root:
+| Path | Responsibility |
+| --- | --- |
+| [`apps/web`](apps/web) | React, TypeScript, and Vite application; editor, local persistence, exports, and playtest lab |
+| [`apps/catalog-api`](apps/catalog-api) | Supplier catalog, ingestion jobs, manufacturing layouts, and quotes |
+| [`supabase/functions`](supabase/functions) | Authenticated AI integrations, remote project history, and supporting services |
+| [`supabase/migrations`](supabase/migrations) | Versioned database schema, access policies, and usage accounting |
+| [`packages`](packages) | Shared types, utilities, component schemas, and game-engine foundations |
+| [`tests`](tests), [`scripts`](scripts) | Regression suites, local-stack tooling, browser checks, and demo recording |
 
-```bash
-npm run test:workshop # Node tests: tables, editable templates, all-family printing, agents
-npm run test:versions # Vitest + fake IndexedDB: persistence, versions and archives
-npm run test:rules:api # Rules writer: auth, model selection, prompts and mocked provider calls
-npm run test:cards:api # Card table AI: scoped edits, provider contracts, auth and billing
-npm run typecheck    # Typecheck all workspaces
-```
+See the [current architecture](.agents/architecture.md) and
+[package-boundary decision](docs/adr/0001-monorepo-engine-boundaries.md).
+Designs under [`docs/future`](docs/future) describe proposed work, not completed
+product capabilities.
 
-UI verification uses Playwright; browser helpers and logs are described below.
-With the dev stack and the dedicated browser running, `npm run test:workshop:browser`
-checks cards, checkpoint restore, agent moves, simulations, print downloads, and
-backup import in an isolated browser context. Set `PLAYWRIGHT_MODULE_PATH` if
-Playwright is installed elsewhere; artifacts go to `/tmp/turnbased-workshop-smoke`.
+## Run locally
 
-The shared template workflow has a separate browser check:
-
-```bash
-npm run test:components:browser
-```
-
-The new AI and tabletop surfaces have focused browser checks:
-`npm run test:rulebook:browser`, `npm run test:cards:ai:browser`, and
-`npm run test:playtest:table:browser`. They launch isolated Chrome processes;
-AI responses are intercepted in regression checks. The tabletop check uses
-the Moonlit Market archive fixture described in the second walkthrough.
-
-It exercises all six component families, layer gestures and data bindings,
-faces, template/SVG/print downloads, reloads, and checkpoint restore in an
-isolated context. It uses the same app and CDP browser defaults; override
-`CODEX_BROWSER_URL`, `CODEX_BROWSER_CDP_URL`, or `PLAYWRIGHT_MODULE_PATH` as
-needed. Screenshots and downloads go to `/tmp/turnbased-component-templates`,
-or `COMPONENT_TEMPLATE_ARTIFACT_DIR` when set.
-
-`npm run test:rules:browser` checks supplier edits, icon descriptions, saved
-AI controls, AI undo, delayed replies during edits and checkpoint restores,
-and returning safely from Settings. It mocks catalog and AI responses in an
-isolated browser context and makes no paid AI calls. Artifacts go to
-`/tmp/turnbased-rules-fixes`; the same browser/app overrides above apply.
-
-The rulebook's **AI assist** remembers its prompt, model, mode, context
-weights, theme/style selections, and Creativity setting per project. Models
-that do not support Creativity show the control as unavailable. A delayed
-reply cannot overwrite newer section text or a restored checkpoint. Icon
-descriptions are shared with Art Studio and included in printable rulebooks.
-**Draft rulebook with AI** generates selected prose chapters together from
-the brief, current rules and component tables. Review the chapter-by-chapter
-proposal before applying it; component inventories and icon legends stay
-connected to the project. Applied prose can be undone until its targets change.
-Changing a component's supplier size updates its printable template dimensions
-while preserving its identity, table rows, and authored layers.
-
-Component templates are stored in `EditorProject.componentDesigns`, keyed by
-the existing physical component instance ID. This keeps the component, its
-table, and its artwork in one versioned design. Old `project.cardStudio`
-data appears as one original deck and moves into the component map when
-opened for editing; its row IDs and copy counts are preserved. The shared
-template renderer drives previews and exports. Printed grids and tracks
-remain artwork until configured as interactive structures in Placement.
-
-## Local Dev
-
-To start the full local stack in one command:
+Requires **Node.js 22.12+** and **Docker with Compose v2**, with Docker running.
+From the repository root:
 
 ```bash
 npm run dev:local
 ```
 
-Both `npm run dev` and `npm run dev:local` start the full stack. Use Node 22.12+
-and Docker with Compose v2.
+The launcher installs dependencies, creates missing local environment files,
+starts the catalog databases and API, applies migrations and seeds, then
+starts Supabase, edge functions, and the web app at
+**http://127.0.0.1:3000**. `npm run dev` runs the same launcher.
 
-That script uses your existing `.env` when present. If `.env` is missing, it
-copies `.env.example` to `.env` without overwriting an existing file. It then
-installs workspace dependencies, starts catalog Postgres + Redis, applies the
-catalog migrations and supplier seed, starts the catalog API on port 3100,
-then starts Supabase, the local edge runtime, and the web app at
-`http://127.0.0.1:3000`. Missing `apps/catalog-api/.env` is also created from its
-example. The web app receives the running local Supabase URL and anon key
-automatically.
+Choose **New game** or open **My workshop** and try **Little Woodland**.
+Local authoring does not require an AI key. To use AI assistance, configure
+`OPENROUTER_API_KEY` in the root `.env` and sign in with **Use local dev account**
+on the local authentication screen. Provider calls incur usage charges.
+A fresh catalog needs a [supplier refresh](apps/catalog-api/README.md#catalog-data).
 
-The catalog server is now part of this monorepo at
-[`apps/catalog-api`](apps/catalog-api/README.md). Its existing API routes stay
-at `/v1`; Vite forwards them to the local server. `npm run dev:catalog` starts
-just the API and its dependencies. Logs are saved under `logs/`.
+Stop the launcher with `Ctrl+C`, then run `npm run dev:stop` to stop containers
+while retaining database volumes. Full configuration and troubleshooting are
+in the [development guide](docs/development.md).
 
-Catalog data lives in its own persistent Docker volume. A fresh machine needs
-a supplier refresh to populate products; see the [catalog setup guide](apps/catalog-api/README.md#catalog-data).
-
-Set `RESET_DB=1` if you want to rebuild the local database from migrations
-and seed data:
+## Verification and deployment
 
 ```bash
-RESET_DB=1 npm run dev:local
+npm run test:dev         # Local-stack orchestration
+npm run test:workshop    # Tables, templates, printing, and deterministic agents
+npm run test:versions    # Persistence, archives, restore, and remote-sync failures
+npm run test:production  # Supplier matching, quantities, ZIP and PNG output
+npm run test:rules:api   # Rules generation, auth, model selection, and provider contracts
+npm run test:cards:api   # Scoped AI edits, validation, auth, and usage accounting
+npm run lint
+npm run typecheck
+npm run build
 ```
 
-### What's actually running
+AI API tests use mocked providers and make no paid calls. GitHub Actions runs
+the automated suites, lint, typechecking, and application builds on pull
+requests and pushes to `main`; see the [workflow](.github/workflows/ci.yml).
+Playwright checks exercise editing, reloads, checkpoint recovery, AI review,
+tabletop interactions, and real export downloads against a running local app.
+Browser setup and artifact locations are in the [verification guide](docs/verification.md).
 
-Local Supabase runs as a stack of **Docker containers**, not as host
-processes — so `pgrep supabase` will show nothing even when the stack is up.
-The Supabase CLI manages them on your behalf.
+Production configuration, release validation, and rollback are documented in
+the [deployment guide](docs/deployment.md).
 
-| Container                              | Role                              | Host port |
-| -------------------------------------- | --------------------------------- | --------- |
-| `supabase_kong_TurnBased`              | API gateway (routes everything)   | **54321** |
-| `supabase_db_TurnBased`                | Postgres                          | 54322     |
-| `supabase_studio_TurnBased`            | Web admin UI                      | 54323     |
-| `supabase_inbucket_TurnBased`          | Mail capture for local auth flows | 54324     |
-| `supabase_analytics_TurnBased`         | Logflare                          | 54327     |
-| `supabase_edge_runtime_TurnBased`      | Edge function runtime (Deno)      | (via Kong on 54321) |
-| `supabase_auth_TurnBased`              | GoTrue auth                       | (via Kong) |
-| `supabase_rest_TurnBased`              | PostgREST                         | (via Kong) |
-| `supabase_realtime_TurnBased`          | Realtime                          | (via Kong) |
-| `supabase_storage_TurnBased`           | Storage API                       | (via Kong) |
-| `supabase_pg_meta_TurnBased`           | DB metadata                       | (via Kong) |
-| `supabase_vector_TurnBased`            | Log shipping                      | —         |
+## Current boundaries
 
-Plus, in front of all that:
-
-- **Catalog API** on `http://127.0.0.1:3100`, with Postgres on **54328**
-  and Redis on **6380** (managed by the root `compose.yml`).
-- **Vite dev server** on `http://127.0.0.1:3000` — the web app
-- The Supabase CLI's `functions serve` Deno worker, attached to
-  `supabase_edge_runtime_TurnBased` over a websocket so the runtime can
-  hot-load functions from `supabase/functions/`.
-
-### Common operations
-
-**Start everything fresh** — easiest path:
-```bash
-npm run dev:local
-```
-
-**Stop everything**:
-```bash
-# First Ctrl+C the npm run dev terminal (stops web, API, and edge workers).
-npm run dev:stop                 # stops Supabase + catalog Postgres/Redis
-# Database volumes and catalog data are preserved.
-```
-
-**Register a newly-added edge function with the running runtime.** The
-edge runtime container's function route table is built when the CLI's
-`supabase functions serve` worker registers them on startup — `docker restart`
-alone keeps the OLD list. To add a function you just dropped into
-`supabase/functions/`, (re-)run the serve worker:
-```bash
-# kill any stale serve worker first
-pkill -f 'supabase functions serve' 2>/dev/null
-
-# from the repo root — the named function doesn't matter; the worker
-# exposes EVERY directory under supabase/functions/ from the same process
-npx supabase functions serve ai-project-builder --env-file .env
-```
-
-Leave that terminal running while developing — it also hot-reloads function
-code on save. To smoke-test the route is wired:
-```bash
-curl -sS http://127.0.0.1:54321/functions/v1/<function-name> \
-  -X POST -H "Content-Type: application/json" -d '{}'
-```
-`{"msg":"Missing authorization header"}` (HTTP 401) is the expected
-response for an auth-gated function — it confirms the route exists.
-
-**Tail edge function logs** while developing:
-```bash
-docker logs -f supabase_edge_runtime_TurnBased
-```
-
-**Reset the local DB** without restarting containers:
-```bash
-npx supabase db reset
-```
-
-**Open Studio** (the local admin UI) — useful for browsing tables, ledger
-entries, etc.:
-```
-http://127.0.0.1:54323
-```
-
-### Manual setup (if you're not using `dev:local`)
-
-1. Copy `.env.example` to `.env` and fill in the values you need.
-2. Start local Supabase:
-   ```bash
-   npx supabase start
-   ```
-3. Apply migrations and seed data:
-   ```bash
-   npx supabase db reset
-   ```
-4. Start the local edge runtime. The CLI's `functions serve` attaches to the
-   already-running edge runtime container — you only need to name **one**
-   function; the runtime exposes every function in `supabase/functions/` from
-   the same process:
-   ```bash
-   npx supabase functions serve ai-project-builder --env-file .env
-   ```
-5. In another terminal, start the catalog API and its dependencies:
-   ```bash
-   npm run dev:catalog
-   ```
-6. Start the web app:
-   ```bash
-   npm run dev --workspace web -- --host 127.0.0.1 --port 3000
-   ```
-7. Open `http://127.0.0.1:3000` and create a game or try Little Woodland.
-   Sign in only when exercising an authenticated feature such as AI assistance.
-
-### Environment variables
-
-Optional root `.env` / shell overrides: `WEB_HOST`, `WEB_PORT`,
-`CATALOG_PORT` (3100), `CATALOG_DB_PORT` (54328), and
-`CATALOG_REDIS_PORT` (6380). The launcher keeps these ports and the web proxy
-in sync. For a manually started Vite server, use `CATALOG_API_URL` to override
-its default `http://127.0.0.1:3100` target. Supplier credentials belong in
-`apps/catalog-api/.env`, which is ignored by git.
-
-The web app reads `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` at build
-time from `.env` (Vite only exposes vars prefixed with `VITE_` to the
-browser).
-
-The edge runtime reads the rest of `.env` (everything **not** starting with
-`VITE_`) when you pass `--env-file .env`. The reserved `SUPABASE_URL`,
-`SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` are injected by the CLI
-automatically — you don't need to set them yourself.
-
-Keys the edge functions actually read:
-
-- `OPENROUTER_API_KEY` — required for any AI-backed function
-  (`ai-project-builder`, `ai-rules-writer`, `ai-image-agent`).
-- `OPENROUTER_DEFAULT_MODEL` — fallback model id used by all AI functions
-  when no per-function override is set.
-- `OPENROUTER_BUILD_MODEL` — override for `ai-project-builder` only.
-- `OPENROUTER_RULES_MODEL` — override for `ai-rules-writer` only. Defaults
-  to `moonshotai/kimi-k2-0905`.
-
-When signed in, initial AI builds can create Supabase-backed project history
-in addition to the local browser working copy.
-
-### Local dev account
-
-A pre-confirmed account is seeded into the local Postgres on every
-`supabase db reset`:
-
-- **Email:** `dev@turnbased.local`
-- **Password:** `dev-local-only`
-- **Local AI wallet:** `$50.00`
-
-Open `http://127.0.0.1:3000/#/auth` and choose **Use local dev account**.
-The shortcut appears only in development when both the app and Supabase use
-localhost/loopback addresses. You can also enter the credentials above in the
-normal form. Guest sessions can open this page to sign into a regular account.
-
-Use it to exercise any flow that requires auth (the `Build with AI` path,
-the rulebook `AI` button on each section, anything that hits the edge
-functions). If you already have local data and don't want a full reset,
-the same account can be created against the running DB with:
-
-```bash
-scripts/seed-dev-account.sh
-```
-
-The seed/script logic both live in `supabase/seed.sql` — credentials never
-leave local-dev databases, they're not deployed to hosted Supabase.
-
-### Codex headed browser
-
-For UI work, Codex should use its own headed Chrome profile instead of the
-shared Playwright MCP profile that Claude Code may already have locked. Keep the
-normal dev server on `http://127.0.0.1:3000`, then launch:
-
-```bash
-node scripts/codex-headed-browser.mjs
-```
-
-The script opens a visible Chrome window with a persistent local profile at
-`.playwright-codex/chrome-profile` and remote debugging on port `9223`. Sign in
-there once with the local dev account above; future Codex browser checks can
-reuse that session without disturbing Claude's browser.
-
-Codex can inspect or screenshot that browser through the approved helper scripts:
-
-```bash
-node scripts/codex-browser-inspect.mjs http://127.0.0.1:3000/#/settings
-node scripts/codex-browser-screenshot.mjs http://127.0.0.1:3000/#/settings settings.png
-```
-
-For simple headed-browser interactions, use the action helper instead of ad-hoc
-`node -e` snippets:
-
-```bash
-node scripts/codex-browser-action.mjs create-project "Codex UI Check"
-node scripts/codex-browser-action.mjs open '#/settings'
-node scripts/codex-browser-action.mjs click-text "AI models" '#/settings'
-node scripts/codex-browser-action.mjs fill-label "Game name" "Test Project" '#/new'
-```
-
-Useful overrides:
-
-```bash
-CODEX_BROWSER_URL=http://127.0.0.1:3000 \
-CODEX_BROWSER_DEBUG_PORT=9223 \
-node scripts/codex-headed-browser.mjs
-```
-
-The `.playwright-codex/` directory is ignored by git because it contains local
-browser profile state.
-
-### Edge function gotcha: validate JWTs explicitly
-
-When writing a new edge function that needs the caller's identity, do NOT
-rely on the supabase-js client's session lookup:
-
-```ts
-// ✗ "Auth session missing!" even when the Authorization header is present
-const { data: { user } } = await supabaseClient.auth.getUser();
-```
-
-The server-side client has no persisted session, so a no-arg `getUser()`
-returns the missing-session error. Pass the JWT from the request explicitly:
-
-```ts
-// ✓ verifies the token from the request header directly
-const authHeader = req.headers.get('Authorization') ?? '';
-const jwt = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
-const { data: { user } } = await supabaseClient.auth.getUser(jwt);
-```
-
-`ai-rules-writer` follows this pattern. Older functions in this repo predate
-the fix and may surface the same issue once they go through more rigorous
-testing.
-
-### Troubleshooting
-
-**"Edge Function returned a non-2xx status code"** — the function threw. The
-web client extracts the real cause and shows it inline (e.g. `OpenRouter API
-Key not configured`, `Not Authenticated`). If you want the raw response,
-tail the runtime logs with `docker logs -f supabase_edge_runtime_TurnBased`
-while you trigger the action.
-
-**Edge function not found (404)** — either the function directory is missing
-from `supabase/functions/`, or the runtime hasn't picked up a new function
-you just added. Restart the runtime container:
-```bash
-docker restart supabase_edge_runtime_TurnBased
-```
-
-**`pgrep supabase` shows nothing but the app still works** — expected.
-Everything is in Docker. Use `docker ps --filter "name=supabase"` instead.
+- **Authoring and execution are separate.** The AI drafts rulebook prose.
+  The executable lab supports an explicit two-player market-race model with
+  numeric costs and points. It does not interpret arbitrary rules or card
+  abilities. Built-in agents are seeded heuristics; external agents can
+  exchange validated JSON moves.
+- **The working copy belongs to the browser.** Cloud checkpoint sync is
+  optional. Export a portable archive before clearing browser storage or
+  moving to another browser. Externally linked artwork still requires its
+  source unless embedded in the project.
+- **Supplier ordering requires a handoff.** Artwork packages support manual
+  proof review and ordering. Integrated checkout, fulfillment, a marketplace,
+  and general hosted multiplayer are not completed product flows.
+- **Hosted supplier lookup is not connected.** Catalog lookup requires the
+  separate catalog API; the local launcher includes it. See the deployment
+  guide for the remaining hosted service configuration.
+- **The catalog has an internal administration boundary.** Its administration
+  routes have no application authentication and must remain behind a private
+  gateway. See the [catalog deployment notes](apps/catalog-api/README.md#checks-and-deployment).
+- **Hosted AI requires sign-in.** Metered features can require account credit;
+  self-service payment and top-up flows are not part of this release.

@@ -28,43 +28,15 @@ import {
   useCatalogProducts,
 } from '../../useSupplierCatalog';
 
-/**
- * The catalog tie for a board/tile/deck — the subset of component properties
- * that pin it to a specific supplier product + variant (thing + size + finish).
- * Shared so the component editor and the rulebook drive the exact same
- * thing → size → finish selectors.
- */
-export interface CatalogSelection {
-  catalogSlug: string;
-  catalogVariantId: string;
-  shape: string;
-  physicalWidthMm: number | null;
-  physicalHeightMm: number | null;
-}
-
-/** Per-context field styling so the same selectors fit the tabletop inspector
- *  or the cozy serif rulebook modal. */
-export interface CatalogSelectorStyles {
-  label: CSSProperties;
-  input: CSSProperties;
-}
+import type { CatalogSelection, CatalogSelectorStyles, SelectionUpdater } from './catalogSelection';
+export type { CatalogSelection, CatalogSelectorStyles } from './catalogSelection';
+import { CatalogPreviewImage } from './CatalogPreviewImage';
+import { infoBadgeStyle, priceBadgeStyle, sectionDividerStyle, groupTitleStyle, catalogErrorStyle } from './catalogSelectorStyles';
 
 const DEFAULT_STYLES: CatalogSelectorStyles = {
   label: tabletopLabel,
   input: { ...tabletopField, padding: '0.58rem 0.68rem', fontSize: '0.86rem' },
 };
-
-type SelectionUpdater = (updater: (selection: CatalogSelection) => CatalogSelection) => void;
-
-export function selectionFromProperties(properties: Record<string, unknown>): CatalogSelection {
-  return {
-    catalogSlug: typeof properties.catalogSlug === 'string' ? properties.catalogSlug : '',
-    catalogVariantId: typeof properties.catalogVariantId === 'string' ? properties.catalogVariantId : '',
-    shape: typeof properties.shape === 'string' ? properties.shape : '',
-    physicalWidthMm: typeof properties.physicalWidthMm === 'number' ? properties.physicalWidthMm : null,
-    physicalHeightMm: typeof properties.physicalHeightMm === 'number' ? properties.physicalHeightMm : null,
-  };
-}
 
 const SHAPE_LABELS: Record<string, string> = {
   rectangle: 'Rectangle',
@@ -124,63 +96,24 @@ function useApplyLayoutWhenFetched(slug: string, onChange: SelectionUpdater) {
 /* Shared sub-components                                               */
 /* ------------------------------------------------------------------ */
 
-const infoBadgeStyle: CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: '0.35rem',
-  fontSize: '0.78rem',
-  fontWeight: 700,
-  color: '#065f46',
-  background: 'rgba(236,253,245,0.95)',
-  border: '1px solid rgba(15,118,110,0.15)',
-  borderRadius: '8px',
-  padding: '0.3rem 0.6rem',
-};
-
-const priceBadgeStyle: CSSProperties = {
-  ...infoBadgeStyle,
-  color: '#92400e',
-  background: 'rgba(254,243,199,0.85)',
-  border: '1px solid rgba(217,119,6,0.2)',
-};
-
-const sectionDividerStyle: CSSProperties = {
-  borderTop: '1px solid rgba(120,95,50,0.14)',
-  paddingTop: '0.6rem',
-  marginTop: '0.3rem',
-};
-
-const groupTitleStyle: CSSProperties = {
-  fontSize: '0.72rem',
-  fontWeight: 700,
-  textTransform: 'uppercase',
-  letterSpacing: '0.06em',
-  color: '#6b7280',
-  marginBottom: '0.5rem',
-};
-
-const catalogErrorStyle: CSSProperties = {
-  fontSize: '0.72rem',
-  color: '#dc2626',
-  lineHeight: 1.4,
-  marginBottom: '0.3rem',
-};
-
-function VariantOptionsPanel({
-  detail,
-  loading,
-  selection,
-  onChange,
-  excludeGroups,
-  styles,
-}: {
+interface VariantOptionsPanelProps {
   detail: ProductDetailResponse | null;
   loading: boolean;
   selection: CatalogSelection;
   onChange: SelectionUpdater;
   excludeGroups?: string[];
   styles: CatalogSelectorStyles;
-}) {
+}
+
+function VariantOptionsPanel(props: VariantOptionsPanelProps) {
+  const variant = props.detail?.productVariants.find((entry) => entry.id === props.selection.catalogVariantId);
+  // Reset draft option choices when a different variant is selected or its
+  // asynchronous detail first arrives; partial unmatched choices stay local.
+  const key = `${props.selection.catalogSlug}:${props.selection.catalogVariantId}:${variant ? 'ready' : 'pending'}`;
+  return <VariantOptionsEditor key={key} {...props} />;
+}
+
+function VariantOptionsEditor({ detail, loading, selection, onChange, excludeGroups, styles }: VariantOptionsPanelProps) {
   const allGroups = useMemo(() => extractVariantOptionGroups(detail), [detail]);
   const optionGroups = useMemo(
     () => (excludeGroups ? allGroups.filter((g) => !excludeGroups.includes(g.group)) : allGroups),
@@ -199,19 +132,6 @@ function VariantOptionsPanel({
     }
     return init;
   });
-
-  const prevVariantIdRef = useRef(currentVariantId);
-  useEffect(() => {
-    if (currentVariantId === prevVariantIdRef.current) return;
-    prevVariantIdRef.current = currentVariantId;
-    if (!currentVariant) return;
-    const next: Record<string, string> = {};
-    for (const opt of currentVariant.options) {
-      if (opt.optionKey.startsWith('dro_choosesize') || opt.optionKey.startsWith('dro_choosepcs')) continue;
-      next[opt.optionGroup] = opt.optionValue;
-    }
-    setSelections(next);
-  }, [currentVariantId, currentVariant]);
 
   function handleOptionChange(group: string, value: string) {
     const next = { ...selections, [group]: value };
@@ -275,118 +195,6 @@ function PricingPanel({ variant }: { variant: ProductVariant | null }) {
 function CountBadge({ count, unit }: { count: number | null; unit: string }) {
   if (count == null) return null;
   return <span style={infoBadgeStyle}>{count} {unit}{count !== 1 ? 's' : ''}</span>;
-}
-
-// Thin-bordered thumbnail that hugs the image: a few px of mat, no fixed frame
-// height, so the border just outlines the artwork. Click opens the lightbox.
-const previewTriggerStyle: CSSProperties = {
-  display: 'block',
-  width: 'fit-content',
-  maxWidth: '100%',
-  margin: '0 auto',
-  padding: '3px',
-  border: '1px solid rgba(120,95,50,0.28)',
-  borderRadius: '10px',
-  background: 'rgba(255,253,246,0.9)',
-  boxShadow: '0 1px 3px rgba(60,40,20,0.1)',
-  cursor: 'zoom-in',
-  lineHeight: 0,
-};
-
-const previewImageStyle: CSSProperties = {
-  display: 'block',
-  maxWidth: '100%',
-  maxHeight: '168px',
-  height: 'auto',
-  borderRadius: '7px',
-};
-
-const lightboxOverlayStyle: CSSProperties = {
-  position: 'fixed',
-  inset: 0,
-  // Above every catalog host: the rulebook picker (z 40) and the new-component
-  // dialog (z 300) both sit below this enlarged view.
-  zIndex: 500,
-  display: 'grid',
-  placeItems: 'center',
-  padding: '2rem',
-  background: 'rgba(20,12,4,0.72)',
-  backdropFilter: 'blur(4px)',
-  cursor: 'zoom-out',
-};
-
-const lightboxImageStyle: CSSProperties = {
-  maxWidth: '92vw',
-  maxHeight: '92vh',
-  objectFit: 'contain',
-  borderRadius: '12px',
-  boxShadow: '0 24px 60px rgba(0,0,0,0.5)',
-};
-
-/**
- * Renders the supplier's preview image for the currently selected catalog
- * product (the `imageUrl` from the catalog API). The thumbnail border just hugs
- * the image; clicking it opens an enlarged lightbox (click anywhere or Esc to
- * dismiss). Stays out of the way when no product is selected, the product has no
- * image, or the CDN image fails to load — the selection flow never depends on
- * the artwork being present.
- */
-function CatalogPreviewImage({ product }: { product: CatalogProduct | null }) {
-  const imageUrl = product?.imageUrl ?? null;
-  const [errored, setErrored] = useState(false);
-  const [enlarged, setEnlarged] = useState(false);
-
-  // Reset both flags whenever the source changes so switching products re-shows
-  // a working thumbnail and never leaves a stale lightbox open.
-  useEffect(() => { setErrored(false); setEnlarged(false); }, [imageUrl]);
-
-  // Esc closes the enlarged view, matching click-to-dismiss.
-  useEffect(() => {
-    if (!enlarged) return undefined;
-    const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') setEnlarged(false); };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [enlarged]);
-
-  if (!product || !imageUrl || errored) return null;
-
-  const label = product.customTitle || product.title || product.slug;
-  return (
-    <div data-layout="catalogPreviewImage" /* supplier product preview from the catalog API */ style={sectionDividerStyle}>
-      <div style={groupTitleStyle}>Preview</div>
-      <button
-        type="button"
-        data-layout="catalogPreviewTrigger"
-        /* thin-bordered thumbnail; opens the enlarged lightbox on click */
-        onClick={() => setEnlarged(true)}
-        aria-label={`Enlarge preview of ${label}`}
-        title="Click to enlarge"
-        style={previewTriggerStyle}
-      >
-        <img
-          src={imageUrl}
-          alt={`Catalog preview of ${label}`}
-          loading="lazy"
-          onError={() => setErrored(true)}
-          style={previewImageStyle}
-        />
-      </button>
-
-      {enlarged ? (
-        <div
-          data-layout="catalogPreviewLightbox"
-          /* enlarged overlay; click anywhere or press Esc to dismiss */
-          role="dialog"
-          aria-modal="true"
-          aria-label={`Enlarged preview of ${label}`}
-          onClick={() => setEnlarged(false)}
-          style={lightboxOverlayStyle}
-        >
-          <img src={imageUrl} alt={`Enlarged catalog preview of ${label}`} style={lightboxImageStyle} />
-        </div>
-      ) : null}
-    </div>
-  );
 }
 
 function Spinner() {
@@ -469,7 +277,7 @@ function TilePicker({ selection, preferredUnits, onChange, styles, products, loa
         </div>
       ) : null}
 
-      {currentSlug ? <CatalogPreviewImage product={selectedProduct} /> : null}
+      {currentSlug ? <CatalogPreviewImage key={selectedProduct?.imageUrl ?? currentSlug} product={selectedProduct} /> : null}
       {currentSlug ? <VariantOptionsPanel detail={detail} loading={detailLoading} selection={selection} onChange={onChange} styles={styles} /> : null}
       <PricingPanel variant={selectedVariant} />
     </div>
@@ -519,7 +327,7 @@ function BoardPicker({ selection, preferredUnits, onChange, styles, products, lo
         </select>
       </label>
 
-      {currentSlug ? <CatalogPreviewImage product={selectedProduct} /> : null}
+      {currentSlug ? <CatalogPreviewImage key={selectedProduct?.imageUrl ?? currentSlug} product={selectedProduct} /> : null}
       {currentSlug ? (
         <VariantOptionsPanel detail={detail} loading={detailLoading} selection={selection} onChange={onChange} excludeGroups={['Configuration']} styles={styles} />
       ) : null}
@@ -589,7 +397,7 @@ function DeckPicker({ selection, preferredUnits, onChange, styles, products, loa
         </div>
       ) : null}
 
-      {currentSlug ? <CatalogPreviewImage product={selectedProduct} /> : null}
+      {currentSlug ? <CatalogPreviewImage key={selectedProduct?.imageUrl ?? currentSlug} product={selectedProduct} /> : null}
       {currentSlug ? <VariantOptionsPanel detail={detail} loading={detailLoading} selection={selection} onChange={onChange} styles={styles} /> : null}
       <PricingPanel variant={selectedVariant} />
     </div>

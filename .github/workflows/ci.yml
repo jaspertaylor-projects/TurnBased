@@ -1,5 +1,12 @@
 name: CI
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: [main]
@@ -9,6 +16,7 @@ on:
 jobs:
   build_and_test:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - name: Setup Node.js
@@ -23,6 +31,17 @@ jobs:
       - name: Check development startup
         run: npm run test:dev
 
+      - name: Check workshop and persistence
+        run: |
+          npm run test:workshop
+          npm run test:versions
+          npm run test:production
+
+      - name: Check AI request contracts
+        run: |
+          npm run test:rules:api
+          npm run test:cards:api
+
       - name: Build catalog API
         run: npm run build --workspace @turnbased/catalog-api
 
@@ -31,3 +50,6 @@ jobs:
 
       - name: Typecheck
         run: npm run typecheck
+
+      - name: Build web app
+        run: npm run build --workspace web

@@ -50,6 +50,17 @@ interface TgcPart {
   virtual?: number;
 }
 
+interface TgcResponse<T> {
+  result?: T;
+  id?: string;
+  error?: { code: number; message: string };
+}
+
+interface TgcPartsPage {
+  items?: TgcPart[];
+  paging?: { total_pages?: number };
+}
+
 /**
  * Adapter for The Game Crafter (https://www.thegamecrafter.com).
  *
@@ -90,7 +101,7 @@ export class TheGameCrafterAdapter implements SupplierCatalogAdapter {
     let totalPages = 1;
 
     do {
-      const body = await this.apiGet(
+      const body = await this.apiGet<TgcPartsPage>(
         `/part?_items_per_page=${PAGE_SIZE}&_page_number=${page}`,
       );
       const items: TgcPart[] = body?.result?.items ?? [];
@@ -137,7 +148,7 @@ export class TheGameCrafterAdapter implements SupplierCatalogAdapter {
     }
 
     const id = this.partIdFromUrl(url);
-    const body = await this.apiGet(`/part/${id}`);
+    const body = await this.apiGet<TgcPart>(`/part/${id}`);
     const part: TgcPart | undefined = body?.result;
     if (!part?.id) {
       throw new Error(`No part returned for ${url}`);
@@ -147,11 +158,11 @@ export class TheGameCrafterAdapter implements SupplierCatalogAdapter {
 
   async parseProduct(page: RawSupplierPage): Promise<ParsedProduct> {
     if (page.url.startsWith(CURATED_URL_PREFIX)) {
-      const curated: CuratedProduct = JSON.parse(page.html);
-      return curatedToParsedProduct(curated);
+      const curated = JSON.parse(page.html) as CuratedProduct;
+      return Promise.resolve(curatedToParsedProduct(curated));
     }
 
-    const part: TgcPart = JSON.parse(page.html);
+    const part = JSON.parse(page.html) as TgcPart;
 
     const slugBase = part.uri_part || part.id;
     const slug = `tgc-${slugBase}`;
@@ -160,7 +171,7 @@ export class TheGameCrafterAdapter implements SupplierCatalogAdapter {
       ? `${PUBLIC_BASE}${part.shop_uri}`
       : `${PUBLIC_BASE}/parts/${slugBase}`;
 
-    return {
+    return Promise.resolve({
       product: {
         externalProductId: part.id,
         slug,
@@ -184,7 +195,7 @@ export class TheGameCrafterAdapter implements SupplierCatalogAdapter {
         },
       ],
       rawMetadata: part as unknown as Record<string, unknown>,
-    };
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -298,13 +309,16 @@ export class TheGameCrafterAdapter implements SupplierCatalogAdapter {
   // ---------------------------------------------------------------------------
 
   /** GET an API path with the current session, re-authenticating once on expiry. */
-  private async apiGet(path: string, retryOnAuth = true): Promise<any> {
+  private async apiGet<T>(
+    path: string,
+    retryOnAuth = true,
+  ): Promise<TgcResponse<T> | null> {
     const sessionId = await this.getSession();
     const sep = path.includes('?') ? '&' : '?';
     const res = await fetch(
       `${this.apiBase}${path}${sep}session_id=${encodeURIComponent(sessionId)}`,
     );
-    const body = await res.json().catch(() => null);
+    const body = (await res.json().catch(() => null)) as TgcResponse<T> | null;
 
     if (body?.error) {
       const { code, message } = body.error;
@@ -313,7 +327,7 @@ export class TheGameCrafterAdapter implements SupplierCatalogAdapter {
         this.logger.warn(`Session rejected (${code}); re-authenticating`);
         this.sessionId = null;
         this.sessionPromise = null;
-        return this.apiGet(path, false);
+        return this.apiGet<T>(path, false);
       }
       throw new Error(`TGC API error ${code}: ${message}`);
     }
@@ -363,7 +377,9 @@ export class TheGameCrafterAdapter implements SupplierCatalogAdapter {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: form.toString(),
     });
-    const body = await res.json().catch(() => null);
+    const body = (await res.json().catch(() => null)) as TgcResponse<{
+      id?: string;
+    }> | null;
     if (body?.error) {
       throw new Error(
         `TGC login failed (${body.error.code}): ${body.error.message}`,

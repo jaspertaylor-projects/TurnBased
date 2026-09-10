@@ -3,9 +3,9 @@ import type { ComponentInstanceModel } from '@turnbased/engine-components';
 import type { EditorLengthUnit } from '../../types';
 import {
   CatalogSelector,
-  selectionFromProperties,
   type CatalogSelection,
 } from './CatalogSelector';
+import { selectionFromProperties } from './catalogSelection';
 
 interface CatalogPickerProps {
   componentType: 'tile' | 'board' | 'deck';

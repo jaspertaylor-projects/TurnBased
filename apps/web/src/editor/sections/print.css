@@ -11,7 +11,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 30px 34px 24px;
+  padding: 22px 30px 20px;
   gap: 20px;
   border-bottom: 1px solid #dedecb;
   flex-shrink: 0;
@@ -25,8 +25,8 @@
 }
 .print-heading h1 {
   font:
-    normal 32px Georgia,
-    serif;
+    600 24px 'Inter',
+    sans-serif;
   margin: 8px 0;
 }
 .print-heading p {
@@ -37,6 +37,28 @@
 .print-heading > svg {
   color: #a5ad85;
 }
+.print-workshop--supplier .print-heading {
+  padding: 12px 34px;
+}
+.print-workshop--supplier .print-heading h1 {
+  font-size: 24px;
+  margin: 4px 0 0;
+}
+.print-workshop--supplier .print-heading p {
+  display: none;
+}
+.print-workshop--supplier .print-heading > svg {
+  width: 34px;
+  height: 34px;
+}
+.print-workshop--supplier .print-mode-tabs {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+.print-mode-tabs{display:flex;gap:6px;padding:10px 32px;border-bottom:1px solid #dedecb;background:#f1f1e4;flex-shrink:0}
+.print-mode-tabs button{padding:8px 14px;border:1px solid transparent;border-radius:7px;background:transparent;color:#7b886b;font-size:12px;cursor:pointer}
+.print-mode-tabs button[aria-pressed=true]{background:#fffdf6;border-color:#d6ddc8;color:#315c41;box-shadow:0 2px 5px #36532a06}
+.print-supplier-link{display:flex;align-items:center;gap:8px;margin-left:auto;border:1px solid #bdcdae;border-radius:7px;padding:10px 14px;background:#f9faef;color:#4b7146;font-size:11px;white-space:nowrap;cursor:pointer}
 .print-body {
   flex: 1;
   min-height: 0;
@@ -71,8 +93,8 @@
 }
 .print-card h2 {
   font:
-    normal 25px Georgia,
-    serif;
+    600 18px 'Inter',
+    sans-serif;
   margin: 10px 0;
 }
 .print-card p {
@@ -138,8 +160,8 @@
 }
 .print-readiness h2 {
   font:
-    normal 22px Georgia,
-    serif;
+    600 17px 'Inter',
+    sans-serif;
   margin: 8px 0 18px;
 }
 .print-readiness ul {
@@ -211,6 +233,6 @@
     width: auto;
   }
   .print-heading h1 {
-    font-size: 27px;
+    font-size: 22px;
   }
 }

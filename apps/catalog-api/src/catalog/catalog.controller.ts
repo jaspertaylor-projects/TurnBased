@@ -22,7 +22,10 @@ export class CatalogController {
   }
 
   @Get('products/:slug/layout')
-  getProductLayout(@Param('slug') slug: string, @Query('variantId') variantId?: string) {
+  getProductLayout(
+    @Param('slug') slug: string,
+    @Query('variantId') variantId?: string,
+  ) {
     return this.catalogService.getProductLayout(slug, variantId);
   }
 

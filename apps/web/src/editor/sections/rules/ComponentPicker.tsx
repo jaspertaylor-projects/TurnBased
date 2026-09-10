@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { AlertTriangle, Check, PackagePlus, X } from 'lucide-react';
 
 import type { BuiltInComponentType } from '@turnbased/engine-components';
@@ -165,13 +165,11 @@ export function ComponentPicker({ onSelect, onAddCustom, onClose, initialSelecti
   const selectedVariant = detail?.productVariants.find((variant) => variant.id === selection.catalogVariantId) ?? null;
   const hasSelection = Boolean(selection.catalogSlug && selection.catalogVariantId);
 
-  // Editing an existing catalog item: derive the shape from the product once it
-  // loads, so the shape-filtered size dropdowns populate with the saved size.
-  useEffect(() => {
-    if (!selection.catalogSlug || selection.shape || !selectedProduct) return;
-    const shape = productShape(selectedProduct);
-    if (shape) setSelection((s) => ({ ...s, shape }));
-  }, [selectedProduct, selection.catalogSlug, selection.shape]);
+  // A saved selection can arrive before the catalog. Derive its shape as the
+  // product loads instead of changing the designer's draft in an effect.
+  const catalogSelection = selection.shape || !selectedProduct
+    ? selection
+    : { ...selection, shape: productShape(selectedProduct) ?? '' };
 
   function changeCategory(nextCategory: ComponentGenre) {
     if (isEditingCatalogItem) return;
@@ -312,7 +310,7 @@ export function ComponentPicker({ onSelect, onAddCustom, onClose, initialSelecti
             {genre.componentType ? (
               <CatalogSelector
                 componentType={genre.componentType}
-                selection={selection}
+                selection={catalogSelection}
                 preferredUnits={preferredUnits}
                 onChange={setSelection}
                 styles={selectorStyles}

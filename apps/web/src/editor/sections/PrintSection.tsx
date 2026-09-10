@@ -18,15 +18,19 @@ import { migrateCardTemplate } from '../templateStudio/model';
 import { createRulebookHtml } from '../exports/rulebook';
 import { downloadFile, fileStem } from '../exports/download';
 import { createDesignArchive, importDesignArchive } from '../versions/archive';
+import { OrderPanel } from '../production/OrderPanel';
 import './print.css';
 
 export function PrintSection({
   project,
   onNavigate,
+  onChange,
 }: {
   project: EditorProject;
   onNavigate: (section: EditorSection) => void;
+  onChange: (project: EditorProject) => void;
 }) {
+  const [mode, setMode] = useState<'home' | 'supplier'>('home');
   const sets = listProjectDesignSets(project);
   const [selectedId, setSelectedId] = useState('');
   const selected = sets.find((set) => set.id === selectedId) ?? sets[0];
@@ -110,15 +114,19 @@ export function PrintSection({
   }
 
   return (
-    <section className="print-workshop" aria-label="Print and share">
+    <section className={`print-workshop${mode === 'supplier' ? ' print-workshop--supplier' : ''}`} aria-label="Print and share">
       <header className="print-heading">
         <div data-layout="printTitle">
-          <span>FROM YOUR SCREEN TO THE TABLE</span>
-          <h1>Make something you can hold.</h1>
-          <p>Cards, boards and the little pieces that bring your game to life.</p>
+          <h1>Print & share</h1>
+          <p>Export prototype sheets, a rulebook, or a complete project backup.</p>
         </div>
         <Printer size={42} strokeWidth={1.2} />
       </header>
+      <nav className="print-mode-tabs" aria-label="Print and order tools">
+        <button type="button" aria-pressed={mode === 'home'} onClick={() => setMode('home')}>Print at home</button>
+        <button type="button" aria-pressed={mode === 'supplier'} onClick={() => setMode('supplier')}>Prepare supplier order</button>
+      </nav>
+      {mode === 'supplier' ? <OrderPanel project={project} onChange={onChange} /> : <>
       <div data-layout="printBody" className="print-body">
         <div data-layout="printExports" className="print-exports">
           <article className="print-card">
@@ -218,8 +226,8 @@ export function PrintSection({
             <div data-layout="printRulesIcon" className="print-icon">
               <BookOpen size={24} />
             </div>
-            <span className="print-kicker">02 / THE HOW-TO-PLAY</span>
-            <h2>A rulebook to share</h2>
+            <span className="print-kicker">02 / RULEBOOK</span>
+            <h2>Print rules</h2>
             <p>
               Give your playtesters a clean copy of the rules and component list. Keep designer notes private
               in your project.
@@ -246,8 +254,8 @@ export function PrintSection({
             <div data-layout="printArchiveIcon" className="print-icon">
               <FileJson size={24} />
             </div>
-            <span className="print-kicker">03 / THE WHOLE WORKSHOP</span>
-            <h2>Take your game with you</h2>
+            <span className="print-kicker">03 / PROJECT BACKUP</span>
+            <h2>Export or import</h2>
             <p>
               A portable archive of every component, editable template, artwork, table, playtest finding and
               saved checkpoint.
@@ -280,8 +288,7 @@ export function PrintSection({
         </div>
         <aside className="print-readiness" aria-label="Prototype preparation">
           <div data-layout="readinessHeading">
-            <span className="print-kicker">BEFORE YOU CUT THE FIRST PIECE</span>
-            <h2>A little preparation goes a long way.</h2>
+            <h2>Prototype readiness</h2>
           </div>
           <ul>
             <li>
@@ -316,20 +323,22 @@ export function PrintSection({
               Before printing {selected?.name ?? 'this component'}: {printError}
             </p>
           )}
-          <div data-layout="futurePrinting" className="print-future">
+          <div data-layout="supplierPrintingNextStep" className="print-future">
             <Printer size={23} />
             <p>
-              <strong>Physical ordering is the next chapter.</strong>
+              <strong>Ready for a manufactured prototype?</strong>
               <br />
-              Your supplier catalog is connected. Checkout and production fulfillment are still being built.
+              Match every piece to a supplier and download the artwork package. Confirm proofs, payment and delivery at the supplier.
             </p>
+            <button type="button" className="print-supplier-link" onClick={() => setMode('supplier')}>Prepare supplier order <ArrowRight size={14} /></button>
           </div>
         </aside>
       </div>
       <footer className="print-footer" role="status">
         {status ||
-          'A paper prototype does not have to be perfect. It just has to make the next playtest possible.'}
+          'Print at 100% scale and check the alignment before printing the full set.'}
       </footer>
+      </>}
     </section>
   );
 }

@@ -1,0 +1,44 @@
+{
+  "recordedOn": "2026-09-10",
+  "durationSeconds": 84.12,
+  "dimensions": {
+    "width": 1600,
+    "height": 1000
+  },
+  "framesPerSecond": 25,
+  "codec": "H.264 / MP4",
+  "audio": "Silent; burned-in captions and separate WebVTT",
+  "generation": {
+    "endpoint": "ai-rules-writer",
+    "httpStatus": 200,
+    "model": "moonshotai/kimi-k2.6",
+    "chapters": 5,
+    "startingProse": "All five chapters empty",
+    "exportMatchesResponse": true
+  },
+  "editing": "Real browser capture at normal speed. Setup, waiting time, and unsuccessful takes omitted. Generation wait shortening is labeled on screen.",
+  "playtest": "Supported local market-race model; free-form rules are not automatically executable.",
+  "browserPlayback": {
+    "passed": true,
+    "seekingAndDecodedFrames": true,
+    "browserErrors": [],
+    "mediaErrors": []
+  },
+  "assets": [
+    {
+      "path": "apps/web/public/demo/turnbased-ai-rules.mp4",
+      "bytes": 4092452,
+      "sha256": "983fcd37bdceb559936b704540a886c3f4f927b131db24fcaa81854113dc79c2"
+    },
+    {
+      "path": "apps/web/public/demo/turnbased-ai-rules.jpg",
+      "bytes": 159246,
+      "sha256": "b4b7ce70d6b080d3cfded99e476b39399d733c9cd6569501453b43575ea13203"
+    },
+    {
+      "path": "apps/web/public/demo/turnbased-ai-rules.vtt",
+      "bytes": 1567,
+      "sha256": "8b49475080502d7989e29a40b1d4487fe2b1444256fba0d95a2f7f2cefbcf9af"
+    }
+  ]
+}

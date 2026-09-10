@@ -25,9 +25,8 @@
 .components-heading h1 {
   color: var(--component-ink);
   font:
-    600 38px/1.1 'Cormorant Garamond',
-    Georgia,
-    serif;
+    600 24px/1.3 'Inter',
+    sans-serif;
   letter-spacing: -0.035em;
   margin: 0 0 9px;
 }

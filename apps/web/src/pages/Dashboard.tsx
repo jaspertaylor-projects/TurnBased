@@ -4,7 +4,6 @@ import {
   BookOpen,
   GitBranch,
   Layers3,
-  Leaf,
   LockKeyhole,
   Plus,
   Search,
@@ -120,11 +119,7 @@ export const Dashboard = () => {
     <section className="workshop-surface" aria-labelledby="my-workshop-title">
       <header className="workshop-surface__header">
         <div data-layout="workshopLibraryHeading">
-          <p className="workshop-eyebrow">
-            <Leaf size={13} /> Your ideas have a home here
-          </p>
           <h1 id="my-workshop-title">My workshop</h1>
-          <p className="workshop-surface__intro">A few good ideas. A little tinkering. One more round.</p>
         </div>
         <a href="#/new" className="workshop-button workshop-button--primary">
           <Plus size={16} /> Create game
@@ -176,12 +171,12 @@ export const Dashboard = () => {
             ) : filtered.length === 0 ? (
               <div data-layout="emptyGameLibrary" className="workshop-empty">
                 <Sprout size={39} strokeWidth={1.1} />
-                <h3>{query ? 'No games by that name.' : loadWarnings.length ? 'Your other ideas still have a home here.' : 'Every good game starts small.'}</h3>
+                <h3>{query ? 'No matching games' : loadWarnings.length ? 'No games available' : 'No games yet'}</h3>
                 <p>
                   {query
                     ? 'Try another title or theme.'
                     : loadWarnings.length ? 'The affected game entries are still saved. You can retry loading them or import a backup from Print & share.'
-                    : 'A rule, a handful of cards, a wonderful “what if.” Make a little space for your first idea.'}
+                    : 'Create a project or open an editable example.'}
                 </p>
                 {query ? (
                   <button onClick={() => setQuery('')} className="workshop-button">
@@ -274,14 +269,13 @@ export const Dashboard = () => {
             )}
           </div>
         </section>
-        <aside className="workshop-rail" aria-label="Workshop inspiration">
+        <aside className="workshop-rail" aria-label="Examples and guidance">
           <article className="workshop-tip">
             <Sprout size={23} />
-            <p className="workshop-eyebrow">A tiny place to start</p>
-            <h2>Meet Little Woodland.</h2>
+            <p className="workshop-eyebrow">Example project</p>
+            <h2>Little Woodland</h2>
             <p>
-              A first rules draft, four card designs, and plenty of room for your ideas. Open a copy and make
-              it yours.
+              A rules draft, four card designs, and a configured playtest. Open an editable copy.
             </p>
             <button onClick={() => void startSample()} disabled={busy} className="workshop-button">
               Try the example <ArrowRight size={13} />
@@ -289,14 +283,10 @@ export const Dashboard = () => {
           </article>
           <article className="workshop-tip workshop-tip--plain">
             <GitBranch size={21} />
-            <h2>Keep the messy middle.</h2>
+            <h2>Save a checkpoint</h2>
             <p>
-              Before you change a cost or rewrite a rule, save a checkpoint. Your next great idea might be one
-              version back.
+              Save before a significant change. Use Versions to compare designs or restore an earlier checkpoint.
             </p>
-            <span className="workshop-eyebrow" style={{ marginBottom: 0 }}>
-              Make → test → learn → repeat
-            </span>
           </article>
         </aside>
       </div>
@@ -304,7 +294,6 @@ export const Dashboard = () => {
         <span>
           <LockKeyhole size={11} /> Your games are saved in this browser. Export a backup from Versions.
         </span>
-        <span>There’s always room for one more idea.</span>
       </footer>
     </section>
   );

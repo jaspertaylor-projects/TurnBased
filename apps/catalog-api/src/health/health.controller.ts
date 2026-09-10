@@ -14,18 +14,18 @@ export class HealthController {
   async checkReadiness() {
     try {
       await this.prisma.$queryRaw`SELECT 1`;
-    } catch (e) {
+    } catch {
       return {
         status: 'error',
         database: 'disconnected',
-        catalogStatus: 'unknown'
+        catalogStatus: 'unknown',
       };
     }
 
     return {
       status: 'ok',
       database: 'connected',
-      catalogStatus: 'ready'
+      catalogStatus: 'ready',
     };
   }
 }

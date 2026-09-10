@@ -58,7 +58,7 @@ export function VersionsSection({ project, gitStatus, versionGraph, busy, onSave
   return (
     <section className="version-history" aria-label="Version history">
       <header className="history-header">
-        <div data-layout="historyIdentity"><span className="history-eyebrow">ROOM TO EXPERIMENT</span><h1>Every idea has a history.</h1><p>Save what works. Try something different. Your old designs stay within reach.</p></div>
+        <div data-layout="historyIdentity"><h1>Version history</h1><p>Save checkpoints, compare changes, and restore earlier designs.</p></div>
         <div data-layout="historyViewActions" className="history-actions">
           <button onClick={() => setView(view === 'history' ? 'map' : 'history')}><Map size={15} />{view === 'history' ? 'Trail map' : 'Checkpoint list'}</button>
           <button onClick={() => { void exportBackup(); }} disabled={exporting}><ArrowDownToLine size={15} />{exporting ? 'Packing…' : 'Backup with history'}</button>

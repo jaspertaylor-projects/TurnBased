@@ -1,5 +1,5 @@
 import { useRef, useState, type FormEvent } from 'react';
-import { ArrowLeft, ArrowRight, Leaf, LockKeyhole } from 'lucide-react';
+import { ArrowLeft, ArrowRight, LockKeyhole } from 'lucide-react';
 import { WorkshopArt } from '../components/workshop/WorkshopArt';
 import { buildWorkshopProject, saveNewWorkshopProject } from '../components/workshop/createWorkshopProject';
 import { projectLink } from '../components/workshop/projectSummary';
@@ -41,12 +41,9 @@ export function CreateGame() {
     <section className="workshop-surface" aria-labelledby="create-game-title">
       <header className="workshop-surface__header" style={{ maxWidth: 920 }}>
         <div data-layout="createGameHeading">
-          <p className="workshop-eyebrow">
-            <Leaf size={13} /> Every game begins with an idea
-          </p>
-          <h1 id="create-game-title">Make room for your game.</h1>
+          <h1 id="create-game-title">Create game</h1>
           <p className="workshop-surface__intro">
-            Start small. Everything here can change as your idea grows.
+            Set the basics. You can edit these later.
           </p>
         </div>
         <a
@@ -69,9 +66,9 @@ export function CreateGame() {
                 maxLength={100}
                 value={name}
                 onChange={(event) => setName(event.target.value)}
-                placeholder="The next great game night"
+                placeholder="Untitled game"
               />
-              <small>A working title is a perfectly good title.</small>
+              <small>Use a working title if you haven’t chosen a name.</small>
             </label>
             <label className="workshop-field">
               Theme or first idea <span style={{ fontWeight: 400 }}>(optional)</span>
@@ -80,9 +77,9 @@ export function CreateGame() {
                 maxLength={250}
                 value={theme}
                 onChange={(event) => setTheme(event.target.value)}
-                placeholder="Tiny dragons running a tea shop…"
+                placeholder="A trading game set in a woodland market"
               />
-              <small>A setting, a feeling, or the thing you can’t stop thinking about.</small>
+              <small>Describe the setting or core mechanic.</small>
             </label>
             <label className="workshop-field">
               Players
@@ -125,10 +122,9 @@ export function CreateGame() {
         </form>
         <aside className="workshop-create__aside" aria-label="Try an example game">
           <WorkshopArt compact />
-          <h2>Prefer a little head start?</h2>
+          <h2>Example project</h2>
           <p>
-            Little Woodland comes with a first rules draft and ten cards. Change a cost, try a template, and
-            make it your own.
+            Little Woodland includes a rules draft, four card designs, and ten cards. Open an editable copy.
           </p>
           <button onClick={() => void create(true)} disabled={busy} className="workshop-button">
             Try Little Woodland <ArrowRight size={14} />
@@ -137,7 +133,7 @@ export function CreateGame() {
       </div>
       <footer className="workshop-surface__footer" style={{ maxWidth: 920 }}>
         <span>
-          <LockKeyhole size={11} /> Saved in this browser. Export a backup as your game grows.
+          <LockKeyhole size={11} /> Saved in this browser. Export a backup from Versions.
         </span>
         <span>No account or AI generation needed.</span>
       </footer>

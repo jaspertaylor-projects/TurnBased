@@ -1,10 +1,9 @@
+import { useState } from 'react';
 import { Ruler, Unlink, PackageOpen, ArrowUpRight } from 'lucide-react';
 import type { EditorProject } from '../types';
-import type { ComponentInstanceModel } from '@turnbased/engine-components';
-import { CatalogPicker } from '../sections/visuals/CatalogPicker';
 import type { ProjectDesignSet } from './types';
-import { setProjectComponentDesign } from './model';
-import { useUserSettings } from '../../userSettings';
+import { SupplierMatchDialog } from '../production/SupplierMatchDialog';
+import { safeSupplierUrl, unlinkSupplierMatch } from '../production/supplierMatch';
 
 export function ComponentPhysicalPanel({
   project,
@@ -17,32 +16,12 @@ export function ComponentPhysicalPanel({
   onChange: (project: EditorProject) => void;
   onOpenPlacement: (id: string) => void;
 }) {
-  const { preferredUnits } = useUserSettings();
+  const [matching, setMatching] = useState(false);
   const instance = design.instanceId ? project.instances[design.instanceId] : null;
-  if (!instance || !design.instanceId) return null;
-  const id = design.instanceId;
-  const tied = Boolean(instance.properties.catalogSlug && instance.properties.catalogVariantId);
-  const supportedCatalog = ['board', 'tile', 'deck'].includes(instance.componentType);
-  function updateInstance(updater: (instance: ComponentInstanceModel) => ComponentInstanceModel) {
-    const next = updater(instance!);
-    const updated = { ...project, instances: { ...project.instances, [id]: next } };
-    const width = Number(next.properties.physicalWidthMm);
-    const height = Number(next.properties.physicalHeightMm);
-    const document = design.studio.template.document;
-    if (document && width > 0 && height > 0) {
-      onChange(
-        setProjectComponentDesign(updated, id, {
-          ...design.studio,
-          template: {
-            ...design.studio.template,
-            widthMm: width,
-            heightMm: height,
-            document: { ...document, widthMm: width, heightMm: height },
-          },
-        }),
-      );
-    } else onChange(updated);
-  }
+  const properties = instance?.properties;
+  const tied = Boolean(properties?.catalogSlug && properties?.catalogVariantId);
+  const source = tied ? safeSupplierUrl(properties?.catalogSourceUrl) : null;
+  const stock = properties?.catalogProductionType === 'stock';
   return (
     <section className="component-physical" aria-label="Physical component settings">
       <article className="component-detail-card">
@@ -62,43 +41,44 @@ export function ComponentPhysicalPanel({
             : 'This is a custom prototype. A supplier match is optional while you design.'}
         </p>
         {tied && (
-          <button
-            className="component-button"
-            onClick={() =>
-              updateInstance((item) => ({
-                ...item,
-                properties: {
-                  ...item.properties,
-                  catalogSlug: '',
-                  catalogVariantId: '',
-                  catalogProductTitle: '',
-                  catalogVariantTitle: '',
-                },
-              }))
-            }
-          >
-            <Unlink size={14} />
-            Unlink supplier
-          </button>
+          <>
+            <p>
+              <strong>{String(properties?.catalogProductTitle || properties?.catalogSlug)}</strong>
+              <br />
+              {String(properties?.catalogVariantTitle || '')}
+            </p>
+            {stock && (
+              <p className="component-muted">
+                Stock part: the supplier’s appearance applies. Your artwork will not be printed on this part.
+              </p>
+            )}
+            {source && (
+              <p>
+                <a href={source} target="_blank" rel="noopener noreferrer">
+                  View supplier product
+                </a>
+              </p>
+            )}
+            <button
+              className="component-button"
+              onClick={() => onChange(unlinkSupplierMatch(project, design.id))}
+            >
+              <Unlink size={14} />
+              Unlink supplier
+            </button>
+          </>
         )}
       </article>
       <article className="component-detail-card">
         <PackageOpen size={23} />
         <h2>Choose physical materials</h2>
-        {supportedCatalog ? (
-          <CatalogPicker
-            componentType={instance.componentType as 'board' | 'tile' | 'deck'}
-            instanceId={id}
-            instance={instance}
-            preferredUnits={preferredUnits}
-            onUpdateComponent={(_id, updater) => updateInstance(updater)}
-          />
-        ) : (
-          <p className="component-muted">
-            Use household pieces for an early playtest. Supplier matching for this component family is not
-            available here yet.
-          </p>
-        )}
+        <p className="component-muted">
+          Browse printed cards, boards, tokens, and tiles, or choose ready-made coins and pieces. Review the
+          product and variant before linking it to your game.
+        </p>
+        <button className="component-button" onClick={() => setMatching(true)}>
+          {tied ? 'Change supplier match' : 'Match supplier product'}
+        </button>
       </article>
       <article className="component-detail-card">
         <h2>Artwork and table placement</h2>
@@ -106,10 +86,25 @@ export function ComponentPhysicalPanel({
           The Template editor designs printed faces. Table placement keeps your existing spaces, tracks, and
           component relationships together.
         </p>
-        <button className="component-button" onClick={() => onOpenPlacement(id)}>
-          Open table placement <ArrowUpRight size={14} />
-        </button>
+        {design.instanceId ? (
+          <button className="component-button" onClick={() => onOpenPlacement(design.instanceId!)}>
+            Open table placement <ArrowUpRight size={14} />
+          </button>
+        ) : (
+          <p className="component-muted">
+            Save a change to this original deck to give it a place in Components.
+          </p>
+        )}
       </article>
+      {matching && (
+        <SupplierMatchDialog
+          key={design.id}
+          project={project}
+          design={design}
+          onChange={onChange}
+          onClose={() => setMatching(false)}
+        />
+      )}
     </section>
   );
 }

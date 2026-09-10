@@ -89,10 +89,10 @@ export function TextBoxInspector({
   // the selection to the start mid-typing. If the selection changes (parent
   // swaps to a different text-box), the parent already keys this component
   // by instance id, so this effectively re-runs on instance change.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const initialContentHtml = useRef(resolved.contentHtml);
   useEffect(() => {
     if (editorRef.current) {
-      editorRef.current.innerHTML = resolved.contentHtml;
+      editorRef.current.innerHTML = initialContentHtml.current;
     }
   }, []);
 

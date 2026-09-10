@@ -351,7 +351,7 @@ export const Editor = () => {
       case 'playtest':
         return <PlaytestSection key={sectionKey} project={currentProject} onChange={commitProject} versionSha={currentVersionGraph.activeCommitSha} versionLabel={playtestVersionLabel} />;
       case 'print':
-        return <PrintSection project={currentProject} onNavigate={setActiveSection} />;
+        return <PrintSection key={sectionKey} project={currentProject} onNavigate={setActiveSection} onChange={commitProject} />;
       case 'rules':
         return (
           <RulesSection

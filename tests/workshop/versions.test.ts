@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { createBlankProject } from '../../apps/web/src/editor/project';
+import { createBlankProject, renameProject } from '../../apps/web/src/editor/project';
 import { createDefaultCardStudio, createCardRow } from '../../apps/web/src/editor/cardStudio/model';
 import { buildPreviewRuntime } from '../../apps/web/src/editor/runtime';
 import { saveEditorProject, loadEditorProject, deleteEditorProject } from '../../apps/web/src/editor/storage';
@@ -56,6 +56,28 @@ async function visibleStorageState() {
 }
 
 describe('design checkpoint integrity', () => {
+  it('renames an imported game and its brief atomically through save, reload, and export', async () => {
+    const original = makeProject();
+    original.brief = { ...original.brief, name: original.name, theme: 'A moonlit forest market', minAge: 10 };
+    const imported = await importDesignArchive(await createDesignArchive(original));
+    expect(imported.name).toBe('Woodland workshop (imported)');
+    const briefBefore = structuredClone(imported.brief);
+
+    const renamed = renameProject(imported, 'Moonlit Market');
+    expect(renamed.name).toBe('Moonlit Market');
+    expect(renamed.brief).toEqual({ ...briefBefore, name: 'Moonlit Market' });
+    expect(imported.name).toBe('Woodland workshop (imported)');
+    expect(imported.brief).toEqual(briefBefore);
+
+    await saveEditorProject(renamed);
+    const reloaded = await loadEditorProject(imported.id);
+    expect(reloaded?.name).toBe('Moonlit Market');
+    expect(reloaded?.brief).toEqual(renamed.brief);
+    const exported = parseArchive(await createDesignArchive(reloaded!));
+    expect(exported.project.name).toBe('Moonlit Market');
+    expect(exported.project.brief).toEqual(renamed.brief);
+  });
+
   it('captures the live design even while the autosaved workspace is stale', async () => {
     const old = makeProject();
     await syncProjectWorkspace(old, buildPreviewRuntime(old));

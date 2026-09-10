@@ -8,7 +8,7 @@ export class AdminService {
   async getScrapeRuns() {
     return this.prisma.scrapeRun.findMany({
       orderBy: { startedAt: 'desc' },
-      take: 20
+      take: 20,
     });
   }
 
@@ -17,17 +17,17 @@ export class AdminService {
     return this.prisma.catalogProduct.findMany({
       where: {
         lastSeenAt: {
-          lt: twentyFourHoursAgo
-        }
-      }
+          lt: twentyFourHoursAgo,
+        },
+      },
     });
   }
 
-  async getProductChanges() {
+  getProductChanges() {
     return [];
   }
 
-  async triggerRefresh() {
+  triggerRefresh() {
     return { status: 'triggered' };
   }
 }
