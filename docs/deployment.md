@@ -95,3 +95,10 @@ The checkpoint authentication fix was verified locally with a signed-in
 commit/history round trip, an ownership rejection, and a missing-token
 rejection using `node scripts/check-cloud-history.mjs`. That check creates and
 removes only its own temporary project and refuses a non-local backend.
+
+The web release `5d4b385` deployed successfully through Cloudflare Pages.
+The public MP4 is served as `video/mp4` and its bytes match the recorded
+release manifest. Hosted guest browser verification covers desktop/mobile
+layout, game creation, rule edits and reload persistence, rulebook download,
+and native ad playback and seeking. Paid authenticated production generation
+was not exercised; the recorded AI request used the local development stack.

@@ -32,4 +32,3 @@ export function selectionFromProperties(properties: Record<string, unknown>): Ca
     physicalHeightMm: typeof properties.physicalHeightMm === 'number' ? properties.physicalHeightMm : null,
   };
 }
-

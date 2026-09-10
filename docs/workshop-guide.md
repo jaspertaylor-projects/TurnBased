@@ -92,4 +92,3 @@ data appears as one original deck and moves into the component map when
 opened for editing; its row IDs and copy counts are preserved. The shared
 template renderer drives previews and exports. Printed grids and tracks
 remain artwork until configured as interactive structures in Placement.
-

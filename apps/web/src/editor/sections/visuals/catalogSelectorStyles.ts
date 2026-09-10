@@ -41,4 +41,3 @@ export const catalogErrorStyle: CSSProperties = {
   lineHeight: 1.4,
   marginBottom: '0.3rem',
 };
-

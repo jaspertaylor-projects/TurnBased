@@ -23,7 +23,7 @@ const local = ['localhost', '127.0.0.1', '[::1]'].includes(new URL(base).hostnam
 const requireProduction = !local || process.env.RELEASE_REQUIRE_PRODUCTION === '1';
 const report = {
   passed: false, base, artifacts, requireProduction, checks: [], layouts: [],
-  pageErrors: [], blockedRequests: [], downloads: [], media: null,
+  pageErrors: [], blockedRequests: [], blockedInfrastructureRequests: [], downloads: [], media: null,
 };
 const heading = 'Rules, components, and playtests in one workspace.';
 const videoLabel = 'Watch an AI agent write a game rulebook in TurnBased';
@@ -47,7 +47,17 @@ async function isolatedPage(name, mobile = false) {
     const url = new URL(request.url());
     const ai = /\/functions\/v1\/ai-/.test(url.pathname);
     if (ai || !['GET', 'HEAD', 'OPTIONS'].includes(request.method())) {
-      report.blockedRequests.push({ context: name, method: request.method(), path: `${url.origin}${url.pathname}` });
+      // Cloudflare injects telemetry and browser-check scripts into hosted pages.
+      // Block these too, while keeping their requests separate from app mutations.
+      const infrastructure = url.origin === new URL(base).origin && (
+        url.pathname === '/cdn-cgi/rum' || url.pathname.startsWith('/cdn-cgi/challenge-platform/')
+      );
+      if (infrastructure) {
+        report.blockedInfrastructureRequests.push({
+          context: name, method: request.method(),
+          path: url.pathname === '/cdn-cgi/rum' ? '/cdn-cgi/rum' : '/cdn-cgi/challenge-platform/',
+        });
+      } else report.blockedRequests.push({ context: name, method: request.method(), path: `${url.origin}${url.pathname}` });
       await route.abort('blockedbyclient');
     } else await route.continue();
   });
